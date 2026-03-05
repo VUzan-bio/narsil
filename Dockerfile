@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY pyproject.toml README.md ./
 COPY guard/ ./guard/
-RUN pip install --no-cache-dir -e ".[primers,api]"
+RUN pip install --no-cache-dir -e ".[primers,api,viz]"
 
 # Stage 3: Lean runtime (no compilers)
 FROM python:3.11-slim
