@@ -52,6 +52,7 @@ COPY --from=frontend /build/dist ./guard-ui/dist
 
 RUN mkdir -p results/api results/panels results/validation
 
-# Railway sets $PORT dynamically; no HEALTHCHECK here — Railway handles it via railway.json
+# Railway sets $PORT dynamically via env var
+ENV PORT=8000
 EXPOSE 8000
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD sh -c "uvicorn api.main:app --host 0.0.0.0 --port $PORT"
