@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import traceback
 import uuid
@@ -119,9 +120,12 @@ class AppState:
             output_dir.mkdir(parents=True, exist_ok=True)
 
             ref_config = ReferenceConfig(
-                genome_fasta=Path("data/references/H37Rv.fasta"),
-                genome_index=Path("data/references/H37Rv"),
-                gff_annotation=Path("data/references/H37Rv.gff3"),
+                genome_fasta=Path(os.environ.get(
+                    "H37RV_FASTA_PATH", "data/references/H37Rv.fasta")),
+                genome_index=Path(os.environ.get(
+                    "BOWTIE2_INDEX_PATH", "data/references/H37Rv")),
+                gff_annotation=Path(os.environ.get(
+                    "H37RV_GFF_PATH", "data/references/H37Rv.gff3")),
             )
 
             # Apply any overrides
