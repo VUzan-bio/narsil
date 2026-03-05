@@ -115,18 +115,21 @@ async def health() -> dict:
 
 
 # Serve frontend static files if built.
-# NOTE: StaticFiles(html=True) at "/" intercepts ALL paths (SPA fallback),
-# so we mount on a sub-app that only serves non-API paths.
 STATIC_DIR = Path("guard-ui/dist")
 if STATIC_DIR.exists():
     from starlette.requests import Request
-    from starlette.responses import Response
-
-    _static = StaticFiles(directory=str(STATIC_DIR), html=True)
+    from starlette.responses import FileResponse, Response
 
     @app.middleware("http")
     async def spa_middleware(request: Request, call_next: object) -> Response:
         """Serve API routes normally; fall back to static/SPA for everything else."""
         if request.url.path.startswith("/api") or request.url.path.startswith("/ws"):
             return await call_next(request)  # type: ignore[operator]
-        return await _static.get_response(request.url.path, request.scope)  # type: ignore[arg-type]
+
+        # Try to serve the exact static file
+        file_path = STATIC_DIR / request.url.path.lstrip("/")
+        if file_path.is_file():
+            return FileResponse(str(file_path))
+
+        # SPA fallback — serve index.html for all other routes
+        return FileResponse(str(STATIC_DIR / "index.html"))
