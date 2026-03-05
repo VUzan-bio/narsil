@@ -4,11 +4,6 @@
 
 Computational design of multiplexed CRISPR-Cas12a diagnostic panels for
 drug-resistant *Mycobacterium tuberculosis*
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
-
 ---
 
 GUARD is an end-to-end computational pipeline that takes WHO-catalogued drug-resistance mutations as input and produces ready-to-order crRNA spacer sequences and RPA primer pairs for a multiplexed CRISPR-Cas12a electrochemical diagnostic panel. The pipeline handles PAM deserts in the GC-rich *M. tuberculosis* genome (65.6% GC) through automatic proximity detection with allele-specific RPA primer design, and integrates biophysical heuristic scoring with a temperature-calibrated convolutional neural network ensemble (Spearman ρ = 0.74 on validation). GUARD designs a complete 15-channel MDR-TB panel — covering rifampicin, isoniazid, ethambutol, pyrazinamide, fluoroquinolone, and aminoglycoside resistance plus an IS6110 species control — in under 15 seconds. The output is compatible with isothermal (37 °C) recombinase polymerase amplification and electrochemical transduction from clinical blood samples.
