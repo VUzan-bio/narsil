@@ -13,9 +13,9 @@ RUN npm run build
 FROM python:3.11-slim AS runtime
 WORKDIR /app
 
-# System deps for BioPython, matplotlib, ViennaRNA
+# System deps + Bowtie2 for off-target screening (M4)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc g++ libffi-dev && \
+    gcc g++ libffi-dev bowtie2 && \
     rm -rf /var/lib/apt/lists/*
 
 # Python deps
@@ -27,6 +27,9 @@ RUN pip install --no-cache-dir -e ".[all]"
 COPY api/ ./api/
 COPY configs/ ./configs/
 COPY data/ ./data/
+
+# Build Bowtie2 index from reference FASTA (avoids committing ~15MB of .bt2 files)
+RUN bowtie2-build data/references/H37Rv.fasta data/references/H37Rv
 
 # Frontend build output
 COPY --from=frontend /build/dist ./guard-ui/dist
