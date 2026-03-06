@@ -231,6 +231,42 @@ const Btn = ({ children, variant = "primary", onClick, disabled, icon: Icon, ful
 const tooltipStyle = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: "8px", fontSize: "12px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", fontFamily: FONT };
 
 /* ═══════════════════════════════════════════════════════════════════
+   TOAST NOTIFICATION SYSTEM
+   ═══════════════════════════════════════════════════════════════════ */
+const ToastContext = React.createContext(() => {});
+const useToast = () => React.useContext(ToastContext);
+
+const ToastProvider = ({ children }) => {
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((message, type = "success") => {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 2500);
+  }, []);
+  return (
+    <ToastContext.Provider value={addToast}>
+      {children}
+      {createPortal(
+        <div style={{ position: "fixed", bottom: 24, right: 24, zIndex: 99999, display: "flex", flexDirection: "column-reverse", gap: "8px", pointerEvents: "none" }}>
+          {toasts.map((t) => (
+            <div key={t.id} style={{
+              background: t.type === "success" ? "#065F46" : t.type === "error" ? "#991B1B" : "#1E3A5F",
+              color: "#fff", padding: "10px 18px", borderRadius: "8px", fontSize: "13px", fontWeight: 500,
+              fontFamily: FONT, boxShadow: "0 4px 16px rgba(0,0,0,0.15)", display: "flex", alignItems: "center", gap: "8px",
+              animation: "toastIn 0.25s ease-out",
+            }}>
+              {t.type === "success" && <Check size={14} />}
+              {t.message}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+    </ToastContext.Provider>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════
    API DATA TRANSFORMER — maps API CandidateResponse → flat v8 format
    ═══════════════════════════════════════════════════════════════════ */
 function transformApiCandidate(c) {
@@ -362,6 +398,7 @@ const MismatchProfile = ({ spacer, wtSpacer, strategy }) => {
 const CandidateViewer = ({ r, onClose }) => {
   if (!r) return null;
   const mobile = useIsMobile();
+  const toast = useToast();
   const ref = r.refs;
   const discColor = r.disc >= 3 ? T.success : r.disc >= 2 ? T.primary : r.disc >= 1.5 ? T.warning : T.danger;
   // Use SM-enhanced spacer when available (the actual crRNA to synthesize)
@@ -463,7 +500,7 @@ const CandidateViewer = ({ r, onClose }) => {
               <Seq s={displaySpacer} />
               <span style={{ fontSize: "10px", color: T.textTer, marginLeft: "6px" }}>→3'</span>
             </div>
-            <button onClick={() => navigator.clipboard?.writeText(displaySpacer)} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "6px", padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: T.textSec }}>
+            <button onClick={() => { navigator.clipboard?.writeText(displaySpacer); toast("Spacer copied to clipboard"); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "6px", padding: "4px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: T.textSec }}>
               <Copy size={12} /> Copy
             </button>
           </div>
@@ -511,7 +548,7 @@ const CandidateViewer = ({ r, onClose }) => {
               <div key={o.name} style={{ padding: "10px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                   <span style={{ fontSize: "11px", fontWeight: 700, fontFamily: MONO, color: T.text }}>{o.name}</span>
-                  <button onClick={() => navigator.clipboard?.writeText(o.seq)} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "5px", padding: "3px 6px", cursor: "pointer", fontSize: "10px", color: T.textSec, display: "flex", alignItems: "center", gap: "3px" }}><Copy size={10} /> Copy</button>
+                  <button onClick={() => { navigator.clipboard?.writeText(o.seq); toast(`${o.name} copied`); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "5px", padding: "3px 6px", cursor: "pointer", fontSize: "10px", color: T.textSec, display: "flex", alignItems: "center", gap: "3px" }}><Copy size={10} /> Copy</button>
                 </div>
                 <Seq s={o.seq} />
                 <div style={{ fontSize: "10px", color: T.textTer, marginTop: "3px" }}>{o.note}</div>
@@ -1305,14 +1342,33 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
     }, 800);
   };
 
-  /* Fetch module stats when pipeline completes */
+  /* Fetch module stats when pipeline completes — mock if offline */
   useEffect(() => {
     if (done && jobId) {
-      getResults(jobId).then(({ data }) => {
-        if (data?.module_stats?.length) setModuleStats(data.module_stats);
-      });
+      if (connected) {
+        getResults(jobId).then(({ data }) => {
+          if (data?.module_stats?.length) setModuleStats(data.module_stats);
+        });
+      } else {
+        /* Realistic mock stats for offline demo */
+        setModuleStats([
+          { module_id: "M1", detail: "14 mutations → 14 genomic targets resolved", candidates_out: 14, duration_ms: 120, breakdown: {} },
+          { module_id: "M2", detail: "842,106 positions scanned → 3,847 PAM hits → 1,206 candidates", candidates_out: 1206, duration_ms: 4230, breakdown: { positions_scanned: 842106, pam_hits: 3847 } },
+          { module_id: "M3", detail: "GC 30–70%, homopolymer ≤4, Tm filter → 847 passed", candidates_out: 847, duration_ms: 310 },
+          { module_id: "M4", detail: "Bowtie2 ≤3mm screen → 12 off-target hits removed", candidates_out: 835, duration_ms: 8920 },
+          { module_id: "M5", detail: "5-feature composite scoring complete", candidates_out: 835, duration_ms: 190 },
+          { module_id: "M5.5", detail: "835 WT/MUT spacer pairs generated", candidates_out: 835, duration_ms: 280 },
+          { module_id: "M6", detail: "SM enhancement: 4 candidates improved (avg 12× → 47×)", candidates_out: 835, duration_ms: 1540 },
+          { module_id: "M6.5", detail: "Discrimination scored: 11 diagnostic-grade (≥3×)", candidates_out: 835, duration_ms: 420 },
+          { module_id: "M7", detail: "Simulated annealing: 14-plex panel selected (score 0.847)", candidates_out: 14, duration_ms: 3200 },
+          { module_id: "M8", detail: "RPA primers: 12/14 successful (2 high-GC failures)", candidates_out: 14, duration_ms: 6100 },
+          { module_id: "M8.5", detail: "Co-selection: 0 crRNA–primer conflicts", candidates_out: 14, duration_ms: 150 },
+          { module_id: "M9", detail: "Panel assembled: 14 targets + IS6110 control = 15-plex", candidates_out: 15, duration_ms: 80 },
+          { module_id: "M10", detail: "Exported JSON + TSV + FASTA", candidates_out: 15, duration_ms: 45 },
+        ]);
+      }
     }
-  }, [done, jobId]);
+  }, [done, jobId, connected]);
 
   /* Staggered reveal of stats (350ms per module) */
   useEffect(() => {
@@ -1341,6 +1397,24 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
   const finalSize = statMap["M9"]?.candidates_out || statMap["M7"]?.candidates_out || 0;
 
   const pct = Math.min(100, Math.round(((step + (done ? 1 : 0)) / MODULES.length) * 100));
+
+  /* Empty state — no job launched */
+  if (!jobId) {
+    return (
+      <div style={{ padding: mobile ? "24px 16px" : "48px 40px", maxWidth: 1100, width: "100%" }}>
+        <div style={{ textAlign: "center", padding: mobile ? "48px 24px" : "80px 24px" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "16px", background: T.bgSub, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "20px" }}>
+            <Cpu size={28} color={T.textTer} strokeWidth={1.5} />
+          </div>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>No pipeline running</div>
+          <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.6, maxWidth: 420, margin: "0 auto 24px" }}>
+            Configure your target mutations and launch the GUARD pipeline from the Home page. Real-time progress will appear here as each module executes.
+          </p>
+          <Btn icon={Play} onClick={() => goTo("home")}>Configure & Launch</Btn>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: mobile ? "24px 16px" : "48px 40px", maxWidth: 1100, width: "100%" }}>
@@ -1654,6 +1728,7 @@ const OverviewTab = ({ results }) => {
 /* ─── Spacer Architecture ─── nucleotide-by-nucleotide crRNA SVG ─── */
 const SpacerArchitecture = ({ r }) => {
   const mobile = useIsMobile();
+  const toast = useToast();
   const [copied, setCopied] = useState(false);
   // Use SM-enhanced spacer when available so the SM base change is visible
   const spacer = (r.hasSM && r.smSpacer) ? r.smSpacer : r.spacer;
@@ -1711,6 +1786,7 @@ const SpacerArchitecture = ({ r }) => {
     e.stopPropagation();
     if (navigator.clipboard) navigator.clipboard.writeText(spacer);
     setCopied(true);
+    toast("Spacer copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -1810,6 +1886,7 @@ const SpacerArchitecture = ({ r }) => {
 
 const CandidateAccordion = ({ r }) => {
   const mobile = useIsMobile();
+  const toast = useToast();
   const ref = r.refs;
   const discColor = r.disc >= 3 ? T.success : r.disc >= 2 ? T.primary : r.disc >= 1.5 ? T.warning : T.danger;
   const displaySpacer = (r.hasSM && r.smSpacer) ? r.smSpacer : r.spacer;
@@ -1882,7 +1959,7 @@ const CandidateAccordion = ({ r }) => {
                 <div key={o.name} style={{ padding: "8px 12px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
                     <span style={{ fontSize: "10px", fontWeight: 700, fontFamily: MONO, color: T.text }}>{o.name}</span>
-                    <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(o.seq); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "5px", padding: "2px 5px", cursor: "pointer", fontSize: "9px", color: T.textSec, display: "flex", alignItems: "center", gap: "2px" }}><Copy size={9} /> Copy</button>
+                    <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(o.seq); toast(`${o.name} copied`); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "5px", padding: "2px 5px", cursor: "pointer", fontSize: "9px", color: T.textSec, display: "flex", alignItems: "center", gap: "2px" }}><Copy size={9} /> Copy</button>
                   </div>
                   <Seq s={o.seq} />
                   <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>{o.note}</div>
@@ -2003,10 +2080,58 @@ const CandidatesTab = ({ results }) => {
         </div>
       </div>
 
-      {/* Table with accordion */}
+      {/* Candidates — cards on mobile, table on desktop */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", overflow: "hidden" }}>
-       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", minWidth: mobile ? 700 : "auto" }}>
+       {mobile ? (
+        /* ── Mobile card layout ── */
+        <div>
+          {filtered.map((r) => {
+            const isExpanded = expanded === r.label;
+            const scoreVal = r.ensembleScore || r.score;
+            const discColor = r.strategy === "Proximity" ? T.purple : r.disc >= 3 ? T.success : r.disc >= 1.5 ? T.warning : T.danger;
+            return (
+              <div key={r.label}>
+                <div onClick={() => setExpanded(isExpanded ? null : r.label)} style={{ padding: "14px 16px", cursor: "pointer", borderBottom: isExpanded ? "none" : `1px solid ${T.borderLight}`, background: isExpanded ? T.primaryLight + "30" : "transparent" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {isExpanded ? <ChevronDown size={14} color={T.primary} /> : <ChevronRight size={14} color={T.textTer} />}
+                      <span style={{ fontWeight: 700, fontFamily: MONO, fontSize: "12px", color: T.text }}>{r.label}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: "4px" }}>
+                      <DrugBadge drug={r.drug} />
+                      <Badge variant={r.strategy === "Direct" ? "success" : "purple"}>{r.strategy}</Badge>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "16px", fontSize: "11px" }}>
+                    <div>
+                      <span style={{ color: T.textTer }}>Score </span>
+                      <span style={{ fontFamily: MONO, fontWeight: 700, color: scoreVal > 0.8 ? T.primary : scoreVal > 0.65 ? T.warning : T.danger }}>{scoreVal.toFixed(3)}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: T.textTer }}>Disc </span>
+                      <span style={{ fontFamily: MONO, fontWeight: 700, color: discColor }}>
+                        {r.strategy === "Proximity" ? "AS-RPA" : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×`}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ color: T.textTer }}>GC </span>
+                      <span style={{ fontFamily: MONO, fontWeight: 600 }}>{(r.gc * 100).toFixed(0)}%</span>
+                    </div>
+                    <div>
+                      <span style={{ color: T.textTer }}>OT </span>
+                      <span style={{ fontFamily: MONO, fontWeight: 600 }}>{r.ot}</span>
+                    </div>
+                  </div>
+                </div>
+                {isExpanded && <CandidateAccordion r={r} />}
+              </div>
+            );
+          })}
+        </div>
+       ) : (
+        /* ── Desktop table layout ── */
+        <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
           <thead>
             <tr style={{ background: T.bgSub }}>
               <th style={{ padding: "10px 8px", borderBottom: `1px solid ${T.border}`, width: 28 }} />
@@ -2051,7 +2176,8 @@ const CandidatesTab = ({ results }) => {
             })}
           </tbody>
         </table>
-       </div>
+        </div>
+       )}
         <div style={{ padding: "12px 16px", fontSize: "11px", color: T.textTer, borderTop: `1px solid ${T.border}`, background: T.bgSub }}>
           Showing {filtered.length} of {results.length} candidates
         </div>
@@ -2486,11 +2612,14 @@ const RESULT_TABS = [
 
 const ResultsPage = ({ connected, jobId, goTo }) => {
   const mobile = useIsMobile();
+  const toast = useToast();
   const [tab, setTab] = useState("overview");
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [activeJob, setActiveJob] = useState(jobId || null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef(null);
 
   /* Sync activeJob when jobId prop changes (e.g. navigating from pipeline) */
   useEffect(() => {
@@ -2525,6 +2654,7 @@ const ResultsPage = ({ connected, jobId, goTo }) => {
   }, [connected, activeJob]);
 
   const handleExport = async (fmt) => {
+    setExportOpen(false);
     if (connected && activeJob) {
       const { data } = await exportResults(activeJob, fmt);
       if (data) {
@@ -2534,9 +2664,18 @@ const ResultsPage = ({ connected, jobId, goTo }) => {
         a.download = `guard_results.${fmt}`;
         a.click();
         URL.revokeObjectURL(url);
+        toast(`Exported as ${fmt.toUpperCase()}`);
       }
     }
   };
+
+  /* Close export dropdown on outside click */
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e) => { if (exportRef.current && !exportRef.current.contains(e.target)) setExportOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [exportOpen]);
 
   const hasResults = results && results.length > 0;
 
@@ -2565,7 +2704,24 @@ const ResultsPage = ({ connected, jobId, goTo }) => {
                 {jobs.map((j) => <option key={j.job_id} value={j.job_id}>{j.name || j.job_id}</option>)}
               </select>
             )}
-            <Btn variant="secondary" size="sm" icon={Download} onClick={() => handleExport("json")}>Export</Btn>
+            <div ref={exportRef} style={{ position: "relative" }}>
+              <Btn variant="secondary" size="sm" icon={Download} onClick={() => setExportOpen(!exportOpen)}>Export</Btn>
+              {exportOpen && (
+                <div style={{ position: "absolute", top: "100%", right: 0, marginTop: "4px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: "8px", boxShadow: "0 4px 16px rgba(0,0,0,0.08)", zIndex: 100, minWidth: 160, overflow: "hidden" }}>
+                  {[
+                    { fmt: "json", label: "JSON", desc: "Full structured data" },
+                    { fmt: "tsv", label: "TSV", desc: "Tab-separated values" },
+                    { fmt: "csv", label: "CSV", desc: "Comma-separated values" },
+                    { fmt: "fasta", label: "FASTA", desc: "Spacer sequences" },
+                  ].map((opt, i, arr) => (
+                    <button key={opt.fmt} onClick={() => handleExport(opt.fmt)} style={{ display: "block", width: "100%", padding: "10px 14px", background: "none", border: "none", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none", cursor: "pointer", textAlign: "left", fontFamily: FONT }} onMouseEnter={(e) => { e.currentTarget.style.background = T.bgHover; }} onMouseLeave={(e) => { e.currentTarget.style.background = "none"; }}>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: T.text }}>{opt.label}</div>
+                      <div style={{ fontSize: "10px", color: T.textTer }}>{opt.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -2623,9 +2779,33 @@ const ResultsPage = ({ connected, jobId, goTo }) => {
 /* ═══════════════════════════════════════════════════════════════════
    PANELS PAGE
    ═══════════════════════════════════════════════════════════════════ */
+const DEFAULT_PANELS = [
+  {
+    id: "mdr14",
+    name: "MDR-TB 14-plex",
+    description: "Complete WHO-catalogued first- and second-line resistance panel. Covers 6 drug classes with 14 target mutations for comprehensive drug-susceptibility profiling.",
+    mutations: MUTATIONS.map(m => `${m.gene}_${m.ref}${m.pos}${m.alt}`),
+    created_at: "2025-01-15T00:00:00Z",
+  },
+  {
+    id: "core5",
+    name: "Core 5-plex",
+    description: "High-confidence tier-1 mutations only. Targets the most clinically actionable resistance determinants for rapid point-of-care screening.",
+    mutations: ["rpoB_S450L", "katG_S315T", "inhA_C-15T", "gyrA_D94G", "rrs_A1401G"],
+    created_at: "2025-01-15T00:00:00Z",
+  },
+  {
+    id: "rif",
+    name: "Rifampicin Panel",
+    description: "Focused panel for rifampicin mono-resistance detection. Covers the rpoB RRDR hotspot mutations conferring >95% of phenotypic RIF resistance.",
+    mutations: ["rpoB_S450L", "rpoB_H445D", "rpoB_H445Y", "rpoB_D435V", "rpoB_S450W"],
+    created_at: "2025-01-15T00:00:00Z",
+  },
+];
+
 const PanelsPage = ({ connected }) => {
   const mobile = useIsMobile();
-  const [panels, setPanels] = useState([]);
+  const [panels, setPanels] = useState(DEFAULT_PANELS);
   const [showNew, setShowNew] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDesc, setNewDesc] = useState("");
@@ -2888,73 +3068,29 @@ const ScoringPage = ({ connected }) => {
         </div>
       </div>
 
-      {/* ── B-JEPA ── */}
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "28px", marginBottom: "24px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
+      {/* ── B-JEPA (teaser) ── */}
+      <div style={{ background: T.bg, border: `1px dashed ${T.border}`, borderRadius: "12px", padding: "28px", marginBottom: "24px", opacity: 0.85 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", flexWrap: "wrap" }}>
           <Brain size={20} color={T.primary} />
-          <span style={{ fontSize: "16px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>B-JEPA</span>
-          <span style={{ background: "#EAEBFA", color: T.primary, padding: "3px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 600 }}>Coming soon</span>
+          <span style={{ fontSize: "16px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>B-DNA JEPA</span>
+          <span style={{ background: "#EAEBFA", color: T.primary, padding: "3px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 600 }}>In development</span>
         </div>
-        <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, marginBottom: "16px" }}>
-          Self-supervised foundation model pretrained on ~1,000 bacterial genomes, then fine-tuned for Cas12a activity prediction.
+        <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 16px" }}>
+          Self-supervised foundation model (JEPA architecture) pretrained on ~1,000 bacterial genomes (301K fragments × 512bp).
+          Fine-tuned for Cas12a activity prediction with the goal of improving cross-library generalisation beyond the supervised CNN.
         </p>
-
-        {/* Attention Distribution */}
-        <div style={{ fontSize: "12px", fontWeight: 700, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Attention Distribution</div>
-        <div style={{ background: T.bgSub, borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "10px" }}>
           {[
-            { name: "Seed region (pos 1\u20138)", weight: 0.35 },
-            { name: "Mid-spacer (pos 9\u201316)", weight: 0.25 },
-            { name: "PAM-distal (pos 17\u201323)", weight: 0.15 },
-            { name: "PAM context", weight: 0.15 },
-            { name: "Flanking context", weight: 0.10 },
-          ].map((f, i, arr) => (
-            <div key={f.name} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
-              <div style={{ width: 180, fontSize: "13px", fontWeight: 600, color: T.text }}>{f.name}</div>
-              <div style={{ flex: 1, height: 8, background: T.bg, borderRadius: 4, overflow: "hidden" }}>
-                <div style={{ width: `${f.weight * 100}%`, height: "100%", background: T.primary, borderRadius: 4 }} />
-              </div>
-              <span style={{ fontSize: "13px", fontWeight: 700, color: T.primary, width: 50, textAlign: "right" }}>{(f.weight * 100).toFixed(0)}%</span>
+            { label: "Pretraining", value: "~1K genomes" },
+            { label: "Parameters", value: "8.5M → 48M" },
+            { label: "Current ρ", value: "0.484" },
+            { label: "Target ρ", value: "> 0.60" },
+          ].map(s => (
+            <div key={s.label} style={{ background: T.bgSub, borderRadius: "8px", padding: "12px", textAlign: "center" }}>
+              <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>{s.label}</div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: T.text, fontFamily: MONO }}>{s.value}</div>
             </div>
           ))}
-        </div>
-
-        {/* Pretraining details */}
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
-          <div>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Pretraining</div>
-            <div style={{ background: T.bgSub, borderRadius: "10px", overflow: "hidden" }}>
-              {[
-                ["Genomes", "~1,000 bacterial"],
-                ["Fragments", "301K \u00d7 512bp"],
-                ["Objective", "JEPA + SIGReg"],
-                ["Species kNN", "~88% accuracy"],
-                ["Collapse check", "PCA-1 \u2248 35%"],
-              ].map(([k, v], i, arr) => (
-                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "12px" }}>
-                  <span style={{ color: T.textSec, fontWeight: 500 }}>{k}</span>
-                  <span style={{ fontWeight: 600, color: T.text, fontSize: "12px" }}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Fine-tuning</div>
-            <div style={{ background: T.bgSub, borderRadius: "10px", overflow: "hidden" }}>
-              {[
-                ["Current \u03c1", "0.484 (v3.1)"],
-                ["Params", "8.5M / 48M (v4.0)"],
-                ["Data", "DeepCpf1 + EasyDesign"],
-                ["Strategy", "Linear probe \u2192 full FT"],
-                ["Embedding", "256-dim per fragment"],
-              ].map(([k, v], i, arr) => (
-                <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "12px" }}>
-                  <span style={{ color: T.textSec, fontWeight: 500 }}>{k}</span>
-                  <span style={{ fontWeight: 600, color: T.text, fontSize: "12px" }}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -3026,12 +3162,14 @@ const GUARDPlatform = () => {
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <Sidebar page={page} setPage={setPage} connected={connected} mobileOpen={sidebarOpen} setMobileOpen={setSidebarOpen} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
         <main style={{ flex: 1, overflow: "auto" }}>
-          {page === "home" && <HomePage goTo={goTo} connected={connected} />}
-          {page === "pipeline" && <PipelinePage jobId={pipelineJobId} connected={connected} goTo={goTo} />}
-          {page === "results" && <ResultsPage connected={connected} jobId={resultsJobId} goTo={goTo} />}
-          {page === "panels" && <PanelsPage connected={connected} />}
-          {page === "mutations" && <MutationsPage />}
-          {page === "scoring" && <ScoringPage connected={connected} />}
+          <div key={page} style={{ animation: "pageIn 0.15s ease-out" }}>
+            {page === "home" && <HomePage goTo={goTo} connected={connected} />}
+            {page === "pipeline" && <PipelinePage jobId={pipelineJobId} connected={connected} goTo={goTo} />}
+            {page === "results" && <ResultsPage connected={connected} jobId={resultsJobId} goTo={goTo} />}
+            {page === "panels" && <PanelsPage connected={connected} />}
+            {page === "mutations" && <MutationsPage />}
+            {page === "scoring" && <ScoringPage connected={connected} />}
+          </div>
         </main>
       </div>
 
@@ -3039,6 +3177,8 @@ const GUARDPlatform = () => {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Urbanist:wght@400;500;600;700;800&display=swap');
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pageIn { from { opacity: 0; } to { opacity: 1; } }
         .spin { animation: spin 1s linear infinite; }
         *, *::before, *::after { box-sizing: border-box; }
         body { margin: 0; padding: 0; overflow: hidden; }
@@ -3052,4 +3192,10 @@ const GUARDPlatform = () => {
   );
 };
 
-export default GUARDPlatform;
+const GUARDApp = () => (
+  <ToastProvider>
+    <GUARDPlatform />
+  </ToastProvider>
+);
+
+export default GUARDApp;
