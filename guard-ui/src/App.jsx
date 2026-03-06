@@ -1401,7 +1401,7 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
   /* Empty state — no job launched */
   if (!jobId) {
     return (
-      <div style={{ padding: mobile ? "24px 16px" : "48px 40px", maxWidth: 1100, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 120px)" }}>
+      <div style={{ padding: mobile ? "24px 16px" : "48px 40px", maxWidth: 1100, width: "100%", display: "flex", alignItems: "center", justifyContent: "center", flex: 1 }}>
         <div style={{ textAlign: "center", padding: mobile ? "48px 24px" : "80px 24px" }}>
           <div style={{ width: 64, height: 64, borderRadius: "16px", background: T.bgSub, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "20px" }}>
             <Cpu size={28} color={T.textTer} strokeWidth={1.5} />
@@ -3161,8 +3161,8 @@ const GUARDPlatform = () => {
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <Sidebar page={page} setPage={setPage} connected={connected} mobileOpen={sidebarOpen} setMobileOpen={setSidebarOpen} collapsed={sidebarCollapsed} setCollapsed={setSidebarCollapsed} />
-        <main style={{ flex: 1, overflow: "auto" }}>
-          <div key={page} style={{ animation: "pageIn 0.15s ease-out" }}>
+        <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+          <div key={page} style={{ animation: "pageIn 0.15s ease-out", flex: 1, display: "flex", flexDirection: "column" }}>
             {page === "home" && <HomePage goTo={goTo} connected={connected} />}
             {page === "pipeline" && <PipelinePage jobId={pipelineJobId} connected={connected} goTo={goTo} />}
             {page === "results" && <ResultsPage connected={connected} jobId={resultsJobId} goTo={goTo} />}
