@@ -2484,10 +2484,10 @@ const RESULT_TABS = [
   { id: "multiplex", label: "Multiplex", icon: Grid3x3 },
 ];
 
-const ResultsPage = ({ connected, jobId }) => {
+const ResultsPage = ({ connected, jobId, goTo }) => {
   const mobile = useIsMobile();
   const [tab, setTab] = useState("overview");
-  const [results, setResults] = useState(RESULTS);
+  const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [jobs, setJobs] = useState([]);
   const [activeJob, setActiveJob] = useState(jobId || null);
@@ -2507,16 +2507,21 @@ const ResultsPage = ({ connected, jobId }) => {
 
   /* Load results for active job */
   useEffect(() => {
-    if (!connected || !activeJob) return;
-    setLoading(true);
-    getResults(activeJob).then(({ data, error }) => {
-      if (data?.targets) {
-        setResults(data.targets.map(transformApiCandidate));
-      } else if (data?.candidates) {
-        setResults(data.candidates.map(transformApiCandidate));
-      }
-      setLoading(false);
-    });
+    if (!activeJob) return;
+    if (connected) {
+      setLoading(true);
+      getResults(activeJob).then(({ data }) => {
+        if (data?.targets) {
+          setResults(data.targets.map(transformApiCandidate));
+        } else if (data?.candidates) {
+          setResults(data.candidates.map(transformApiCandidate));
+        }
+        setLoading(false);
+      });
+    } else if (activeJob.startsWith("mock-")) {
+      /* Mock mode — use mock data when pipeline was launched offline */
+      setResults(RESULTS);
+    }
   }, [connected, activeJob]);
 
   const handleExport = async (fmt) => {
@@ -2533,6 +2538,8 @@ const ResultsPage = ({ connected, jobId }) => {
     }
   };
 
+  const hasResults = results && results.length > 0;
+
   return (
     <div style={{ padding: mobile ? "16px" : "36px 40px" }}>
       {/* Header */}
@@ -2541,19 +2548,26 @@ const ResultsPage = ({ connected, jobId }) => {
           <h2 style={{ fontSize: mobile ? "20px" : "24px", fontWeight: 800, color: T.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>
             Panel Results
           </h2>
-          <p style={{ fontSize: "13px", color: T.textTer, marginTop: "4px" }}>
-            {results.length} candidates · {new Set(results.map((r) => r.drug)).size} drug classes · {results.filter(r => r.hasPrimers).length} with primers
-          </p>
-        </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          {connected && jobs.length > 0 && (
-            <select value={activeJob || ""} onChange={(e) => setActiveJob(e.target.value)} style={{ padding: "8px 12px", borderRadius: "8px", border: `1px solid ${T.border}`, fontFamily: MONO, fontSize: "11px", outline: "none", background: T.bg }}>
-              <option value="">Select job…</option>
-              {jobs.map((j) => <option key={j.job_id} value={j.job_id}>{j.name || j.job_id}</option>)}
-            </select>
+          {hasResults && (
+            <p style={{ fontSize: "13px", color: T.textTer, marginTop: "4px" }}>
+              {results.length} candidates · {new Set(results.map((r) => r.drug)).size} drug classes · {results.filter(r => r.hasPrimers).length} with primers
+            </p>
           )}
-          <Btn variant="secondary" size="sm" icon={Download} onClick={() => handleExport("json")}>Export</Btn>
+          {!hasResults && !loading && (
+            <p style={{ fontSize: "13px", color: T.textTer, marginTop: "4px" }}>No results yet</p>
+          )}
         </div>
+        {hasResults && (
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            {connected && jobs.length > 0 && (
+              <select value={activeJob || ""} onChange={(e) => setActiveJob(e.target.value)} style={{ padding: "8px 12px", borderRadius: "8px", border: `1px solid ${T.border}`, fontFamily: MONO, fontSize: "11px", outline: "none", background: T.bg }}>
+                <option value="">Select job…</option>
+                {jobs.map((j) => <option key={j.job_id} value={j.job_id}>{j.name || j.job_id}</option>)}
+              </select>
+            )}
+            <Btn variant="secondary" size="sm" icon={Download} onClick={() => handleExport("json")}>Export</Btn>
+          </div>
+        )}
       </div>
 
       {loading && (
@@ -2563,7 +2577,20 @@ const ResultsPage = ({ connected, jobId }) => {
         </div>
       )}
 
-      {!loading && (
+      {!loading && !hasResults && (
+        <div style={{ textAlign: "center", padding: mobile ? "48px 24px" : "80px 24px" }}>
+          <div style={{ width: 64, height: 64, borderRadius: "16px", background: T.bgSub, display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "20px" }}>
+            <BarChart3 size={28} color={T.textTer} strokeWidth={1.5} />
+          </div>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>No pipeline results yet</div>
+          <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.6, maxWidth: 420, margin: "0 auto 24px" }}>
+            Run the GUARD pipeline from the Home page to design crRNA candidates. Results will appear here once the pipeline completes.
+          </p>
+          <Btn icon={Play} onClick={() => goTo("home")}>Launch Pipeline</Btn>
+        </div>
+      )}
+
+      {!loading && hasResults && (
         <>
           {/* Tabs */}
           <div style={{ display: "flex", gap: "0", marginBottom: "28px", borderBottom: `1px solid ${T.border}`, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
@@ -3001,7 +3028,7 @@ const GUARDPlatform = () => {
         <main style={{ flex: 1, overflow: "auto" }}>
           {page === "home" && <HomePage goTo={goTo} connected={connected} />}
           {page === "pipeline" && <PipelinePage jobId={pipelineJobId} connected={connected} goTo={goTo} />}
-          {page === "results" && <ResultsPage connected={connected} jobId={resultsJobId} />}
+          {page === "results" && <ResultsPage connected={connected} jobId={resultsJobId} goTo={goTo} />}
           {page === "panels" && <PanelsPage connected={connected} />}
           {page === "mutations" && <MutationsPage />}
           {page === "scoring" && <ScoringPage connected={connected} />}
