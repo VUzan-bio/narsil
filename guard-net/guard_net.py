@@ -45,14 +45,19 @@ class GUARDNet(nn.Module):
         cnn_out_dim: int = 64,
         # RNA-FM branch config
         use_rnafm: bool = True,
+        use_rnafm_lora: bool = False,
         rnafm_embed_dim: int = 640,
         rnafm_proj_dim: int = 64,
+        lora_rank: int = 4,
+        lora_alpha: int = 8,
         # Attention
         use_rloop_attention: bool = False,
         # Multi-task
         multitask: bool = False,
-        # Optional scalar features (e.g. Evo 2 LLR, GC%, MFE)
+        # Optional scalar features (e.g. thermodynamic dG, Evo 2 LLR)
         n_scalar_features: int = 0,
+        # Domain-adversarial (for multi-dataset training)
+        n_domains: int | None = None,
         # Head params
         hidden_dim: int = 64,
         dropout: float = 0.3,
@@ -64,9 +69,15 @@ class GUARDNet(nn.Module):
             in_channels=4, branches=cnn_branches, out_dim=cnn_out_dim,
         )
 
-        # -- Branch 2: RNA-FM projection on crRNA (projection trainable) --
+        # -- Branch 2: RNA-FM on crRNA --
         self.use_rnafm = use_rnafm
-        if self.use_rnafm:
+        self.use_rnafm_lora = use_rnafm_lora
+        if self.use_rnafm_lora:
+            from .branches.rnafm_lora_branch import RNAFMLoRABranch
+            self.rnafm_lora = RNAFMLoRABranch(
+                proj_dim=rnafm_proj_dim, lora_rank=lora_rank, lora_alpha=lora_alpha,
+            )
+        elif self.use_rnafm:
             self.rnafm = RNAFMBranch(
                 embed_dim=rnafm_embed_dim, proj_dim=rnafm_proj_dim,
             )
@@ -109,6 +120,14 @@ class GUARDNet(nn.Module):
         if self.multitask:
             self.disc_head = DiscriminationHead(dense_input_dim, hidden_dim)
 
+        # -- Domain-adversarial head (optional, for multi-dataset training) --
+        self.use_domain_adversarial = n_domains is not None and n_domains > 1
+        if self.use_domain_adversarial:
+            from .heads.domain_head import DomainHead
+            self.domain_head = DomainHead(
+                input_dim=dense_input_dim, n_domains=n_domains,
+            )
+
         # For visualisation
         self._attn_weights: torch.Tensor | None = None
 
@@ -116,6 +135,7 @@ class GUARDNet(nn.Module):
         self,
         target_onehot: torch.Tensor,
         crrna_rnafm_emb: torch.Tensor | None = None,
+        crrna_sequences: list[str] | None = None,
     ) -> torch.Tensor:
         """Shared encoder: fuse branches -> optional attention -> per-position features.
 
@@ -123,6 +143,8 @@ class GUARDNet(nn.Module):
             target_onehot:   (batch, 4, 34) one-hot target DNA for CNN.
             crrna_rnafm_emb: (batch, 20, 640) pre-computed RNA-FM embeddings
                              for the crRNA spacer. None if use_rnafm=False.
+            crrna_sequences: list of RNA strings for live LoRA mode.
+                             Used when use_rnafm_lora=True.
 
         Returns:
             (batch, 34, fused_dim) per-position fused features.
@@ -130,7 +152,10 @@ class GUARDNet(nn.Module):
         cnn_feat = self.cnn(target_onehot)  # (batch, 34, cnn_out_dim)
         branches = [cnn_feat]
 
-        if self.use_rnafm and crrna_rnafm_emb is not None:
+        if self.use_rnafm_lora and crrna_sequences is not None:
+            rnafm_feat = self.rnafm_lora(crrna_sequences)  # (batch, 34, proj_dim)
+            branches.append(rnafm_feat)
+        elif self.use_rnafm and crrna_rnafm_emb is not None:
             rnafm_feat = self.rnafm(crrna_rnafm_emb)  # (batch, 34, rnafm_proj_dim)
             branches.append(rnafm_feat)
 
@@ -157,6 +182,7 @@ class GUARDNet(nn.Module):
         self,
         target_onehot: torch.Tensor,
         crrna_rnafm_emb: torch.Tensor | None = None,
+        crrna_sequences: list[str] | None = None,
         scalar_features: torch.Tensor | None = None,
         # For multi-task: wildtype TARGET DNA (crRNA stays the same)
         wt_target_onehot: torch.Tensor | None = None,
@@ -167,7 +193,8 @@ class GUARDNet(nn.Module):
         Args:
             target_onehot:    (batch, 4, 34) mutant target DNA (perfect match to guide).
             crrna_rnafm_emb:  (batch, 20, 640) crRNA spacer RNA-FM embeddings.
-            scalar_features:  (batch, n_scalar_features) optional scalars (Evo 2 LLR, etc).
+            crrna_sequences:  list of RNA strings for live LoRA mode.
+            scalar_features:  (batch, n_scalar_features) optional scalars.
             wt_target_onehot: (batch, 4, 34) wildtype target DNA (one SNP mismatch).
                               Only needed when multitask=True.
 
@@ -178,17 +205,21 @@ class GUARDNet(nn.Module):
                 "attn_weights":   (batch, 34, 34) attention map (if RLPA enabled).
         """
         # Encode mutant target (perfect match to crRNA)
-        mut_feat = self.encode(target_onehot, crrna_rnafm_emb)
+        mut_feat = self.encode(target_onehot, crrna_rnafm_emb, crrna_sequences)
         mut_pooled = self._pool_and_append_scalars(mut_feat, scalar_features)
 
         output: dict[str, torch.Tensor] = {
             "efficiency": self.efficiency_head(mut_pooled),
         }
 
+        # Domain-adversarial: predict source dataset
+        if self.use_domain_adversarial:
+            output["domain_logits"] = self.domain_head(mut_pooled)
+
         # Multi-task: discrimination from paired targets
         if self.multitask and wt_target_onehot is not None:
             # Encode wildtype target with the SAME crRNA
-            wt_feat = self.encode(wt_target_onehot, crrna_rnafm_emb)
+            wt_feat = self.encode(wt_target_onehot, crrna_rnafm_emb, crrna_sequences)
             wt_pooled = self._pool_and_append_scalars(wt_feat, scalar_features)
             output["discrimination"] = self.disc_head(mut_pooled, wt_pooled)
 
