@@ -602,40 +602,30 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
       transition: "width 0.2s ease",
       ...(mobile ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 9998, boxShadow: "4px 0 24px rgba(0,0,0,0.15)" } : {}),
     }}>
-      {/* Logo + Toggle */}
-      <div style={{ padding: isCollapsed ? "16px 0" : "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: mobile ? "center" : "center", justifyContent: isCollapsed ? "center" : "space-between", gap: "8px" }}>
+      {/* Toggle + Connection */}
+      <div style={{ padding: isCollapsed ? "16px 0" : "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between", gap: "8px" }}>
         {mobile ? (
           <>
-            <img src="/guard-logo.svg" alt="GUARD" style={{ width: 22, height: 22 }} />
-            <span style={{ fontSize: "14px", fontWeight: 800, fontFamily: HEADING, color: T.text, letterSpacing: "-0.02em" }}>GUARD</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
+              {connected ? <Wifi size={12} color={T.success} /> : <WifiOff size={12} color={T.danger} />}
+              <span style={{ color: connected ? T.success : T.danger, fontWeight: 600 }}>{connected ? "API Connected" : "Offline (mock)"}</span>
+            </div>
             <button onClick={() => setMobileOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", marginLeft: "auto" }}><X size={20} color={T.textSec} /></button>
           </>
         ) : (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <img src="/guard-logo.svg" alt="GUARD" style={{ width: 22, height: 22 }} />
-              {!isCollapsed && <span style={{ fontSize: "14px", fontWeight: 800, fontFamily: HEADING, color: T.text, letterSpacing: "-0.02em" }}>GUARD</span>}
-            </div>
             {!isCollapsed && (
-              <button onClick={() => setCollapsed(!collapsed)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex", borderRadius: "6px" }} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
-                <PanelLeftClose size={18} color={T.textSec} />
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
+                {connected ? <Wifi size={12} color={T.success} /> : <WifiOff size={12} color={T.danger} />}
+                <span style={{ color: connected ? T.success : T.danger, fontWeight: 600 }}>{connected ? "API Connected" : "Offline (mock)"}</span>
+              </div>
             )}
-            {isCollapsed && (
-              <button onClick={() => setCollapsed(!collapsed)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex", borderRadius: "6px" }} title="Expand sidebar">
-                <PanelLeft size={18} color={T.textSec} />
-              </button>
-            )}
+            <button onClick={() => setCollapsed(!collapsed)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex", borderRadius: "6px" }} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+              {isCollapsed ? <PanelLeft size={18} color={T.textSec} /> : <PanelLeftClose size={18} color={T.textSec} />}
+            </button>
           </>
         )}
       </div>
-      {/* Connection status */}
-      {!isCollapsed && (
-        <div style={{ padding: "8px 20px", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
-          {connected ? <Wifi size={12} color={T.success} /> : <WifiOff size={12} color={T.danger} />}
-          <span style={{ color: connected ? T.success : T.danger, fontWeight: 600 }}>{connected ? "API Connected" : "Offline (mock)"}</span>
-        </div>
-      )}
       {/* Nav groups */}
       <nav style={{ flex: 1, padding: isCollapsed ? "12px 6px" : "12px 10px", overflowY: "auto" }}>
         {NAV.map((g) => (
@@ -660,9 +650,8 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
       </nav>
       {/* Footer */}
       {!isCollapsed && (
-        <div style={{ padding: "12px 16px", borderTop: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}>
-          <img src="/guard-logo.svg" alt="" style={{ width: 14, height: 14, opacity: 0.4 }} />
-          <span style={{ fontSize: "10px", color: T.textTer }}>GUARD v2</span>
+        <div style={{ padding: "16px", borderTop: `1px solid ${T.border}`, fontSize: "10px", color: T.textTer, lineHeight: 1.6, textAlign: "center" }}>
+          GUARD v2
         </div>
       )}
     </aside>
@@ -3107,8 +3096,6 @@ const GUARDPlatform = () => {
           <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex" }}>
             <Menu size={22} color={T.text} />
           </button>
-          <img src="/guard-logo.svg" alt="GUARD" style={{ width: 20, height: 20 }} />
-          <span style={{ fontSize: "14px", fontWeight: 800, fontFamily: HEADING, color: T.text, letterSpacing: "-0.02em" }}>GUARD</span>
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
             {connected ? <Wifi size={12} color={T.success} /> : <WifiOff size={12} color={T.danger} />}
             <span style={{ color: connected ? T.success : T.danger, fontWeight: 600 }}>{connected ? "Connected" : "Offline"}</span>
