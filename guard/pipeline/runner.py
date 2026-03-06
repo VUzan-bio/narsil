@@ -291,8 +291,15 @@ class GUARDPipeline:
     def run_full(
         self,
         mutations: list[Mutation],
+        parameter_profile: Optional["ParameterProfile"] = None,
     ) -> MultiplexPanel:
         """Run complete end-to-end pipeline: Modules 1-9.
+
+        Args:
+            mutations: List of mutations to design against.
+            parameter_profile: Optional sensitivity-specificity profile
+                that overrides default optimizer thresholds. If provided,
+                the optimizer weights and thresholds are adjusted accordingly.
 
         Returns a MultiplexPanel with crRNAs, primers, discrimination
         scores, and the IS6110 positive control.
@@ -656,6 +663,21 @@ class GUARDPipeline:
         t0 = time.perf_counter_ns()
         logger.info("Module 7: Multiplex panel optimization...")
         pool_size = sum(len(sl) for sl in scored_by_target.values())
+
+        # Apply parameter profile overrides to optimizer config if provided
+        if parameter_profile is not None:
+            self.optimizer.config.efficiency_weight = parameter_profile.efficiency_weight
+            self.optimizer.config.discrimination_weight = parameter_profile.discrimination_weight
+            self.optimizer.config.cross_reactivity_weight = parameter_profile.cross_reactivity_weight
+            self.optimizer.config.cross_reactivity_threshold = parameter_profile.cross_reactivity_max
+            logger.info(
+                "  Using profile '%s': eff_w=%.2f, disc_w=%.2f, xr_w=%.2f",
+                parameter_profile.name,
+                parameter_profile.efficiency_weight,
+                parameter_profile.discrimination_weight,
+                parameter_profile.cross_reactivity_weight,
+            )
+
         panel = self.optimizer.optimize(targets, scored_by_target)
 
         self._stats.append({
@@ -841,6 +863,17 @@ class GUARDPipeline:
             "detail": f"{pre_is6110_plex} candidates + IS6110 species control \u2192 final {panel.plex}-channel panel",
             "breakdown": {"direct_channels": n_direct, "proximity_channels": n_prox, "species_control": "IS6110"},
         })
+
+        # --- Module 9.5: Top-K alternatives (Block 3) ---
+        from guard.optimisation.top_k import collect_top_k
+        top_k_results = collect_top_k(
+            members=panel.members,
+            candidates_by_target=scored_by_target,
+            k=5,
+        )
+        # Store on pipeline instance for API access
+        self._top_k_results = top_k_results
+        self._scored_by_target = scored_by_target
 
         # --- Module 10: Export ---
         t0 = time.perf_counter_ns()

@@ -106,7 +106,7 @@ app.add_middleware(
 )
 
 # Include routers
-from api.routes import figures, panels, pipeline, results, scoring, validation
+from api.routes import figures, optimisation, panels, pipeline, results, scoring, validation
 from api import ws
 
 app.include_router(pipeline.router)
@@ -115,6 +115,7 @@ app.include_router(panels.router)
 app.include_router(figures.router)
 app.include_router(scoring.router)
 app.include_router(validation.router)
+app.include_router(optimisation.router)
 app.include_router(ws.router)
 
 @app.get("/api/health")
