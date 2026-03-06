@@ -1463,13 +1463,13 @@ const OverviewTab = ({ results }) => {
   /* Adaptyv-style grouped stat section */
   const StatGroup = ({ title, items }) => (
     <div style={{ flex: 1, minWidth: mobile ? "100%" : 0 }}>
-      <div style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>{title}</div>
+      <div style={{ fontSize: "11px", fontWeight: 700, color: T.primary, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>{title}</div>
       <div style={{ display: "flex", gap: 0 }}>
         {items.map((s, i) => (
-          <div key={s.l} style={{ flex: 1, paddingLeft: i > 0 ? "20px" : 0, borderLeft: i > 0 ? `1px solid rgba(255,255,255,0.15)` : "none" }}>
-            <div style={{ fontSize: "10px", fontWeight: 500, color: "rgba(255,255,255,0.55)", marginBottom: "4px" }}>{s.l}</div>
-            <div style={{ fontSize: "22px", fontWeight: 800, color: "#fff", fontFamily: MONO, lineHeight: 1.2 }}>{s.v}</div>
-            {s.sub && <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.5)", marginTop: "3px" }}>{s.sub}</div>}
+          <div key={s.l} style={{ flex: 1, paddingLeft: i > 0 ? "20px" : 0, borderLeft: i > 0 ? `1px solid ${T.border}` : "none" }}>
+            <div style={{ fontSize: "10px", fontWeight: 500, color: T.textTer, marginBottom: "4px" }}>{s.l}</div>
+            <div style={{ fontSize: "22px", fontWeight: 800, color: T.text, fontFamily: MONO, lineHeight: 1.2 }}>{s.v}</div>
+            {s.sub && <div style={{ fontSize: "10px", color: T.textTer, marginTop: "3px" }}>{s.sub}</div>}
           </div>
         ))}
       </div>
@@ -1496,23 +1496,23 @@ const OverviewTab = ({ results }) => {
       </div>
 
       {/* Grouped stat bar — blue */}
-      <div style={{ background: "linear-gradient(135deg, #1E3A5F 0%, #1A4B8C 50%, #2563EB 100%)", borderRadius: "12px", padding: mobile ? "20px" : "24px 32px", marginBottom: "24px", display: "flex", flexDirection: mobile ? "column" : "row", gap: mobile ? "24px" : "32px" }}>
+      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "20px" : "24px 32px", marginBottom: "24px", display: "flex", flexDirection: mobile ? "column" : "row", gap: mobile ? "24px" : "32px" }}>
         <StatGroup title="Panel" items={[
           { l: "Candidates", v: results.length },
           { l: "Drug classes", v: drugs.length },
           { l: "Detection", v: `${directCount} / ${proximityCount}`, sub: "direct / proximity" },
         ]} />
-        <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "auto", background: "rgba(255,255,255,0.15)", flexShrink: 0 }} />
+        <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "auto", background: T.border, flexShrink: 0 }} />
         <StatGroup title="Primers" items={[
           { l: "Designed", v: `${withPrimers}/${results.length}` },
           { l: "Coverage", v: `${results.length ? Math.round(withPrimers / results.length * 100) : 0}%` },
         ]} />
-        <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "auto", background: "rgba(255,255,255,0.15)", flexShrink: 0 }} />
+        <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "auto", background: T.border, flexShrink: 0 }} />
         <StatGroup title="Discrimination" items={[
           { l: "Avg. ratio", v: `${avgDisc}×` },
           { l: "Diagnostic-grade", v: highDisc, sub: "≥ 3× threshold" },
         ]} />
-        <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "auto", background: "rgba(255,255,255,0.15)", flexShrink: 0 }} />
+        <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "auto", background: T.border, flexShrink: 0 }} />
         <StatGroup title="Scoring" items={[
           { l: "Avg. score", v: avgScore },
           { l: "Range", v: `${minScore} – ${maxScore}`, sub: "min – max" },
