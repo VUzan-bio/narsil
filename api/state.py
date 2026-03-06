@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import secrets
 import threading
 import traceback
 import uuid
@@ -33,7 +34,7 @@ class PipelineJob:
         mutations: list[MutationInput],
         config_overrides: dict,
     ) -> None:
-        self.job_id: str = uuid.uuid4().hex[:12]
+        self.job_id: str = secrets.token_hex(16)
         self.name = name
         self.mode = mode
         self.mutations = mutations
@@ -128,16 +129,21 @@ class AppState:
                     "H37RV_GFF_PATH", "data/references/H37Rv.gff3")),
             )
 
-            # Apply any overrides
+            # Apply whitelisted overrides only
+            ALLOWED_OVERRIDES = {
+                "cas_type", "pam_length", "spacer_length",
+                "gc_min", "gc_max", "off_target_threshold",
+                "multiplex_size", "primer_opt_tm", "primer_min_tm",
+                "primer_max_tm", "amplicon_size_range",
+            }
             config_kwargs: dict[str, Any] = {
                 "name": job.name,
                 "output_dir": output_dir,
                 "reference": ref_config,
             }
             for key, val in job.config_overrides.items():
-                if key in ("name", "output_dir", "reference"):
-                    continue
-                config_kwargs[key] = val
+                if key in ALLOWED_OVERRIDES:
+                    config_kwargs[key] = val
 
             config = PipelineConfig(**config_kwargs)
             pipeline = GUARDPipeline(config)
@@ -235,5 +241,5 @@ class AppState:
         except Exception as e:
             job.status = JobStatus.FAILED
             job.completed_at = datetime.now(timezone.utc)
-            job.error = f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
-            logger.error("Job %s failed: %s", job_id, e, exc_info=True)
+            job.error = f"Pipeline failed: {type(e).__name__}"
+            logger.error("Job %s failed: %s\n%s", job_id, e, traceback.format_exc())

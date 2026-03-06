@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
@@ -84,10 +85,21 @@ app = FastAPI(
     default_response_class=SafeJSONResponse,
 )
 
-# CORS for development
+# CORS — restrict to known origins
+_cors_origins = os.environ.get("CORS_ORIGINS", "").split(",")
+_cors_origins = [o.strip() for o in _cors_origins if o.strip()]
+if not _cors_origins:
+    _cors_origins = [
+        "https://guard-design.app",
+        "https://www.guard-design.app",
+        "https://guard-production.up.railway.app",
+        "http://localhost:5173",
+        "http://localhost:3000",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -126,9 +138,9 @@ if STATIC_DIR.exists():
         if request.url.path.startswith("/api") or request.url.path.startswith("/ws"):
             return await call_next(request)  # type: ignore[operator]
 
-        # Try to serve the exact static file
-        file_path = STATIC_DIR / request.url.path.lstrip("/")
-        if file_path.is_file():
+        # Try to serve the exact static file (with path traversal protection)
+        file_path = (STATIC_DIR / request.url.path.lstrip("/")).resolve()
+        if file_path.is_relative_to(STATIC_DIR.resolve()) and file_path.is_file():
             return FileResponse(str(file_path))
 
         # SPA fallback — serve index.html for all other routes
