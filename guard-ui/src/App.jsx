@@ -6,15 +6,18 @@ import {
   Folder, GitBranch, Grid3x3, Layers, List, Loader2,
   Lock, Menu, Package, PanelLeft, PanelLeftClose, Play, Plus, RefreshCw, Search, Settings, Target,
   TrendingUp, X, Zap, Shield, Crosshair, Brain, Cpu, Wifi, WifiOff,
+  AlertTriangle, CheckCircle,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ScatterChart, Scatter, Cell, Legend, ComposedChart, ReferenceLine,
+  LineChart, Line,
 } from "recharts";
 import {
   healthCheck, submitRun, getJob, getResults, exportResults,
   getFigureUrl, listPanels, createPanel, listJobs, connectJobWS,
-  listScoringModels,
+  listScoringModels, getPresets, getDiagnostics, getWHOCompliance,
+  getTopK, runSweep, runPareto,
 } from "./api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2011,13 +2014,38 @@ const CandidateAccordion = ({ r }) => {
   );
 };
 
-const CandidatesTab = ({ results }) => {
+const CandidatesTab = ({ results, jobId, connected }) => {
   const mobile = useIsMobile();
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState("score");
   const [sortDir, setSortDir] = useState(-1);
   const [drugFilter, setDrugFilter] = useState("ALL");
   const [expanded, setExpanded] = useState(null);
+  const [topKData, setTopKData] = useState({});
+  const [topKLoading, setTopKLoading] = useState({});
+
+  const loadTopK = useCallback((targetLabel) => {
+    if (topKData[targetLabel] || topKLoading[targetLabel]) return;
+    setTopKLoading(prev => ({ ...prev, [targetLabel]: true }));
+    if (connected && jobId) {
+      getTopK(jobId, targetLabel, 5).then(({ data }) => {
+        if (data) setTopKData(prev => ({ ...prev, [targetLabel]: data }));
+        setTopKLoading(prev => ({ ...prev, [targetLabel]: false }));
+      });
+    } else {
+      // Mock top-K data
+      const mockAlts = Array.from({ length: 3 }, (_, i) => ({
+        rank: i + 2,
+        spacer_seq: "GCTAGCTAGCTAGCTAGCTA".slice(0, 20 - i) + "A".repeat(i),
+        score: +(0.8 - i * 0.1).toFixed(3),
+        discrimination: +(3.5 - i * 0.5).toFixed(1),
+        has_primers: i < 2,
+        tradeoff: i === 0 ? "Similar efficiency, lower discrimination" : i === 1 ? "Higher discrimination, lower efficiency" : "No primers available",
+      }));
+      setTopKData(prev => ({ ...prev, [targetLabel]: { target_label: targetLabel, alternatives: mockAlts } }));
+      setTopKLoading(prev => ({ ...prev, [targetLabel]: false }));
+    }
+  }, [topKData, topKLoading, connected, jobId]);
 
   const drugs = ["ALL", ...new Set(results.map((r) => r.drug))];
 
@@ -2123,7 +2151,33 @@ const CandidatesTab = ({ results }) => {
                     </div>
                   </div>
                 </div>
-                {isExpanded && <CandidateAccordion r={r} />}
+                {isExpanded && (
+                  <>
+                    <CandidateAccordion r={r} />
+                    {/* Top-K Alternatives */}
+                    <div style={{ padding: "0 16px 16px", background: T.bgSub }}>
+                      <button onClick={(e) => { e.stopPropagation(); loadTopK(r.label); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "6px", padding: "6px 12px", cursor: "pointer", fontSize: "11px", fontWeight: 600, color: T.primary, fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px" }}>
+                        <Layers size={12} /> Show alternatives
+                      </button>
+                      {topKLoading[r.label] && <div style={{ fontSize: "11px", color: T.textTer, marginTop: "8px" }}><Loader2 size={12} style={{ animation: "spin 1s linear infinite", display: "inline-block", verticalAlign: "middle", marginRight: "4px" }} />Loading…</div>}
+                      {topKData[r.label]?.alternatives && (
+                        <div style={{ marginTop: "8px", border: `1px solid ${T.border}`, borderRadius: "8px", overflow: "hidden", background: T.bg }}>
+                          <div style={{ padding: "8px 12px", background: T.bgSub, fontSize: "11px", fontWeight: 700, color: T.text, borderBottom: `1px solid ${T.border}` }}>Top-K Alternatives</div>
+                          {topKData[r.label].alternatives.map((alt, ai) => (
+                            <div key={ai} style={{ padding: "8px 12px", borderBottom: ai < topKData[r.label].alternatives.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <div><span style={{ fontFamily: MONO, fontWeight: 600 }}>#{alt.rank}</span> <Seq s={alt.spacer_seq?.slice(0, 16)} /></div>
+                              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                <span style={{ fontFamily: MONO }}>{alt.score}</span>
+                                <span style={{ fontFamily: MONO }}>{alt.discrimination}×</span>
+                                {alt.has_primers ? <Badge variant="success">P</Badge> : <Badge variant="danger">—</Badge>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
             );
           })}
@@ -2168,6 +2222,36 @@ const CandidatesTab = ({ results }) => {
                     <tr>
                       <td colSpan={cols.length + 1} style={{ padding: 0 }}>
                         <CandidateAccordion r={r} />
+                        {/* Top-K Alternatives */}
+                        <div style={{ padding: "0 24px 16px", background: T.bgSub, borderTop: `1px solid ${T.borderLight}` }}>
+                          <button onClick={(e) => { e.stopPropagation(); loadTopK(r.label); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "6px", padding: "6px 12px", cursor: "pointer", fontSize: "11px", fontWeight: 600, color: T.primary, fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px" }}>
+                            <Layers size={12} /> Show alternatives
+                          </button>
+                          {topKLoading[r.label] && <div style={{ fontSize: "11px", color: T.textTer, marginTop: "8px" }}><Loader2 size={12} style={{ animation: "spin 1s linear infinite", display: "inline-block", verticalAlign: "middle", marginRight: "4px" }} />Loading…</div>}
+                          {topKData[r.label]?.alternatives && (
+                            <div style={{ marginTop: "8px", border: `1px solid ${T.border}`, borderRadius: "8px", overflow: "hidden", background: T.bg, maxWidth: 600 }}>
+                              <div style={{ padding: "8px 12px", background: T.bgSub, fontSize: "11px", fontWeight: 700, color: T.text, borderBottom: `1px solid ${T.border}` }}>Top-K Alternatives for {r.label}</div>
+                              {topKData[r.label].alternatives.map((alt, ai) => (
+                                <div key={ai} style={{ padding: "8px 12px", borderBottom: ai < topKData[r.label].alternatives.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+                                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                                    <span style={{ fontFamily: MONO, fontWeight: 700, color: T.textSec }}>#{alt.rank}</span>
+                                    <Seq s={alt.spacer_seq?.slice(0, 20)} />
+                                  </div>
+                                  <div style={{ display: "flex", gap: "12px", alignItems: "center", flexShrink: 0 }}>
+                                    <span style={{ fontFamily: MONO, fontWeight: 600 }}>{alt.score}</span>
+                                    <span style={{ fontFamily: MONO, fontWeight: 600 }}>{alt.discrimination}×</span>
+                                    {alt.has_primers ? <Badge variant="success">Primers</Badge> : <Badge variant="danger">No primers</Badge>}
+                                  </div>
+                                </div>
+                              ))}
+                              {topKData[r.label].alternatives.length > 0 && topKData[r.label].alternatives[0].tradeoff && (
+                                <div style={{ padding: "8px 12px", background: T.bgSub, fontSize: "10px", color: T.textTer, borderTop: `1px solid ${T.border}` }}>
+                                  Tradeoff notes available — hover for details
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -2600,6 +2684,331 @@ const MultiplexTab = ({ results }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
+   DIAGNOSTICS TAB — Block 3 Sensitivity-Specificity Optimization
+   ═══════════════════════════════════════════════════════════════════ */
+const DiagnosticsTab = ({ results, jobId, connected }) => {
+  const mobile = useIsMobile();
+
+  // State
+  const [presets, setPresets] = useState([]);
+  const [activePreset, setActivePreset] = useState("balanced");
+  const [diagnostics, setDiagnostics] = useState(null);
+  const [whoCompliance, setWhoCompliance] = useState(null);
+  const [sweepData, setSweepData] = useState(null);
+  const [paretoData, setParetoData] = useState(null);
+  const [loadingDiag, setLoadingDiag] = useState(false);
+  const [sweepLoading, setSweepLoading] = useState(false);
+  const [paretoLoading, setParetoLoading] = useState(false);
+
+  // Load presets on mount
+  useEffect(() => {
+    if (!connected) {
+      setPresets([
+        { name: "stringent", display_name: "Stringent", description: "High thresholds for clinical deployment", efficiency_threshold: 0.7, discrimination_threshold: 3.0 },
+        { name: "balanced", display_name: "Balanced (WHO TPP)", description: "WHO Target Product Profile defaults", efficiency_threshold: 0.5, discrimination_threshold: 2.0 },
+        { name: "permissive", display_name: "Permissive", description: "Low thresholds for maximum coverage", efficiency_threshold: 0.3, discrimination_threshold: 1.5 },
+      ]);
+      return;
+    }
+    getPresets().then(({ data }) => { if (data) setPresets(data); });
+  }, [connected]);
+
+  // Load diagnostics + WHO compliance when preset or job changes
+  useEffect(() => {
+    if (!jobId) return;
+    setLoadingDiag(true);
+    if (connected) {
+      Promise.all([
+        getDiagnostics(jobId, activePreset),
+        getWHOCompliance(jobId, activePreset),
+      ]).then(([diagRes, whoRes]) => {
+        if (diagRes.data) setDiagnostics(diagRes.data);
+        if (whoRes.data) setWhoCompliance(whoRes.data);
+        setLoadingDiag(false);
+      });
+    } else {
+      // Mock data for offline mode
+      const mockDiag = {
+        sensitivity: 0.857, specificity: 0.782, coverage: 12, total_targets: 14,
+        assay_ready: 12, mean_efficiency: 0.724, mean_discrimination: 3.2,
+        per_target: results ? results.map(r => ({
+          target_label: r.label, efficiency: r.ensembleScore || r.score,
+          discrimination: r.disc, is_assay_ready: r.hasPrimers && r.score >= 0.5 && r.disc >= 2,
+          has_primers: r.hasPrimers,
+        })) : [],
+      };
+      setDiagnostics(mockDiag);
+      setWhoCompliance({
+        preset: activePreset,
+        panel_sensitivity: mockDiag.sensitivity,
+        panel_specificity: mockDiag.specificity,
+        who_compliance: {
+          RIF: { sensitivity: 0.96, specificity: 0.80, meets_tpp: true, targets_covered: 4, targets_total: 4 },
+          INH: { sensitivity: 0.85, specificity: 0.75, meets_tpp: true, targets_covered: 2, targets_total: 3 },
+          FQ: { sensitivity: 0.80, specificity: 0.70, meets_tpp: false, targets_covered: 1, targets_total: 2 },
+          AG: { sensitivity: 0.90, specificity: 0.85, meets_tpp: true, targets_covered: 1, targets_total: 1 },
+          EMB: { sensitivity: 0.75, specificity: 0.65, meets_tpp: false, targets_covered: 1, targets_total: 2 },
+          PZA: { sensitivity: 0.0, specificity: 0.0, meets_tpp: false, targets_covered: 0, targets_total: 0 },
+        },
+      });
+      setLoadingDiag(false);
+    }
+  }, [jobId, activePreset, connected, results]);
+
+  // Run sweep
+  const handleSweep = (paramName) => {
+    if (!jobId) return;
+    setSweepLoading(true);
+    const values = paramName === "efficiency_threshold"
+      ? [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+      : [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0];
+
+    if (connected) {
+      runSweep(jobId, paramName, values, activePreset).then(({ data }) => {
+        if (data) setSweepData(data);
+        setSweepLoading(false);
+      });
+    } else {
+      // Mock sweep
+      setSweepData({
+        parameter_name: paramName,
+        points: values.map(v => ({
+          value: v,
+          sensitivity: Math.max(0, 1 - v * 0.6 + Math.random() * 0.1),
+          specificity: Math.min(1, v * 0.5 + 0.3 + Math.random() * 0.1),
+          coverage: Math.max(0, Math.round(14 * (1 - v * 0.5))),
+          assay_ready: Math.max(0, Math.round(12 * (1 - v * 0.4))),
+        })),
+      });
+      setSweepLoading(false);
+    }
+  };
+
+  // Run Pareto
+  const handlePareto = () => {
+    if (!jobId) return;
+    setParetoLoading(true);
+    if (connected) {
+      runPareto(jobId).then(({ data }) => {
+        if (data) setParetoData(data);
+        setParetoLoading(false);
+      });
+    } else {
+      // Mock Pareto frontier
+      const frontier = [];
+      for (let s = 0.3; s <= 1.0; s += 0.05) {
+        frontier.push({
+          sensitivity: +(1.05 - s + Math.random() * 0.05).toFixed(3),
+          specificity: +s.toFixed(3),
+          efficiency_threshold: +(s * 0.8).toFixed(2),
+          discrimination_threshold: +(1 + s * 3).toFixed(1),
+          coverage: Math.round(14 * (1.05 - s)),
+        });
+      }
+      setParetoData({ n_points: frontier.length, frontier });
+      setParetoLoading(false);
+    }
+  };
+
+  const presetObj = presets.find(p => p.name === activePreset);
+
+  return (
+    <div>
+      {/* A: Preset Selector */}
+      <div style={{ marginBottom: "24px" }}>
+        <div style={{ fontSize: "11px", fontWeight: 700, color: T.primary, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "10px" }}>Optimization Profile</div>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {presets.map(p => (
+            <button key={p.name} onClick={() => setActivePreset(p.name)} style={{
+              padding: "10px 18px", borderRadius: "8px", cursor: "pointer", fontFamily: FONT, fontSize: "13px", fontWeight: 600,
+              transition: "all 0.15s", border: activePreset === p.name ? `2px solid ${T.primary}` : `1px solid ${T.border}`,
+              background: activePreset === p.name ? T.primaryLight : T.bg, color: activePreset === p.name ? T.primaryDark : T.text,
+            }}>
+              <div>{p.display_name || p.name}</div>
+              <div style={{ fontSize: "10px", fontWeight: 400, color: T.textTer, marginTop: "2px" }}>{p.description}</div>
+            </button>
+          ))}
+        </div>
+        {presetObj && (
+          <div style={{ marginTop: "8px", fontSize: "11px", color: T.textSec }}>
+            Thresholds: efficiency ≥ {presetObj.efficiency_threshold}, discrimination ≥ {presetObj.discrimination_threshold}×
+          </div>
+        )}
+      </div>
+
+      {loadingDiag && (
+        <div style={{ textAlign: "center", padding: "32px", color: T.textTer }}>
+          <Loader2 size={20} style={{ animation: "spin 1s linear infinite" }} />
+          <div style={{ marginTop: "6px", fontSize: "12px" }}>Computing diagnostics…</div>
+        </div>
+      )}
+
+      {!loadingDiag && diagnostics && (
+        <>
+          {/* B: Summary Cards */}
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "12px", marginBottom: "24px" }}>
+            {[
+              { label: "Sensitivity", value: `${(diagnostics.sensitivity * 100).toFixed(1)}%`, color: diagnostics.sensitivity >= 0.85 ? T.success : diagnostics.sensitivity >= 0.7 ? T.warning : T.danger, icon: TrendingUp },
+              { label: "Specificity", value: `${(diagnostics.specificity * 100).toFixed(1)}%`, color: diagnostics.specificity >= 0.80 ? T.success : diagnostics.specificity >= 0.6 ? T.warning : T.danger, icon: Shield },
+              { label: "Coverage", value: `${diagnostics.coverage || diagnostics.assay_ready}/${diagnostics.total_targets}`, color: T.primary, icon: Target },
+              { label: "Assay-Ready", value: diagnostics.assay_ready, color: T.purple, icon: CheckCircle },
+            ].map(card => (
+              <div key={card.label} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                  <card.icon size={14} color={card.color} />
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em" }}>{card.label}</span>
+                </div>
+                <div style={{ fontSize: "28px", fontWeight: 800, color: card.color, fontFamily: MONO, lineHeight: 1 }}>{card.value}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* C: WHO Compliance Table */}
+          {whoCompliance && whoCompliance.who_compliance && (
+            <div style={{ marginBottom: "24px", border: `1px solid ${T.border}`, borderRadius: "10px", overflow: "hidden" }}>
+              <div style={{ background: T.bgSub, padding: "12px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: "8px" }}>
+                <Shield size={14} color={T.primary} />
+                <span style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>WHO TPP Compliance by Drug Class</span>
+                <Badge variant={Object.values(whoCompliance.who_compliance).every(d => d.meets_tpp) ? "success" : "warning"}>
+                  {Object.values(whoCompliance.who_compliance).filter(d => d.meets_tpp).length}/{Object.keys(whoCompliance.who_compliance).length} passing
+                </Badge>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT, fontSize: "12px" }}>
+                  <thead>
+                    <tr style={{ background: T.bgSub }}>
+                      {["Drug Class", "Sensitivity", "Specificity", "Coverage", "Status"].map(h => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, color: T.textSec, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(whoCompliance.who_compliance).map(([drug, data]) => (
+                      <tr key={drug} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                        <td style={{ padding: "10px 14px" }}><DrugBadge drug={drug} /></td>
+                        <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 600, color: data.sensitivity >= 0.85 ? T.success : T.warning }}>{(data.sensitivity * 100).toFixed(1)}%</td>
+                        <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 600, color: data.specificity >= 0.80 ? T.success : T.warning }}>{(data.specificity * 100).toFixed(1)}%</td>
+                        <td style={{ padding: "10px 14px", fontFamily: MONO }}>{data.targets_covered}/{data.targets_total}</td>
+                        <td style={{ padding: "10px 14px" }}>
+                          {data.meets_tpp ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: T.success, fontWeight: 600, fontSize: "11px" }}><CheckCircle size={13} /> Pass</span>
+                          ) : (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", color: T.danger, fontWeight: 600, fontSize: "11px" }}><AlertTriangle size={13} /> Fail</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* D: Per-Target Breakdown */}
+          {diagnostics.per_target && diagnostics.per_target.length > 0 && (
+            <CollapsibleSection title={`Per-Target Breakdown (${diagnostics.per_target.length} targets)`} defaultOpen={false}>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT, fontSize: "12px" }}>
+                  <thead>
+                    <tr style={{ background: T.bgSub }}>
+                      {["Target", "Efficiency", "Discrimination", "Primers", "Assay-Ready"].map(h => (
+                        <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: T.textSec, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diagnostics.per_target.map(t => (
+                      <tr key={t.target_label} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                        <td style={{ padding: "8px 12px", fontWeight: 600, fontFamily: MONO, fontSize: "11px" }}>{t.target_label}</td>
+                        <td style={{ padding: "8px 12px", fontFamily: MONO, color: t.efficiency >= 0.7 ? T.success : t.efficiency >= 0.5 ? T.warning : T.danger }}>{t.efficiency.toFixed(3)}</td>
+                        <td style={{ padding: "8px 12px", fontFamily: MONO, color: t.discrimination >= 3 ? T.success : t.discrimination >= 2 ? T.warning : T.danger }}>{typeof t.discrimination === "number" ? `${t.discrimination.toFixed(1)}×` : "—"}</td>
+                        <td style={{ padding: "8px 12px" }}>{t.has_primers ? <Badge variant="success">Yes</Badge> : <Badge variant="danger">No</Badge>}</td>
+                        <td style={{ padding: "8px 12px" }}>{t.is_assay_ready ? <Badge variant="success">Ready</Badge> : <Badge>Not ready</Badge>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CollapsibleSection>
+          )}
+
+          {/* E: Parameter Sweep Charts */}
+          <CollapsibleSection title="Parameter Sweep" defaultOpen={false}>
+            <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+              <Btn variant="secondary" size="sm" icon={TrendingUp} onClick={() => handleSweep("efficiency_threshold")} disabled={sweepLoading}>
+                Sweep Efficiency Threshold
+              </Btn>
+              <Btn variant="secondary" size="sm" icon={TrendingUp} onClick={() => handleSweep("discrimination_threshold")} disabled={sweepLoading}>
+                Sweep Discrimination Threshold
+              </Btn>
+            </div>
+            {sweepLoading && (
+              <div style={{ textAlign: "center", padding: "24px", color: T.textTer }}>
+                <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+                <div style={{ marginTop: "6px", fontSize: "12px" }}>Running sweep…</div>
+              </div>
+            )}
+            {!sweepLoading && sweepData && (
+              <div>
+                <div style={{ fontSize: "12px", fontWeight: 600, color: T.text, marginBottom: "8px" }}>
+                  Sweep: {sweepData.parameter_name?.replace(/_/g, " ")}
+                </div>
+                <ResponsiveContainer width="100%" height={280}>
+                  <LineChart data={sweepData.points} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={T.borderLight} />
+                    <XAxis dataKey="value" fontSize={11} fontFamily={MONO} label={{ value: sweepData.parameter_name?.replace(/_/g, " "), position: "insideBottom", offset: -2, fontSize: 11 }} />
+                    <YAxis fontSize={11} fontFamily={MONO} domain={[0, 1]} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                    <Line type="monotone" dataKey="sensitivity" stroke={T.primary} strokeWidth={2} dot={{ r: 3 }} name="Sensitivity" />
+                    <Line type="monotone" dataKey="specificity" stroke={T.success} strokeWidth={2} dot={{ r: 3 }} name="Specificity" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CollapsibleSection>
+
+          {/* F: Pareto Frontier */}
+          <CollapsibleSection title="Pareto Frontier" defaultOpen={false}>
+            <div style={{ marginBottom: "16px" }}>
+              <Btn variant="secondary" size="sm" icon={Zap} onClick={handlePareto} disabled={paretoLoading}>
+                Compute Pareto Frontier
+              </Btn>
+            </div>
+            {paretoLoading && (
+              <div style={{ textAlign: "center", padding: "24px", color: T.textTer }}>
+                <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+                <div style={{ marginTop: "6px", fontSize: "12px" }}>Computing frontier…</div>
+              </div>
+            )}
+            {!paretoLoading && paretoData && paretoData.frontier && (
+              <div>
+                <div style={{ fontSize: "12px", fontWeight: 600, color: T.text, marginBottom: "8px" }}>
+                  {paretoData.n_points} Pareto-optimal configurations
+                </div>
+                <ResponsiveContainer width="100%" height={320}>
+                  <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={T.borderLight} />
+                    <XAxis type="number" dataKey="specificity" name="Specificity" domain={[0, 1]} fontSize={11} fontFamily={MONO} label={{ value: "Specificity", position: "insideBottom", offset: -10, fontSize: 11 }} />
+                    <YAxis type="number" dataKey="sensitivity" name="Sensitivity" domain={[0, 1]} fontSize={11} fontFamily={MONO} label={{ value: "Sensitivity", angle: -90, position: "insideLeft", offset: 10, fontSize: 11 }} />
+                    <Tooltip contentStyle={tooltipStyle} formatter={(val, name) => [typeof val === "number" ? val.toFixed(3) : val, name]} />
+                    <Scatter data={paretoData.frontier} fill={T.primary} strokeWidth={1} stroke={T.primaryDark}>
+                      {paretoData.frontier.map((_, i) => (
+                        <Cell key={i} fill={T.primary} />
+                      ))}
+                    </Scatter>
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CollapsibleSection>
+        </>
+      )}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════
    RESULTS PAGE — Tab container with accordion candidates
    ═══════════════════════════════════════════════════════════════════ */
 const RESULT_TABS = [
@@ -2608,6 +3017,7 @@ const RESULT_TABS = [
   { id: "discrimination", label: "Discrimination", icon: TrendingUp },
   { id: "primers", label: "Primers", icon: Crosshair },
   { id: "multiplex", label: "Multiplex", icon: Grid3x3 },
+  { id: "diagnostics", label: "Diagnostics", icon: Shield },
 ];
 
 const ResultsPage = ({ connected, jobId, goTo }) => {
@@ -2765,10 +3175,11 @@ const ResultsPage = ({ connected, jobId, goTo }) => {
 
           {/* Tab content */}
           {tab === "overview" && <OverviewTab results={results} />}
-          {tab === "candidates" && <CandidatesTab results={results} />}
+          {tab === "candidates" && <CandidatesTab results={results} jobId={activeJob} connected={connected} />}
           {tab === "discrimination" && <DiscriminationTab results={results} />}
           {tab === "primers" && <PrimersTab results={results} />}
           {tab === "multiplex" && <MultiplexTab results={results} />}
+          {tab === "diagnostics" && <DiagnosticsTab results={results} jobId={activeJob} connected={connected} />}
         </>
       )}
 

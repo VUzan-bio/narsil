@@ -86,6 +86,37 @@ export async function listScoringModels() {
   return request("/api/scoring/models");
 }
 
+// Block 3: Optimisation
+export async function getPresets() {
+  return request("/api/v1/presets");
+}
+
+export async function getDiagnostics(jobId, preset = "balanced") {
+  return request(`/api/v1/panel/${jobId}/diagnostics?preset=${preset}`);
+}
+
+export async function getWHOCompliance(jobId, preset = "balanced") {
+  return request(`/api/v1/panel/${jobId}/who_compliance?preset=${preset}`);
+}
+
+export async function getTopK(jobId, targetLabel, k = 5) {
+  return request(`/api/v1/panel/${jobId}/top_k/${encodeURIComponent(targetLabel)}?k=${k}`);
+}
+
+export async function runSweep(jobId, parameterName, values, basePreset = "balanced") {
+  return request(`/api/v1/panel/${jobId}/sweep`, {
+    method: "POST",
+    body: JSON.stringify({ parameter_name: parameterName, values, base_preset: basePreset }),
+  });
+}
+
+export async function runPareto(jobId, discValues = null, scoreValues = null) {
+  return request(`/api/v1/panel/${jobId}/pareto`, {
+    method: "POST",
+    body: JSON.stringify({ disc_values: discValues, score_values: scoreValues }),
+  });
+}
+
 // WebSocket for live progress
 export function connectJobWS(jobId, onMessage, onClose) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
