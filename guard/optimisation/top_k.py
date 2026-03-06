@@ -2,24 +2,21 @@
 
 After the multiplex optimizer selects one candidate per target, this module
 collects the next-best alternatives and annotates each with the tradeoff
-it represents relative to the selected candidate:
+it represents relative to the selected candidate.
 
-- "higher_efficiency": better predicted activity, worse discrimination
-- "higher_discrimination": better MUT/WT ratio, lower activity
-- "fewer_offtargets": cleaner off-target profile, some other metric worse
-- "different_pam": targets a different PAM site (structural diversity)
-
-This gives clinicians visibility into what they're giving up with the
-current selection, and allows interactive exploration of alternatives
-in the UI.
+This enables:
+1. Experimental fallback (if #1 fails in the lab, try #2)
+2. Pareto analysis (different candidates optimise different metrics)
+3. Active learning (test alternatives with highest uncertainty)
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from guard.core.types import ScoredCandidate, PanelMember
+from guard.optimisation.metrics import TARGET_DRUG_CLASS
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +26,10 @@ class AlternativeCandidate:
     """An alternative candidate with tradeoff annotation."""
     candidate: ScoredCandidate
     rank: int
-    tradeoffs: list[str]    # e.g. ["higher_discrimination", "fewer_offtargets"]
-    delta_efficiency: float  # vs selected candidate
-    delta_discrimination: float  # vs selected candidate
+    tradeoffs: list[str]        # e.g. ["higher_discrimination", "fewer_offtargets"]
+    tradeoff_summary: str       # human-readable summary
+    delta_efficiency: float
+    delta_discrimination: float
 
     def to_dict(self) -> dict:
         return {
@@ -44,6 +42,7 @@ class AlternativeCandidate:
             ),
             "offtarget_count": self.candidate.offtarget.total_risky_hits,
             "tradeoffs": self.tradeoffs,
+            "tradeoff_summary": self.tradeoff_summary,
             "delta_efficiency": round(self.delta_efficiency, 4),
             "delta_discrimination": round(self.delta_discrimination, 4),
         }
@@ -53,21 +52,68 @@ class AlternativeCandidate:
 class TargetCandidateSet:
     """Selected candidate + ranked alternatives for one target."""
     target_label: str
+    drug_class: str
     selected: ScoredCandidate
     alternatives: list[AlternativeCandidate]
+    selection_reason: str
+
+    @property
+    def top_k(self) -> list:
+        return [self.selected] + [a.candidate for a in self.alternatives]
 
     def to_dict(self) -> dict:
         return {
             "target_label": self.target_label,
+            "drug_class": self.drug_class,
             "selected_spacer": self.selected.candidate.spacer_seq,
             "selected_efficiency": self.selected.composite_score,
             "selected_discrimination": (
                 self.selected.discrimination.ratio
                 if self.selected.discrimination else None
             ),
+            "selection_reason": self.selection_reason,
             "n_alternatives": len(self.alternatives),
             "alternatives": [a.to_dict() for a in self.alternatives],
         }
+
+
+def _build_tradeoff_summary(
+    selected: ScoredCandidate,
+    alternative: ScoredCandidate,
+    tradeoffs: list[str],
+) -> str:
+    """Build a human-readable tradeoff summary string."""
+    sel_eff = selected.composite_score
+    alt_eff = alternative.composite_score
+    sel_disc = selected.discrimination.ratio if selected.discrimination else 0.0
+    alt_disc = alternative.discrimination.ratio if alternative.discrimination else 0.0
+    sel_ot = selected.offtarget.total_risky_hits
+    alt_ot = alternative.offtarget.total_risky_hits
+
+    parts = []
+    if "higher_discrimination" in tradeoffs:
+        parts.append(f"higher disc ({alt_disc:.1f}x vs {sel_disc:.1f}x)")
+    if "higher_efficiency" in tradeoffs:
+        parts.append(f"higher score ({alt_eff:.2f} vs {sel_eff:.2f})")
+    if "fewer_offtargets" in tradeoffs:
+        parts.append(f"fewer off-targets ({alt_ot} vs {sel_ot})")
+    if "different_pam" in tradeoffs:
+        parts.append("different PAM site")
+
+    if not parts:
+        return "comparable performance"
+
+    # Add cost
+    costs = []
+    if alt_eff < sel_eff - 0.02 and "higher_efficiency" not in tradeoffs:
+        costs.append(f"lower score ({alt_eff:.2f} vs {sel_eff:.2f})")
+    if alt_disc < sel_disc * 0.8 and "higher_discrimination" not in tradeoffs:
+        costs.append(f"lower disc ({alt_disc:.1f}x vs {sel_disc:.1f}x)")
+
+    summary = " + ".join(parts)
+    if costs:
+        summary += " but " + " and ".join(costs)
+    return summary
 
 
 def _annotate_tradeoffs(
@@ -84,29 +130,43 @@ def _annotate_tradeoffs(
     sel_ot = selected.offtarget.total_risky_hits
     alt_ot = alternative.offtarget.total_risky_hits
 
-    # Higher efficiency
     if alt_eff > sel_eff + 0.02:
         tradeoffs.append("higher_efficiency")
 
-    # Higher discrimination
     if alt_disc > sel_disc * 1.2 and alt_disc > sel_disc + 0.5:
         tradeoffs.append("higher_discrimination")
 
-    # Fewer off-targets
     if alt_ot < sel_ot:
         tradeoffs.append("fewer_offtargets")
 
-    # Different PAM (structural diversity)
-    sel_pam_pos = selected.candidate.genomic_start
-    alt_pam_pos = alternative.candidate.genomic_start
-    if abs(sel_pam_pos - alt_pam_pos) > 5:
+    sel_pos = selected.candidate.genomic_start
+    alt_pos = alternative.candidate.genomic_start
+    if abs(sel_pos - alt_pos) > 5:
         tradeoffs.append("different_pam")
 
-    # If no specific tradeoff identified, it's a general alternative
     if not tradeoffs:
         tradeoffs.append("comparable")
 
     return tradeoffs
+
+
+def _selection_reason(selected: ScoredCandidate) -> str:
+    """Generate a human-readable reason why this candidate was selected."""
+    eff = selected.composite_score
+    disc = selected.discrimination.ratio if selected.discrimination else 0.0
+    ot = selected.offtarget.total_risky_hits
+    strategy = selected.candidate.detection_strategy.value
+
+    parts = [f"score={eff:.2f}"]
+    if disc > 0:
+        parts.append(f"disc={disc:.1f}x")
+    parts.append(f"off-targets={ot}")
+    if strategy != "direct":
+        parts.append(f"strategy={strategy}")
+    if selected.candidate.in_seed:
+        parts.append(f"seed pos {selected.candidate.mutation_position_in_spacer}")
+
+    return "Best composite: " + ", ".join(parts)
 
 
 def collect_top_k(
@@ -129,16 +189,15 @@ def collect_top_k(
     for member in members:
         selected = member.selected_candidate
         label = member.label
+        drug_class = TARGET_DRUG_CLASS.get(label, "unknown")
         all_candidates = candidates_by_target.get(label, [])
 
-        # Sort by composite score (descending)
         ranked = sorted(
             all_candidates,
             key=lambda sc: sc.composite_score,
             reverse=True,
         )
 
-        # Collect alternatives (exclude the selected one)
         alternatives: list[AlternativeCandidate] = []
         rank = 0
         for sc in ranked:
@@ -149,10 +208,14 @@ def collect_top_k(
             sel_disc = selected.discrimination.ratio if selected.discrimination else 0.0
             alt_disc = sc.discrimination.ratio if sc.discrimination else 0.0
 
+            tradeoffs = _annotate_tradeoffs(selected, sc)
+            summary = _build_tradeoff_summary(selected, sc, tradeoffs)
+
             alt = AlternativeCandidate(
                 candidate=sc,
                 rank=rank,
-                tradeoffs=_annotate_tradeoffs(selected, sc),
+                tradeoffs=tradeoffs,
+                tradeoff_summary=summary,
                 delta_efficiency=sc.composite_score - selected.composite_score,
                 delta_discrimination=alt_disc - sel_disc,
             )
@@ -163,8 +226,10 @@ def collect_top_k(
 
         results.append(TargetCandidateSet(
             target_label=label,
+            drug_class=drug_class,
             selected=selected,
             alternatives=alternatives,
+            selection_reason=_selection_reason(selected),
         ))
 
     logger.info(

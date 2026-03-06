@@ -8,29 +8,47 @@ that match their deployment context:
 - High sensitivity (field screening): maximize coverage, tolerate lower
   discrimination ratios. Catches rare mutations at the cost of false positives.
 - Balanced (WHO TPP): meet WHO Target Product Profile thresholds.
-  Sens >= 95%, Spec >= 98% for drug-resistant TB.
+  RIF sens >= 95%, INH/FQ >= 90%, spec >= 98% for drug-resistant TB.
 - High specificity (confirmatory): maximize discrimination ratios,
   accept fewer covered targets. Minimizes false resistance calls.
 
 Key components:
-    DiagnosticMetrics: sensitivity, specificity, coverage calculations
+    DiagnosticMetrics: panel-level metrics with per-drug-class WHO compliance
     ParameterProfile: preset threshold configurations
+    compute_diagnostic_metrics: bridge between pipeline output and metrics
     sweep_parameter: 1D parameter sweep with sens/spec curves
     pareto_frontier: multi-objective Pareto-optimal profiles
     collect_top_k: ranked alternatives per target with tradeoff annotations
 """
 
-from guard.optimisation.metrics import DiagnosticMetrics
-from guard.optimisation.profiles import ParameterProfile, get_preset
-from guard.optimisation.sweep import sweep_parameter, pareto_frontier
+from guard.optimisation.metrics import (
+    DiagnosticMetrics,
+    DrugClassMetrics,
+    TargetMetrics,
+    compute_diagnostic_metrics,
+    WHO_TPP_SENSITIVITY,
+    WHO_TPP_SPECIFICITY,
+    TARGET_DRUG_CLASS,
+)
+from guard.optimisation.profiles import ParameterProfile, get_preset, list_presets
+from guard.optimisation.sweep import sweep_parameter
+from guard.optimisation.pareto import pareto_frontier, generate_profile_grid
 from guard.optimisation.top_k import TargetCandidateSet, collect_top_k
 
 __all__ = [
     "DiagnosticMetrics",
+    "DrugClassMetrics",
+    "TargetMetrics",
+    "compute_diagnostic_metrics",
+    "WHO_TPP_SENSITIVITY",
+    "WHO_TPP_SPECIFICITY",
+    "TARGET_DRUG_CLASS",
     "ParameterProfile",
     "get_preset",
+    "list_presets",
     "sweep_parameter",
     "pareto_frontier",
+    "generate_profile_grid",
     "TargetCandidateSet",
     "collect_top_k",
 ]

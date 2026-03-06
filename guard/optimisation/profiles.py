@@ -5,29 +5,39 @@ Three presets cover the clinical deployment spectrum:
 1. HIGH_SENSITIVITY (field screening)
    - Low thresholds: catch everything, accept false positives
    - For: resource-limited settings, initial screening, ruling out susceptibility
-   - Sens target: >= 98%, Spec target: >= 90%
+   - disc >= 2x, score >= 0.3, top_k = 5
+   - Clinical rationale: In field screening at peripheral health centres,
+     missing a resistant case (false negative) is more dangerous than a
+     false positive, which can be resolved by confirmatory testing at a
+     reference lab. Maximise mutation coverage.
 
 2. BALANCED (WHO TPP)
    - WHO Target Product Profile for drug-resistant TB diagnostics
-   - Sens >= 95%, Spec >= 98% (WHO 2014 TPP for rifampicin resistance)
-   - This is the default for clinical diagnostic deployment
+   - disc >= 3x, score >= 0.4, top_k = 3
+   - Clinical rationale: Meets WHO 2024 TPP requirements — RIF sensitivity
+     >= 95%, INH/FQ >= 90%, specificity >= 98%. The default for clinical
+     diagnostic deployment in settings with confirmatory capacity.
 
 3. HIGH_SPECIFICITY (confirmatory)
    - Strict thresholds: only high-confidence calls
+   - disc >= 5x, score >= 0.6, top_k = 3
    - For: reference labs, confirmatory testing, clinical decision-making
-   - Sens target: >= 90%, Spec target: >= 99%
+   - Clinical rationale: When the result directly informs treatment decisions
+     (e.g., switching from first-line to MDR-TB regimen), false positives
+     carry high cost (unnecessary toxic drugs, prolonged treatment). Accept
+     lower coverage in exchange for high discrimination confidence.
 
 Each profile defines thresholds for:
     - efficiency_threshold: minimum predicted cleavage activity
     - discrimination_threshold: minimum MUT/WT ratio
     - offtarget_max_hits: maximum allowed off-target sites
     - cross_reactivity_max: maximum allowed cross-reactivity in multiplex
+    - top_k: number of alternative candidates to retain per target
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -42,10 +52,10 @@ class ParameterProfile:
     description: str
 
     # Efficiency: minimum predicted cleavage activity (0-1 scale)
-    efficiency_threshold: float = 0.3
+    efficiency_threshold: float = 0.4
 
     # Discrimination: minimum MUT/WT activity ratio
-    discrimination_threshold: float = 2.0
+    discrimination_threshold: float = 3.0
 
     # Off-target: maximum allowed off-target sites (Cas-OFFinder)
     offtarget_max_hits: int = 5
@@ -62,6 +72,9 @@ class ParameterProfile:
     target_sensitivity: float = 0.95
     target_specificity: float = 0.98
 
+    # Top-K alternatives to retain per target
+    top_k: int = 3
+
     def to_dict(self) -> dict:
         return {
             "name": self.name,
@@ -75,6 +88,7 @@ class ParameterProfile:
             "cross_reactivity_weight": self.cross_reactivity_weight,
             "target_sensitivity": self.target_sensitivity,
             "target_specificity": self.target_specificity,
+            "top_k": self.top_k,
         }
 
 
@@ -82,9 +96,13 @@ class ParameterProfile:
 
 HIGH_SENSITIVITY = ParameterProfile(
     name="high_sensitivity",
-    description="Field screening: maximize mutation coverage, tolerate lower discrimination",
-    efficiency_threshold=0.2,
-    discrimination_threshold=1.5,
+    description=(
+        "Field screening: maximise mutation coverage, tolerate lower discrimination. "
+        "For resource-limited settings and initial screening where missing a resistant "
+        "case (false negative) is more dangerous than a false positive."
+    ),
+    efficiency_threshold=0.3,
+    discrimination_threshold=2.0,
     offtarget_max_hits=10,
     cross_reactivity_max=0.4,
     efficiency_weight=0.5,
@@ -92,13 +110,17 @@ HIGH_SENSITIVITY = ParameterProfile(
     cross_reactivity_weight=0.3,
     target_sensitivity=0.98,
     target_specificity=0.90,
+    top_k=5,
 )
 
 BALANCED = ParameterProfile(
     name="balanced",
-    description="WHO TPP: sensitivity >= 95%, specificity >= 98% for drug-resistant TB",
-    efficiency_threshold=0.3,
-    discrimination_threshold=2.0,
+    description=(
+        "WHO TPP: sensitivity >= 95% (RIF), >= 90% (INH, FQ), >= 80% (EMB, PZA, AG); "
+        "specificity >= 98%. The default for clinical diagnostic deployment."
+    ),
+    efficiency_threshold=0.4,
+    discrimination_threshold=3.0,
     offtarget_max_hits=5,
     cross_reactivity_max=0.3,
     efficiency_weight=0.4,
@@ -106,12 +128,17 @@ BALANCED = ParameterProfile(
     cross_reactivity_weight=0.3,
     target_sensitivity=0.95,
     target_specificity=0.98,
+    top_k=3,
 )
 
 HIGH_SPECIFICITY = ParameterProfile(
     name="high_specificity",
-    description="Confirmatory testing: minimize false resistance calls, accept fewer covered targets",
-    efficiency_threshold=0.5,
+    description=(
+        "Confirmatory testing: minimise false resistance calls, accept fewer covered "
+        "targets. For reference labs where results directly inform treatment decisions "
+        "(e.g., switching to MDR-TB regimen)."
+    ),
+    efficiency_threshold=0.6,
     discrimination_threshold=5.0,
     offtarget_max_hits=2,
     cross_reactivity_max=0.2,
@@ -120,6 +147,7 @@ HIGH_SPECIFICITY = ParameterProfile(
     cross_reactivity_weight=0.2,
     target_sensitivity=0.90,
     target_specificity=0.99,
+    top_k=3,
 )
 
 _PRESETS = {

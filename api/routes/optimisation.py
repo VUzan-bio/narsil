@@ -1,9 +1,15 @@
 """Block 3: Sensitivity-Specificity Optimization API endpoints.
 
-GET  /api/v1/presets       — list available parameter presets
-POST /api/v1/sweep         — sweep one parameter, return sens/spec curve
-POST /api/v1/pareto        — compute Pareto frontier
-POST /api/v1/top-k         — get top-K alternatives per target
+GET  /api/v1/presets                            — list available parameter presets
+GET  /api/v1/panel/{job_id}/diagnostics         — panel-level diagnostics
+GET  /api/v1/panel/{job_id}/who_compliance      — per-drug-class WHO TPP compliance
+GET  /api/v1/panel/{job_id}/top_k/{target_label} — top-K candidates for one target
+POST /api/v1/panel/{job_id}/sweep               — sweep one parameter
+POST /api/v1/panel/{job_id}/pareto              — compute Pareto frontier
+
+All endpoints operate on COMPLETED pipeline runs. They re-evaluate
+existing candidates against different thresholds — they do NOT re-run
+the pipeline.
 """
 
 from __future__ import annotations
@@ -15,24 +21,39 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from guard.optimisation.profiles import list_presets, get_preset, ParameterProfile
-from guard.optimisation.sweep import sweep_parameter, pareto_frontier
+from guard.optimisation.sweep import sweep_parameter
+from guard.optimisation.pareto import pareto_frontier
 from guard.optimisation.top_k import collect_top_k
-from guard.optimisation.metrics import compute_metrics
+from guard.optimisation.metrics import compute_diagnostic_metrics
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["optimisation"])
 
-# In-memory cache for the most recent pipeline result (set by pipeline route)
-_cached_members: list = []
-_cached_candidates: dict = {}
+# In-memory cache for pipeline results, keyed by job_id
+_job_cache: dict[str, dict] = {}
 
 
-def set_pipeline_result(members: list, candidates_by_target: dict) -> None:
+def cache_pipeline_result(
+    job_id: str,
+    members: list,
+    candidates_by_target: dict,
+) -> None:
     """Called by the pipeline route after panel assembly to cache results."""
-    global _cached_members, _cached_candidates
-    _cached_members = members
-    _cached_candidates = candidates_by_target
+    _job_cache[job_id] = {
+        "members": members,
+        "candidates": candidates_by_target,
+    }
+
+
+def _get_job(job_id: str) -> dict:
+    """Retrieve cached pipeline result or raise 404."""
+    if job_id not in _job_cache:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No pipeline results for job '{job_id}'. Run the pipeline first.",
+        )
+    return _job_cache[job_id]
 
 
 # --- Request/Response models ---
@@ -52,37 +73,94 @@ class SweepRequest(BaseModel):
 
 
 class ParetoRequest(BaseModel):
-    efficiency_range: list[float] = Field(
-        default=[0.1, 0.8],
-        description="[min, max] for efficiency threshold",
+    disc_values: Optional[list[float]] = Field(
+        default=None,
+        description="Custom discrimination threshold grid (optional)",
     )
-    discrimination_range: list[float] = Field(
-        default=[1.0, 10.0],
-        description="[min, max] for discrimination threshold",
+    score_values: Optional[list[float]] = Field(
+        default=None,
+        description="Custom efficiency threshold grid (optional)",
     )
-    n_steps: int = Field(default=10, ge=3, le=50)
-
-
-class TopKRequest(BaseModel):
-    k: int = Field(default=5, ge=1, le=20)
 
 
 # --- Endpoints ---
 
 @router.get("/presets")
 async def get_presets() -> list[dict]:
-    """Return all available parameter presets."""
+    """Return all available parameter presets with descriptions."""
     return list_presets()
 
 
-@router.post("/sweep")
-async def run_sweep(request: SweepRequest) -> dict:
+@router.get("/panel/{job_id}/diagnostics")
+async def get_diagnostics(job_id: str, preset: str = "balanced") -> dict:
+    """Return DiagnosticMetrics.summary() for a completed pipeline run.
+
+    Uses the specified preset's thresholds to determine which targets
+    are covered. Default: balanced (WHO TPP).
+    """
+    job = _get_job(job_id)
+    try:
+        profile = get_preset(preset)
+    except KeyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    metrics = compute_diagnostic_metrics(
+        members=job["members"],
+        candidates_by_target=job["candidates"],
+        efficiency_threshold=profile.efficiency_threshold,
+        discrimination_threshold=profile.discrimination_threshold,
+    )
+    return metrics.summary()
+
+
+@router.get("/panel/{job_id}/who_compliance")
+async def get_who_compliance(job_id: str, preset: str = "balanced") -> dict:
+    """Return per-drug-class WHO TPP compliance status."""
+    job = _get_job(job_id)
+    try:
+        profile = get_preset(preset)
+    except KeyError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    metrics = compute_diagnostic_metrics(
+        members=job["members"],
+        candidates_by_target=job["candidates"],
+        efficiency_threshold=profile.efficiency_threshold,
+        discrimination_threshold=profile.discrimination_threshold,
+    )
+    return {
+        "preset": preset,
+        "who_compliance": metrics.who_compliance,
+        "panel_sensitivity": round(metrics.sensitivity, 3),
+        "panel_specificity": round(metrics.specificity, 3),
+    }
+
+
+@router.get("/panel/{job_id}/top_k/{target_label}")
+async def get_target_top_k(job_id: str, target_label: str, k: int = 5) -> dict:
+    """Return top-K candidates for one target with tradeoff annotations."""
+    job = _get_job(job_id)
+
+    results = collect_top_k(
+        members=job["members"],
+        candidates_by_target=job["candidates"],
+        k=k,
+    )
+
+    for r in results:
+        if r.target_label == target_label:
+            return r.to_dict()
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Target '{target_label}' not found in panel.",
+    )
+
+
+@router.post("/panel/{job_id}/sweep")
+async def run_sweep(job_id: str, request: SweepRequest) -> dict:
     """Sweep one parameter and return the sensitivity/specificity curve."""
-    if not _cached_members:
-        raise HTTPException(
-            status_code=400,
-            detail="No pipeline results available. Run the pipeline first.",
-        )
+    job = _get_job(job_id)
 
     try:
         base_profile = get_preset(request.base_preset)
@@ -92,81 +170,27 @@ async def run_sweep(request: SweepRequest) -> dict:
     result = sweep_parameter(
         parameter_name=request.parameter_name,
         values=request.values,
-        members=_cached_members,
-        candidates_by_target=_cached_candidates,
+        members=job["members"],
+        candidates_by_target=job["candidates"],
         base_profile=base_profile,
     )
 
     return result.to_dict()
 
 
-@router.post("/pareto")
-async def run_pareto(request: ParetoRequest) -> dict:
+@router.post("/panel/{job_id}/pareto")
+async def run_pareto(job_id: str, request: ParetoRequest) -> dict:
     """Compute the Pareto frontier over efficiency and discrimination thresholds."""
-    if not _cached_members:
-        raise HTTPException(
-            status_code=400,
-            detail="No pipeline results available. Run the pipeline first.",
-        )
-
-    if len(request.efficiency_range) != 2 or len(request.discrimination_range) != 2:
-        raise HTTPException(
-            status_code=400,
-            detail="efficiency_range and discrimination_range must be [min, max]",
-        )
+    job = _get_job(job_id)
 
     frontier = pareto_frontier(
-        members=_cached_members,
-        candidates_by_target=_cached_candidates,
-        efficiency_range=tuple(request.efficiency_range),
-        discrimination_range=tuple(request.discrimination_range),
-        n_steps=request.n_steps,
+        members=job["members"],
+        candidates_by_target=job["candidates"],
+        disc_values=request.disc_values,
+        score_values=request.score_values,
     )
 
     return {
         "n_points": len(frontier),
         "frontier": [p.to_dict() for p in frontier],
     }
-
-
-@router.post("/top-k")
-async def get_top_k(request: TopKRequest) -> dict:
-    """Get top-K alternative candidates per target with tradeoff annotations."""
-    if not _cached_members:
-        raise HTTPException(
-            status_code=400,
-            detail="No pipeline results available. Run the pipeline first.",
-        )
-
-    results = collect_top_k(
-        members=_cached_members,
-        candidates_by_target=_cached_candidates,
-        k=request.k,
-    )
-
-    return {
-        "n_targets": len(results),
-        "targets": [r.to_dict() for r in results],
-    }
-
-
-@router.post("/metrics")
-async def compute_panel_metrics(
-    efficiency_threshold: float = 0.3,
-    discrimination_threshold: float = 2.0,
-) -> dict:
-    """Compute panel metrics with custom thresholds."""
-    if not _cached_members:
-        raise HTTPException(
-            status_code=400,
-            detail="No pipeline results available. Run the pipeline first.",
-        )
-
-    metrics = compute_metrics(
-        members=_cached_members,
-        candidates_by_target=_cached_candidates,
-        efficiency_threshold=efficiency_threshold,
-        discrimination_threshold=discrimination_threshold,
-    )
-
-    return metrics.to_dict()

@@ -866,14 +866,31 @@ class GUARDPipeline:
 
         # --- Module 9.5: Top-K alternatives (Block 3) ---
         from guard.optimisation.top_k import collect_top_k
+        top_k = parameter_profile.top_k if parameter_profile else 5
         top_k_results = collect_top_k(
             members=panel.members,
             candidates_by_target=scored_by_target,
-            k=5,
+            k=top_k,
         )
-        # Store on pipeline instance for API access
         self._top_k_results = top_k_results
         self._scored_by_target = scored_by_target
+
+        # --- Module 9.6: Diagnostic metrics (Block 3) ---
+        from guard.optimisation.metrics import compute_diagnostic_metrics
+        eff_thresh = parameter_profile.efficiency_threshold if parameter_profile else 0.4
+        disc_thresh = parameter_profile.discrimination_threshold if parameter_profile else 3.0
+        self._diagnostic_metrics = compute_diagnostic_metrics(
+            members=panel.members,
+            candidates_by_target=scored_by_target,
+            efficiency_threshold=eff_thresh,
+            discrimination_threshold=disc_thresh,
+        )
+        logger.info(
+            "  Diagnostics: sensitivity=%.3f, specificity=%.3f, coverage=%.3f",
+            self._diagnostic_metrics.sensitivity,
+            self._diagnostic_metrics.specificity,
+            self._diagnostic_metrics.drug_class_coverage,
+        )
 
         # --- Module 10: Export ---
         t0 = time.perf_counter_ns()
