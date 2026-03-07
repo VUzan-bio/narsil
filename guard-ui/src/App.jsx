@@ -661,28 +661,29 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
       transition: "width 0.2s ease",
       ...(mobile ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 9998, boxShadow: "4px 0 24px rgba(0,0,0,0.15)" } : {}),
     }}>
-      {/* Toggle + Connection */}
-      <div style={{ padding: isCollapsed ? "16px 0" : "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between", gap: "8px" }}>
-        {mobile ? (
-          <>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
-              {connected ? <Wifi size={12} color={T.success} /> : <WifiOff size={12} color={T.danger} />}
-              <span style={{ color: connected ? T.success : T.danger, fontWeight: 600 }}>{connected ? "API Connected" : "Offline (mock)"}</span>
+      {/* Logo + Toggle */}
+      <div style={{ padding: isCollapsed ? "16px 0" : "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between", gap: "8px" }}>
+          {!isCollapsed && (
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <img src="/logo.png" alt="GUARD" style={{ height: 28, width: "auto", objectFit: "contain" }} />
+              <span style={{ fontSize: "15px", fontWeight: 800, color: T.text, fontFamily: HEADING, letterSpacing: "-0.02em" }}>GUARD</span>
             </div>
+          )}
+          {isCollapsed && <img src="/logo.png" alt="GUARD" style={{ height: 24, width: "auto", objectFit: "contain" }} />}
+          {mobile ? (
             <button onClick={() => setMobileOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", marginLeft: "auto" }}><X size={20} color={T.textSec} /></button>
-          </>
-        ) : (
-          <>
-            {!isCollapsed && (
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
-                {connected ? <Wifi size={12} color={T.success} /> : <WifiOff size={12} color={T.danger} />}
-                <span style={{ color: connected ? T.success : T.danger, fontWeight: 600 }}>{connected ? "API Connected" : "Offline (mock)"}</span>
-              </div>
-            )}
+          ) : (
             <button onClick={() => setCollapsed(!collapsed)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex", borderRadius: "6px" }} title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
               {isCollapsed ? <PanelLeft size={18} color={T.textSec} /> : <PanelLeftClose size={18} color={T.textSec} />}
             </button>
-          </>
+          )}
+        </div>
+        {!isCollapsed && (
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
+            {connected ? <Wifi size={12} color={T.success} /> : <WifiOff size={12} color={T.danger} />}
+            <span style={{ color: connected ? T.success : T.danger, fontWeight: 600 }}>{connected ? "API Connected" : "Offline (mock)"}</span>
+          </div>
         )}
       </div>
       {/* Nav groups */}
@@ -710,7 +711,7 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
       {/* Footer */}
       {!isCollapsed && (
         <div style={{ padding: "16px", borderTop: `1px solid ${T.border}`, fontSize: "10px", color: T.textTer, lineHeight: 1.6, textAlign: "center" }}>
-          GUARD v2
+          v2.0
         </div>
       )}
     </aside>
@@ -766,7 +767,7 @@ const HomePage = ({ goTo, connected }) => {
   const [mode, setMode] = useState("standard");
   const [selectedModules, setSelectedModules] = useState(new Set(MODULES.map(m => m.id)));
   const [configOpen, setConfigOpen] = useState(false);
-  const [scorer, setScorer] = useState("guard_net"); // "heuristic" | "seq_cnn" | "guard_net"
+  const [scorer, setScorer] = useState("guard_net"); // "heuristic" | "guard_net"
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState(null);
 
@@ -831,95 +832,34 @@ const HomePage = ({ goTo, connected }) => {
       {/* ── Run Workflow ── */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: mobile ? "20px" : "32px", marginBottom: "24px" }}>
 
-        {/* 1. Run Name */}
-        <div style={{ marginBottom: "28px" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "10px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 700, color: T.primary }}>1</span>
-            <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Run Name</span>
+        {/* 1. Run Name — compact inline */}
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <label style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, flexShrink: 0 }}>Run Name</label>
+            <input value={runName} onChange={(e) => setRunName(e.target.value)}
+              style={{ flex: 1, padding: "10px 14px", border: `1px solid ${T.border}`, borderRadius: "8px", fontSize: "13px", fontFamily: MONO, color: T.text, background: T.bgSub, outline: "none", boxSizing: "border-box" }}
+              placeholder="e.g. MDR-TB_14plex_v2"
+            />
           </div>
-          <input value={runName} onChange={(e) => setRunName(e.target.value)}
-            style={{ width: "100%", padding: "12px 14px", border: `1px solid ${T.border}`, borderRadius: "8px", fontSize: "14px", fontFamily: FONT, color: T.text, background: T.bgSub, outline: "none", boxSizing: "border-box" }}
-            placeholder="e.g. MDR-TB_14plex_v2"
-          />
-          <p style={{ fontSize: "12px", color: T.textTer, margin: "6px 0 0" }}>A descriptive name for tracking. Used in export filenames and panel metadata.</p>
         </div>
 
-        {/* 2. Pipeline Mode */}
-        <div style={{ marginBottom: "28px" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "10px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 700, color: T.primary }}>2</span>
-            <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Pipeline Mode</span>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
-            {[
-              { id: "standard", name: "Standard", desc: "Full pipeline. crRNA design, GUARD-Net scoring, discrimination, primers, multiplex assembly, WHO compliance." },
-              { id: "custom", name: "Custom", desc: "Select individual modules. For re-running specific stages on existing results." },
-            ].map(m => (
-              <div key={m.id} onClick={() => { setMode(m.id); if (m.id === "standard") setSelectedModules(new Set(MODULES.map(x => x.id))); }} style={{
-                padding: "16px", borderRadius: "10px", cursor: "pointer",
-                border: `2px solid ${mode === m.id ? T.primary : T.border}`,
-                background: mode === m.id ? T.primaryLight : T.bg,
-              }}>
-                <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>{m.name}</div>
-                <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.5 }}>{m.desc}</div>
-              </div>
-            ))}
-          </div>
+        <div style={{ height: 1, background: T.borderLight, margin: "0 0 24px" }} />
 
-          {/* Module selection for Custom mode */}
-          {mode === "custom" && (
-            <div style={{ marginTop: "12px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Select Modules</span>
-                <div style={{ display: "flex", gap: "6px" }}>
-                  <button onClick={() => setSelectedModules(new Set(MODULES.map(x => x.id)))} style={{ padding: "4px 10px", borderRadius: "6px", border: `1px solid ${T.border}`, background: selectedModules.size === MODULES.length ? T.primaryLight : T.bg, color: selectedModules.size === MODULES.length ? T.primary : T.textSec, fontSize: "11px", fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>All</button>
-                  <button onClick={() => setSelectedModules(new Set())} style={{ padding: "4px 10px", borderRadius: "6px", border: `1px solid ${T.border}`, background: T.bg, color: T.textSec, fontSize: "11px", fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>None</button>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "6px" }}>
-                {MODULES.map(m => {
-                  const sel = selectedModules.has(m.id);
-                  return (
-                    <div key={m.id} onClick={() => { const n = new Set(selectedModules); sel ? n.delete(m.id) : n.add(m.id); setSelectedModules(n); }} style={{
-                      display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", borderRadius: "8px", cursor: "pointer",
-                      border: `1px solid ${sel ? T.primary : T.borderLight}`,
-                      background: sel ? T.primaryLight + "60" : "transparent",
-                      transition: "all 0.12s",
-                    }}>
-                      <div style={{ width: 16, height: 16, borderRadius: "4px", border: `2px solid ${sel ? T.primary : T.border}`, background: sel ? T.primary : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                        {sel && <Check size={10} color="#fff" strokeWidth={3} />}
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: "12px", fontWeight: 600, color: T.text, fontFamily: MONO }}>{m.id}</div>
-                        <div style={{ fontSize: "11px", color: T.textSec, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div style={{ marginTop: "10px", fontSize: "11px", color: T.textTer }}>{selectedModules.size} of {MODULES.length} modules selected</div>
-            </div>
-          )}
-        </div>
-
-        {/* 3. Diagnostic Panel */}
+        {/* Diagnostic Panel */}
         <div style={{ marginBottom: "28px" }}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "10px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 700, color: T.primary }}>3</span>
-            <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Diagnostic Panel</span>
-          </div>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "10px" }}>Diagnostic Panel</div>
 
           {/* Preset cards */}
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "10px", marginBottom: "16px" }}>
             {[
               { id: "mdr14", name: "MDR-TB 14-plex", targets: ALL_INDICES.length + " targets",
-                desc: "Complete WHO-catalogued first- and second-line resistance panel. Covers rifampicin, isoniazid, ethambutol, pyrazinamide, fluoroquinolones, and aminoglycosides. Recommended for comprehensive drug-susceptibility profiling.",
+                desc: "Full WHO-catalogued first- and second-line resistance panel covering RIF, INH, EMB, PZA, FQ, and aminoglycosides.",
                 meta: [["6 drug classes", ""], ["Tier 1–2", ""], ["High + Moderate", ""]] },
               { id: "core5", name: "Core 5-plex", targets: "5 targets",
-                desc: "High-confidence tier-1 mutations only, targeting the most clinically actionable resistance determinants. Suitable for rapid point-of-care screening where multiplexing capacity is limited.",
+                desc: "High-confidence tier-1 mutations only. Suitable for point-of-care screening with limited multiplexing capacity.",
                 meta: [["4 drug classes", ""], ["Tier 1", ""], ["High", ""]] },
               { id: "custom", name: "Custom Panel", targets: panel === "custom" ? selected.size + " targets" : "",
-                desc: "Select individual mutations from the WHO mutation catalogue. Use for targeted re-design, single-drug panels, or validation of specific resistance determinants.",
+                desc: "Select individual mutations. For targeted re-design, single-drug panels, or validation studies.",
                 meta: [] },
             ].map(p => (
               <div key={p.id} onClick={() => selectPanel(p.id)} style={{
@@ -1021,54 +961,100 @@ const HomePage = ({ goTo, connected }) => {
           </div>
         </div>
 
-        {/* 4. Scoring Model */}
+        {/* Scoring Model */}
         <div style={{ marginBottom: "28px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-            <span style={{ fontSize: "12px", fontWeight: 700, color: T.primary }}>4</span>
-            <span style={{ fontSize: "14px", fontWeight: 700, color: T.text }}>Scoring Model</span>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "8px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "10px" }}>Scoring Model</div>
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
             {[
-              { id: "heuristic", label: "Heuristic", desc: "Position-weighted biophysical features.", level: "Level 1" },
-              { id: "seq_cnn", label: "SeqCNN", desc: "CNN + heuristic ensemble.", level: "Level 2" },
-              { id: "guard_net", label: "GUARD-Net", desc: "CNN + RNA-FM + RLPA attention.", level: "Level 3" },
+              { id: "heuristic", label: "Heuristic", desc: "Position-weighted composite across 5 biophysical features. Fast, interpretable, no GPU required.", tag: "Baseline" },
+              { id: "guard_net", label: "GUARD-Net", desc: "Dual-branch CNN + RNA-FM with R-loop propagation attention. Trained on 15K Cas12a measurements.", tag: "Recommended" },
             ].map(s => (
               <button key={s.id} onClick={() => setScorer(s.id)} style={{
-                padding: "14px 16px", borderRadius: "10px", cursor: "pointer", fontFamily: FONT, textAlign: "left",
-                border: scorer === s.id ? `2px solid ${T.primary}` : `1px solid ${T.border}`,
+                padding: "16px", borderRadius: "10px", cursor: "pointer", fontFamily: FONT, textAlign: "left",
+                border: `2px solid ${scorer === s.id ? T.primary : T.border}`,
                 background: scorer === s.id ? T.primaryLight : T.bg, transition: "all 0.15s",
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 700, color: scorer === s.id ? T.primaryDark : T.text }}>{s.label}</span>
-                  <span style={{ fontSize: "9px", fontWeight: 700, color: scorer === s.id ? T.primary : T.textTer, textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.level}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: scorer === s.id ? T.primaryDark : T.text, fontFamily: HEADING }}>{s.label}</span>
+                  <span style={{ fontSize: "9px", fontWeight: 700, color: scorer === s.id ? T.primary : T.textTer, textTransform: "uppercase", letterSpacing: "0.08em", padding: "2px 8px", borderRadius: "4px", background: scorer === s.id ? T.primary + "15" : T.bgSub }}>{s.tag}</span>
                 </div>
-                <div style={{ fontSize: "11px", color: scorer === s.id ? T.primaryDark : T.textSec, opacity: 0.85 }}>{s.desc}</div>
+                <div style={{ fontSize: "12px", color: scorer === s.id ? T.primaryDark : T.textSec, lineHeight: 1.5, opacity: 0.85 }}>{s.desc}</div>
               </button>
             ))}
           </div>
         </div>
 
-        {/* 5. Configuration (collapsible) */}
+        {/* Advanced Configuration (collapsible) */}
         <div style={{ marginBottom: "28px" }}>
           <button onClick={() => setConfigOpen(!configOpen)} style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "0 0 10px 0", fontFamily: FONT }}>
-            <span style={{ fontSize: "12px", fontWeight: 700, color: T.primary }}>5</span>
-            <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, flex: 1, textAlign: "left" }}>Configuration</span>
-            <span style={{ fontSize: "11px", color: T.textTer, marginRight: "4px" }}>defaults shown</span>
+            <Settings size={14} color={T.textSec} />
+            <span style={{ fontSize: "13px", fontWeight: 600, color: T.text, flex: 1, textAlign: "left" }}>Advanced Configuration</span>
+            <span style={{ fontSize: "11px", color: T.textTer, marginRight: "4px" }}>defaults</span>
             <ChevronDown size={14} color={T.textSec} style={{ transform: configOpen ? "rotate(180deg)" : "none", transition: "0.2s" }} />
           </button>
           {configOpen && (
             <div style={{ background: T.bgSub, borderRadius: "10px", padding: "16px 20px", border: `1px solid ${T.borderLight}` }}>
+              {/* Pipeline mode toggle */}
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px" }}>Pipeline Mode</div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {[
+                    { id: "standard", label: "Standard", tip: "All 8 modules" },
+                    { id: "custom", label: "Custom", tip: "Select modules" },
+                  ].map(m => (
+                    <button key={m.id} onClick={() => { setMode(m.id); if (m.id === "standard") setSelectedModules(new Set(MODULES.map(x => x.id))); }}
+                      style={{
+                        padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: 600, fontFamily: FONT, cursor: "pointer",
+                        border: `1px solid ${mode === m.id ? T.primary : T.border}`,
+                        background: mode === m.id ? T.primaryLight : T.bg,
+                        color: mode === m.id ? T.primaryDark : T.textSec,
+                      }}
+                    >{m.label}</button>
+                  ))}
+                </div>
+              </div>
+              {/* Module selection for custom mode */}
+              {mode === "custom" && (
+                <div style={{ marginBottom: "16px", background: T.bg, border: `1px solid ${T.borderLight}`, borderRadius: "8px", padding: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: T.text }}>Modules</span>
+                    <div style={{ display: "flex", gap: "4px" }}>
+                      <button onClick={() => setSelectedModules(new Set(MODULES.map(x => x.id)))} style={{ padding: "3px 8px", borderRadius: "4px", border: `1px solid ${T.border}`, background: T.bg, color: T.textSec, fontSize: "10px", fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>All</button>
+                      <button onClick={() => setSelectedModules(new Set())} style={{ padding: "3px 8px", borderRadius: "4px", border: `1px solid ${T.border}`, background: T.bg, color: T.textSec, fontSize: "10px", fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>None</button>
+                    </div>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: "4px" }}>
+                    {MODULES.map(m => {
+                      const sel = selectedModules.has(m.id);
+                      return (
+                        <div key={m.id} onClick={() => { const n = new Set(selectedModules); sel ? n.delete(m.id) : n.add(m.id); setSelectedModules(n); }} style={{
+                          display: "flex", alignItems: "center", gap: "6px", padding: "6px 8px", borderRadius: "6px", cursor: "pointer",
+                          border: `1px solid ${sel ? T.primary + "50" : T.borderLight}`,
+                          background: sel ? T.primaryLight + "60" : "transparent", fontSize: "11px",
+                        }}>
+                          <div style={{ width: 14, height: 14, borderRadius: "3px", border: `2px solid ${sel ? T.primary : T.border}`, background: sel ? T.primary : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                            {sel && <Check size={8} color="#fff" strokeWidth={3} />}
+                          </div>
+                          <span style={{ fontFamily: MONO, fontWeight: 600, color: T.text, fontSize: "10px" }}>{m.id}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ marginTop: "6px", fontSize: "10px", color: T.textTer }}>{selectedModules.size}/{MODULES.length} modules</div>
+                </div>
+              )}
+              {/* Parameter defaults */}
               <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "0 32px" }}>
                 {[
                   ["Cas12a Variant", "enAsCas12a"], ["PAM Pattern", "TTTV"],
-                  ["Spacer Lengths", "20, 21, 22, 23 nt"], ["GC Range", "30–70%"],
+                  ["Spacer Lengths", "20–23 nt"], ["GC Range", "30–70%"],
                   ["Min Discrimination", "2.0×"], ["SM Enhancement", "Enabled"],
                   ["RPA Amplicon", "100–200 bp"],
-                  ["Scoring Model", scorer === "guard_net" ? "GUARD-Net (CNN + RNA-FM + RLPA)" : scorer === "seq_cnn" ? "SeqCNN + Heuristic" : "Heuristic only"],
+                  ["Scoring Model", scorer === "guard_net" ? "GUARD-Net" : "Heuristic"],
                 ].map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${T.borderLight}`, fontSize: "13px" }}>
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.borderLight}`, fontSize: "12px" }}>
                     <span style={{ color: T.textSec }}>{k}</span>
-                    <span style={{ fontWeight: 600, color: T.text }}>{v}</span>
+                    <span style={{ fontWeight: 600, color: T.text, fontFamily: MONO, fontSize: "11px" }}>{v}</span>
                   </div>
                 ))}
               </div>
@@ -1081,12 +1067,14 @@ const HomePage = ({ goTo, connected }) => {
 
         {/* Summary + Launch */}
         {error && <div style={{ color: T.danger, fontSize: "12px", marginBottom: "12px" }}>{error}</div>}
-        <div style={{ display: "flex", alignItems: mobile ? "stretch" : "center", flexDirection: mobile ? "column" : "row", justifyContent: "space-between", gap: mobile ? "12px" : "0" }}>
-          <div style={{ display: "flex", gap: "24px", fontSize: "13px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: mobile ? "stretch" : "center", flexDirection: mobile ? "column" : "row", justifyContent: "space-between", gap: mobile ? "12px" : "16px" }}>
+          <div style={{ display: "flex", gap: "16px", fontSize: "12px", flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ color: T.textSec }}><strong style={{ color: T.text }}>{selected.size}</strong> targets</span>
+            <span style={{ color: T.textSec }}><strong style={{ color: T.text }}>{[...new Set([...selected].map(i => MUTATIONS[i]?.drug))].length}</strong> drug classes</span>
             <span style={{ color: T.textSec }}><strong style={{ color: T.text }}>{mode === "custom" ? selectedModules.size : MODULES.length}</strong> modules</span>
-            <span style={{ color: T.textSec }}>Est. <strong style={{ color: T.text }}>~{Math.max(15, selected.size * 3)}s</strong></span>
-            <span style={{ color: T.textSec }}>{[...new Set([...selected].map(i => MUTATIONS[i]?.drug))].length} drug classes</span>
+            <span style={{ padding: "2px 8px", borderRadius: "4px", background: scorer === "guard_net" ? T.primaryLight : T.bgSub, color: scorer === "guard_net" ? T.primaryDark : T.textSec, fontSize: "11px", fontWeight: 600 }}>
+              {scorer === "guard_net" ? "GUARD-Net" : "Heuristic"}
+            </span>
           </div>
           <Btn icon={launching ? Loader2 : Play} onClick={launch} disabled={launching || selected.size === 0}>
             {launching ? "Launching…" : "Launch Pipeline"}
@@ -1742,8 +1730,8 @@ const OverviewTab = ({ results }) => {
 
   // Detect scorer from ml_scores
   const usesGuardNet = results.some(r => r.mlScores?.some(m => (m.model_name || m.modelName) === "guard_net"));
-  const mlModelLabel = usesGuardNet ? "GUARD-Net" : "SeqCNN";
-  const mlModelDetail = usesGuardNet ? "235K params · CNN + RNA-FM + RLPA" : "110K params · T=7.5";
+  const mlModelLabel = usesGuardNet ? "GUARD-Net" : "Heuristic";
+  const mlModelDetail = usesGuardNet ? "235K params · CNN + RNA-FM + RLPA" : "Biophysical features";
 
   /* Adaptyv-style grouped stat section */
   const StatGroup = ({ title, items }) => (
@@ -1772,10 +1760,10 @@ const OverviewTab = ({ results }) => {
             The pipeline evaluates every candidate on four axes:
           </p>
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "6px 24px", fontSize: "12px" }}>
-            <div><strong>Score</strong> (0–1) — ensemble of calibrated CNN activity prediction and heuristic biophysical features. Used as the primary ranking metric.</div>
-            <div><strong>Discrimination</strong> (×) — how well the guide distinguishes resistant bacteria from normal (drug-susceptible) bacteria. Expressed as the ratio of mutant vs wildtype cleavage activity. ≥ 3× is diagnostic-grade.</div>
-            <div><strong>RPA Primers</strong> — short DNA sequences that amplify the target region at 37°C (no thermal cycler needed). A candidate without primers cannot be used as a complete assay.</div>
-            <div><strong>Drug class</strong> — which antibiotic the mutation confers resistance to (e.g. RIF = rifampicin, INH = isoniazid). A complete panel covers all first- and second-line drugs.</div>
+            <div><strong>Score</strong> (0–1) — {usesGuardNet ? "ensemble of GUARD-Net neural network prediction and heuristic biophysical features" : "heuristic composite of position-weighted biophysical features"}. Used as the primary ranking metric.</div>
+            <div><strong>Discrimination</strong> (×) — predicted ratio of mutant vs wildtype cleavage activity. ≥ 3× is diagnostic-grade.</div>
+            <div><strong>RPA Primers</strong> — isothermal amplification primers for the target region (37°C, no thermal cycler). A candidate without primers cannot be used as a complete assay.</div>
+            <div><strong>Drug class</strong> — which antibiotic the mutation confers resistance to (e.g. RIF = rifampicin, INH = isoniazid).</div>
           </div>
         </div>
       </div>
@@ -1798,8 +1786,8 @@ const OverviewTab = ({ results }) => {
           { l: "Diagnostic-grade", v: highDisc, sub: "≥ 3× threshold" },
         ]} />
         <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "auto", background: T.border, flexShrink: 0 }} />
-        <StatGroup title="Scoring" items={[
-          { l: "Avg. score", v: avgScore },
+        <StatGroup title={usesGuardNet ? "GUARD-Net Scoring" : "Heuristic Scoring"} items={[
+          { l: "Avg. score", v: usesGuardNet && avgEnsemble ? avgEnsemble : avgScore },
           { l: "Range", v: `${minScore} – ${maxScore}`, sub: "min – max" },
         ]} />
       </div>
@@ -1809,9 +1797,7 @@ const OverviewTab = ({ results }) => {
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "20px" : "28px 32px", marginBottom: "24px" }}>
           <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, marginBottom: "6px", fontFamily: HEADING }}>Scoring Model Comparison</div>
           <div style={{ fontSize: "12px", color: T.textSec, marginBottom: "20px", lineHeight: 1.6 }}>
-            {usesGuardNet
-              ? "Each candidate is scored by three approaches. The heuristic uses hand-crafted biophysical features. GUARD-Net (CNN + RNA-FM + RLPA attention) learns nucleotide preferences, RNA structure, and R-loop propagation kinetics. The ensemble blends both for improved ranking."
-              : "Each candidate is scored by three approaches. The heuristic uses hand-crafted biophysical features. The CNN learns nucleotide preferences from 15K Cas12a measurements, then is temperature-calibrated (T=7.5) to spread saturated scores. The ensemble blends both for improved ranking."}
+            Each candidate is scored by the heuristic (biophysical features) and GUARD-Net (CNN + RNA-FM + RLPA attention, trained on 15K Cas12a measurements). The ensemble blends both for improved ranking.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "16px" }}>
             <div style={{ background: T.bgSub, borderRadius: "10px", padding: "20px" }}>
@@ -1835,15 +1821,16 @@ const OverviewTab = ({ results }) => {
 
       {/* Score distribution chart — Adaptyv style: light bars + scatter dots + reference zones */}
       {(() => {
-        /* Build per-candidate chart data: one bar per candidate sorted by score desc */
-        const sorted = [...results].sort((a, b) => b.score - a.score);
-        const chartData = sorted.map((r, i) => ({ name: r.label, score: r.score, disc: r.disc, drug: r.drug, idx: i }));
+        /* Build per-candidate chart data: use ensemble when ML active, otherwise heuristic */
+        const getScore = (r) => usesGuardNet ? (r.ensembleScore || r.score) : r.score;
+        const sorted = [...results].sort((a, b) => getScore(b) - getScore(a));
+        const chartData = sorted.map((r, i) => ({ name: r.label, score: getScore(r), disc: r.disc, drug: r.drug, idx: i }));
         return (
           <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "20px" : "28px 32px", marginBottom: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "20px" }}>
               <div>
-                <span style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Composite Score</span>
-                <span style={{ fontSize: "12px", color: T.textTer, marginLeft: "10px" }}>{results.length} / {results.length} candidates scored</span>
+                <span style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>{usesGuardNet ? "Ensemble Score" : "Heuristic Score"}</span>
+                <span style={{ fontSize: "12px", color: T.textTer, marginLeft: "10px" }}>{results.length} candidates · {usesGuardNet ? "GUARD-Net + Heuristic" : "biophysical features"}</span>
               </div>
             </div>
             <ResponsiveContainer width="100%" height={320}>
@@ -2303,7 +2290,7 @@ const CandidatesTab = ({ results, jobId, connected }) => {
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : hasML ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr", gap: "6px 20px", fontSize: "12px", color: T.primaryDark, lineHeight: 1.5, opacity: 0.85 }}>
           <div><strong>Score</strong> — {hasML ? `ensemble (heuristic + ${hasGuardNet ? "GUARD-Net" : "CNN"})` : "heuristic composite (0–1)"}.</div>
           <div><strong>Disc</strong> — MUT/WT discrimination ratio. ≥ 3× is diagnostic-grade.</div>
-          {hasML && <div><strong>{mlColLabel}</strong> — {hasGuardNet ? "GUARD-Net (CNN + RNA-FM + RLPA)" : "SeqCNN calibrated"} prediction.</div>}
+          {hasML && <div><strong>{mlColLabel}</strong> — {hasGuardNet ? "GUARD-Net (CNN + RNA-FM + RLPA)" : "ML calibrated"} prediction.</div>}
           <div><strong>Expand</strong> — click any row for full crRNA, amplicon map, primers, and scoring breakdown.</div>
         </div>
       </div>
@@ -2924,9 +2911,7 @@ const DiagnosticsTab = ({ results, jobId, connected }) => {
     if (first) {
       const model = first.mlScores[0].model_name || first.mlScores[0].modelName;
       if (model === "guard_net") return { name: "GUARD-Net", level: 3 };
-      if (model === "seq_cnn") return { name: "SeqCNN + Heuristic", level: 2 };
     }
-    if (results.some(r => r.ensembleScore != null)) return { name: "SeqCNN + Heuristic", level: 2 };
     return { name: "Heuristic", level: 1 };
   }, [results]);
 
@@ -3112,12 +3097,12 @@ const DiagnosticsTab = ({ results, jobId, connected }) => {
             <span style={{
               display: "inline-flex", alignItems: "center", gap: "5px",
               padding: "2px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: 600,
-              background: scorerInfo.level >= 3 ? "rgba(16,185,129,0.1)" : scorerInfo.level >= 2 ? T.primaryLight : T.bgSub,
-              color: scorerInfo.level >= 3 ? T.success : scorerInfo.level >= 2 ? T.primary : T.textSec,
-              border: `1px solid ${scorerInfo.level >= 3 ? T.success + "33" : scorerInfo.level >= 2 ? T.primary + "33" : T.borderLight}`,
+              background: scorerInfo.level >= 3 ? "rgba(16,185,129,0.1)" : T.bgSub,
+              color: scorerInfo.level >= 3 ? T.success : T.textSec,
+              border: `1px solid ${scorerInfo.level >= 3 ? T.success + "33" : T.borderLight}`,
             }}>
               <Cpu size={10} />
-              Scored by: {scorerInfo.name} (Level {scorerInfo.level})
+              Scored by: {scorerInfo.name}
             </span>
           </div>
         )}
@@ -3736,29 +3721,29 @@ const ScoringPage = ({ connected }) => {
         </div>
       </div>
 
-      {/* ── Supervised CNN ── */}
+      {/* ── GUARD-Net ── */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "28px", marginBottom: "24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px", flexWrap: "wrap" }}>
           <Cpu size={20} color={T.primary} />
-          <span style={{ fontSize: "16px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Supervised CNN</span>
-          <Badge variant="success">Calibrated (T=7.5, ρ = 0.74)</Badge>
+          <span style={{ fontSize: "16px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>GUARD-Net</span>
+          <Badge variant="success">Recommended</Badge>
         </div>
         <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, marginBottom: "16px" }}>
-          Multi-scale CNN trained on high-throughput Cas12a activity data (Kim et al., 2018; 15,000 guides). Captures nonlinear position-dependent nucleotide interactions through parallel convolutions at three kernel scales. Temperature-calibrated (T=7.5) to spread saturated sigmoid outputs into a meaningful [0.36, 0.61] range. Ensemble with heuristic (α=0.007) serves as primary ranking score. Validated on held-out HT 1-2 (ρ = 0.74) and cross-library HT 2+3 test set (ensemble ρ = 0.53).
+          Dual-branch neural network combining a target-DNA CNN with RNA Foundation Model (RNA-FM) embeddings for crRNA secondary structure.
+          R-Loop Propagation Attention (RLPA) encodes the biophysics of Cas12a's directional R-loop formation into the architecture.
+          Trained on 15,000 high-throughput Cas12a measurements (Kim et al., 2018). Ensemble with heuristic serves as primary ranking score.
         </p>
 
-        {/* Learned Feature Attribution */}
-        <div style={{ fontSize: "12px", fontWeight: 700, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Learned Feature Attribution</div>
+        {/* Architecture branches */}
+        <div style={{ fontSize: "12px", fontWeight: 700, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Model Branches</div>
         <div style={{ background: T.bgSub, borderRadius: "10px", overflow: "hidden", marginBottom: "20px" }}>
           {[
-            { name: "Seed nucleotide identity", weight: 0.40 },
-            { name: "PAM context (4nt)", weight: 0.20 },
-            { name: "Sequence composition", weight: 0.15 },
-            { name: "Structure propensity", weight: 0.15 },
-            { name: "Flanking context (±3nt)", weight: 0.10 },
+            { name: "CNN branch (target DNA)", weight: 0.45 },
+            { name: "RNA-FM branch (crRNA structure)", weight: 0.30 },
+            { name: "RLPA attention (R-loop kinetics)", weight: 0.25 },
           ].map((f, i, arr) => (
             <div key={f.name} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
-              <div style={{ width: 180, fontSize: "13px", fontWeight: 600, color: T.text }}>{f.name}</div>
+              <div style={{ width: 220, fontSize: "13px", fontWeight: 600, color: T.text }}>{f.name}</div>
               <div style={{ flex: 1, height: 8, background: T.bg, borderRadius: 4, overflow: "hidden" }}>
                 <div style={{ width: `${f.weight * 100}%`, height: "100%", background: T.primary, borderRadius: 4 }} />
               </div>
@@ -3771,12 +3756,13 @@ const ScoringPage = ({ connected }) => {
         <div style={{ fontSize: "12px", fontWeight: 700, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Architecture</div>
         <div style={{ background: T.bgSub, borderRadius: "10px", overflow: "hidden" }}>
           {[
-            ["Architecture", "MultiScale-Conv → DilatedConv → AdaptivePool → Dense"],
-            ["Input", "One-hot 34nt (context + PAM + spacer + context)"],
-            ["Training data", "15,000 guides (Kim et al., 2018 HT 1-1)"],
-            ["Parameters", "110,009"],
-            ["Val ρ", "0.74 (Spearman, HT 1-2, n=1,292)"],
-            ["Test ρ", "0.53 (Spearman, HT 2+3 cross-library, n=4,214)"],
+            ["Architecture", "CNN + RNA-FM → RLPA Attention → Fusion → Dense"],
+            ["CNN input", "One-hot 34nt (PAM + spacer + context)"],
+            ["RNA-FM input", "Pre-cached 640-dim embeddings (20 positions)"],
+            ["Training data", "15,000 guides (Kim et al., 2018)"],
+            ["Parameters", "235K"],
+            ["Val ρ", "0.537 (Spearman, with RLPA + RNA-FM)"],
+            ["Attention", "RLPA — causal mask encoding PAM→distal R-loop propagation"],
             ["Loss", "Huber + differentiable Spearman"],
           ].map(([k, v], i, arr) => (
             <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "12px" }}>
