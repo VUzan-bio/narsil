@@ -18,7 +18,7 @@ import {
   getFigureUrl, listPanels, createPanel, listJobs, connectJobWS,
   listScoringModels, getPresets, getDiagnostics, getWHOCompliance,
   getTopK, runSweep, runPareto,
-  compareScorers, getThermoProfile, getAblation,
+  compareScorers, getThermoProfile, getThermoStandalone, getAblation,
 } from "./api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -4330,6 +4330,8 @@ const ResearchPage = ({ connected }) => {
   const [modelB, setModelB] = useState("guard_net");
   const [comparing, setComparing] = useState(false);
   const [thermoTarget, setThermoTarget] = useState("");
+  const [thermoStandaloneSeq, setThermoStandaloneSeq] = useState("TCGGTCAACCCCGACAGC");
+  const [thermoMode, setThermoMode] = useState("standalone"); // "standalone" | "panel"
   const [thermoData, setThermoData] = useState(null);
   const [thermoLoading, setThermoLoading] = useState(false);
   const [thermoShowWT, setThermoShowWT] = useState(true);
@@ -4361,7 +4363,19 @@ const ResearchPage = ({ connected }) => {
     if (!selectedJob || !label) return;
     setThermoLoading(true);
     setThermoTarget(label);
+    setThermoMode("panel");
     const { data } = await getThermoProfile(selectedJob, label);
+    if (data) setThermoData(data);
+    setThermoLoading(false);
+  };
+
+  const handleThermoStandalone = async () => {
+    const seq = thermoStandaloneSeq.trim().toUpperCase();
+    if (!seq || seq.length < 15) return;
+    setThermoLoading(true);
+    setThermoTarget(seq);
+    setThermoMode("standalone");
+    const { data } = await getThermoStandalone(seq);
     if (data) setThermoData(data);
     setThermoLoading(false);
   };
@@ -4573,14 +4587,35 @@ const ResearchPage = ({ connected }) => {
           )}
         </div>
 
-        {/* Target input */}
+        {/* Target input — dual mode */}
         {!thermoData && !thermoLoading && (
           <div style={{ fontSize: "12px", color: RS.muted }}>
-            Select a target from the comparison table, or enter one manually:
-            <div style={{ marginTop: "8px", display: "flex", gap: "8px", alignItems: "center" }}>
-              <input value={thermoTarget} onChange={(e) => setThermoTarget(e.target.value)} placeholder="e.g. rpoB_S531L" style={{ ...selectStyle, flex: 1, maxWidth: "240px" }} />
-              <button onClick={() => handleThermo(thermoTarget)} disabled={!thermoTarget || !selectedJob} style={{ ...btnStyle, opacity: !thermoTarget || !selectedJob ? 0.5 : 1 }}>Load</button>
+            {/* Mode tabs */}
+            <div style={{ display: "flex", gap: "0", marginBottom: "12px" }}>
+              {[{ key: "standalone", label: "Standalone (enter sequence)" }, { key: "panel", label: "Panel-linked (select target)" }].map(m => (
+                <button key={m.key} onClick={() => setThermoMode(m.key)} style={{ background: thermoMode === m.key ? RS.accent : "transparent", color: thermoMode === m.key ? "#fff" : RS.muted, border: `1px solid ${thermoMode === m.key ? RS.accent : RS.border}`, padding: "5px 12px", fontSize: "11px", fontWeight: 600, cursor: "pointer", borderRadius: m.key === "standalone" ? "6px 0 0 6px" : "0 6px 6px 0" }}>{m.label}</button>
+              ))}
             </div>
+
+            {thermoMode === "standalone" ? (
+              <div>
+                <div style={{ marginBottom: "6px" }}>Enter a DNA spacer sequence (15–30 nt) to compute the R-loop free energy profile:</div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input value={thermoStandaloneSeq} onChange={(e) => setThermoStandaloneSeq(e.target.value.toUpperCase().replace(/[^ATCG]/g, ""))} placeholder="e.g. TCGGTCAACCCCGACAGC" style={{ ...selectStyle, flex: 1, maxWidth: "320px", fontFamily: MONO, letterSpacing: "0.05em" }} />
+                  <button onClick={handleThermoStandalone} disabled={thermoStandaloneSeq.trim().length < 15} style={{ ...btnStyle, opacity: thermoStandaloneSeq.trim().length < 15 ? 0.5 : 1 }}>Compute</button>
+                </div>
+                <div style={{ fontSize: "10px", color: "#a3a3a3", marginTop: "4px" }}>Pre-filled: rpoB_H445D spacer (18 nt). No panel run needed.</div>
+              </div>
+            ) : (
+              <div>
+                <div style={{ marginBottom: "6px" }}>Select a target from a completed panel run, or enter a target label:</div>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input value={thermoTarget} onChange={(e) => setThermoTarget(e.target.value)} placeholder="e.g. rpoB_S531L" style={{ ...selectStyle, flex: 1, maxWidth: "240px" }} />
+                  <button onClick={() => handleThermo(thermoTarget)} disabled={!thermoTarget || !selectedJob} style={{ ...btnStyle, opacity: !thermoTarget || !selectedJob ? 0.5 : 1 }}>Load</button>
+                </div>
+                {!selectedJob && <div style={{ fontSize: "10px", color: "#dc2626", marginTop: "4px" }}>No completed panel run selected. Switch to Standalone mode or run a panel first.</div>}
+              </div>
+            )}
           </div>
         )}
         {thermoLoading && <div style={{ fontSize: "12px", color: RS.muted }}>Computing thermodynamic profile...</div>}

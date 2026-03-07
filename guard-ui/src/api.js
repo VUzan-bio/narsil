@@ -136,6 +136,10 @@ export async function getThermoProfile(jobId, targetLabel) {
   return request(`/api/research/thermo/${jobId}/${encodeURIComponent(targetLabel)}`);
 }
 
+export async function getThermoStandalone(spacer, pam = "TTTV") {
+  return request(`/api/research/thermo/standalone?spacer=${encodeURIComponent(spacer)}&pam=${encodeURIComponent(pam)}`);
+}
+
 export async function getAblation() {
   return request("/api/research/ablation");
 }

@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from api.state import AppState, JobStatus
@@ -125,6 +125,23 @@ async def get_thermo_profile(job_id: str, target_label: str) -> dict[str, Any]:
 
     from guard.research.thermo_profile import get_thermo_profile
     return get_thermo_profile(spacer, pam or "", snp_pos)
+
+
+# ── GET /api/research/thermo/standalone ──
+
+@router.get("/thermo/standalone")
+async def get_thermo_standalone(
+    spacer: str = Query(..., min_length=15, max_length=30, description="DNA spacer sequence (15-30 nt)"),
+    pam: str = Query("TTTV", description="PAM sequence"),
+) -> dict[str, Any]:
+    """Compute thermodynamic profile from a raw spacer sequence (no panel needed)."""
+    spacer = spacer.upper().strip()
+    invalid = set(spacer) - {"A", "T", "C", "G"}
+    if invalid:
+        raise HTTPException(400, f"Invalid bases in spacer: {invalid}")
+
+    from guard.research.thermo_profile import get_thermo_profile
+    return get_thermo_profile(spacer, pam, snp_position=None)
 
 
 # ── GET /api/research/ablation ──
