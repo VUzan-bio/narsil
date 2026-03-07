@@ -763,6 +763,19 @@ const HomePage = ({ goTo, connected }) => {
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState(null);
 
+  /* ── Inline pipeline execution state ── */
+  const [pipeJobId, setPipeJobId] = useState(null);
+  const [pipeStep, setPipeStep] = useState(0);
+  const [pipeDone, setPipeDone] = useState(false);
+  const [pipeStats, setPipeStats] = useState([]);
+  const [pipeElapsed, setPipeElapsed] = useState(0);
+  const [showLog, setShowLog] = useState(false);
+  const pipeStartRef = useRef(Date.now());
+  const pipeTimerRef = useRef(null);
+  const pipeWsRef = useRef(null);
+  const pipePollRef = useRef(null);
+  const prevPipeStep = useRef(-1);
+
   /* ── Preset panel definitions ── */
   const ALL_INDICES = MUTATIONS.map((_, i) => i);
   const CORE5_LABELS = ["rpoB_S450L", "katG_S315T", "inhA_C-15T", "gyrA_D94G", "rrs_A1401G"];
@@ -797,11 +810,106 @@ const HomePage = ({ goTo, connected }) => {
     if (connected) {
       const { data, error: err } = await submitRun(runName, apiMode, muts, overrides);
       if (err) { setError(err); setLaunching(false); return; }
-      goTo("pipeline", { jobId: data.job_id });
+      startInlinePipeline(data.job_id);
     } else {
-      setTimeout(() => goTo("pipeline", { jobId: "mock-" + Date.now() }), 600);
+      startInlinePipeline("mock-" + Date.now());
     }
   };
+
+  /* ── Inline pipeline management ── */
+  const startInlinePipeline = (jobId) => {
+    setPipeJobId(jobId);
+    setPipeStep(0);
+    setPipeDone(false);
+    setPipeStats([]);
+    setPipeElapsed(0);
+    prevPipeStep.current = -1;
+    pipeStartRef.current = Date.now();
+    setLaunching(false);
+
+    // Elapsed timer
+    pipeTimerRef.current = setInterval(() => {
+      setPipeElapsed((Date.now() - pipeStartRef.current) / 1000);
+    }, 100);
+
+    if (connected) {
+      try {
+        const ws = connectJobWS(jobId,
+          (msg) => {
+            if (msg.current_module) {
+              const idx = MODULE_NAME_MAP[msg.current_module];
+              if (idx !== undefined) setPipeStep(idx);
+            }
+            if (msg.status === "complete" || msg.status === "completed") {
+              finishInlinePipeline(jobId);
+            }
+          },
+          () => { startInlinePolling(jobId); }
+        );
+        pipeWsRef.current = ws;
+      } catch {
+        startInlinePolling(jobId);
+      }
+    } else {
+      // Mock simulation
+      let i = 0;
+      const iv = setInterval(() => {
+        if (i >= MODULES.length) { clearInterval(iv); finishInlinePipeline(jobId); return; }
+        setPipeStep(i);
+        i++;
+      }, 800);
+    }
+  };
+
+  const startInlinePolling = (jobId) => {
+    pipePollRef.current = setInterval(async () => {
+      const { data } = await getJob(jobId);
+      if (data) {
+        const idx = MODULE_NAME_MAP[data.current_module] || 0;
+        setPipeStep(idx);
+        if (data.status === "complete" || data.status === "completed") {
+          finishInlinePipeline(jobId);
+          clearInterval(pipePollRef.current);
+        }
+      }
+    }, 2000);
+  };
+
+  const finishInlinePipeline = (jobId) => {
+    setPipeDone(true);
+    if (pipeTimerRef.current) clearInterval(pipeTimerRef.current);
+
+    if (connected) {
+      getResults(jobId).then(({ data }) => {
+        if (data?.module_stats?.length) setPipeStats(data.module_stats);
+      });
+    } else {
+      setPipeStats([
+        { module_id: "M1", detail: "14 mutations resolved on H37Rv", candidates_out: 14, duration_ms: 1 },
+        { module_id: "M2", detail: "34,364 positions scanned, 1,837 PAM sites, 238 candidates", candidates_out: 238, duration_ms: 74 },
+        { module_id: "M3", detail: "238 → 213 (25 removed: GC, homopolymer, Tm)", candidates_out: 213, duration_ms: 87 },
+        { module_id: "M4", detail: "213 → 183 (30 off-target hits, Bowtie2)", candidates_out: 183, duration_ms: 846 },
+        { module_id: "M5", detail: "213 scored (range 0.325–0.831)", candidates_out: 213, duration_ms: 4 },
+        { module_id: "M5.5", detail: "213 MUT/WT spacer pairs generated", candidates_out: 213, duration_ms: 3 },
+        { module_id: "M6", detail: "54 evaluated, 42 enhanced (seed pos 2–6)", candidates_out: 42, duration_ms: 34 },
+        { module_id: "M6.5", detail: "54 above 2× threshold (48 diagnostic-grade)", candidates_out: 54, duration_ms: 2 },
+        { module_id: "M7", detail: "14 selected (simulated annealing, 10K iterations)", candidates_out: 14, duration_ms: 3500 },
+        { module_id: "M8", detail: "28 primers designed, 378 dimer checks", candidates_out: 14, duration_ms: 3300 },
+        { module_id: "M8.5", detail: "0 crRNA-primer conflicts", candidates_out: 14, duration_ms: 15 },
+        { module_id: "M9", detail: "14 targets + IS6110 control = 15-plex", candidates_out: 15, duration_ms: 15 },
+        { module_id: "M10", detail: "JSON + TSV + FASTA exported", candidates_out: 15, duration_ms: 1 },
+      ]);
+    }
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pipeTimerRef.current) clearInterval(pipeTimerRef.current);
+      pipeWsRef.current?.close();
+      if (pipePollRef.current) clearInterval(pipePollRef.current);
+    };
+  }, []);
 
   const sectionTitle = (text) => (
     <div style={{ fontSize: mobile ? "18px" : "22px", fontWeight: 800, color: T.text, marginBottom: "12px", marginTop: mobile ? "32px" : "48px", letterSpacing: "-0.02em", fontFamily: HEADING }}>{text}</div>
@@ -1068,11 +1176,108 @@ const HomePage = ({ goTo, connected }) => {
               {scorer === "guard_net" ? "GUARD-Net" : "Heuristic"}
             </span>
           </div>
-          <Btn icon={launching ? Loader2 : Play} onClick={launch} disabled={launching || selected.size === 0}>
-            {launching ? "Launching…" : "Launch Pipeline"}
+          <Btn icon={launching ? Loader2 : Play} onClick={launch} disabled={launching || selected.size === 0 || !!pipeJobId}>
+            {launching ? "Launching…" : pipeJobId ? (pipeDone ? "Complete" : "Running…") : "Launch Pipeline"}
           </Btn>
         </div>
       </div>
+
+      {/* ═══ INLINE PIPELINE EXECUTION ═══ */}
+      {pipeJobId && (() => {
+        const activeModule = MODULES[pipeStep] || MODULES[0];
+        const ActiveIcon = activeModule.icon;
+        const statMap = {};
+        pipeStats.forEach(s => { statMap[s.module_id] = s; });
+        const totalDuration = pipeStats.reduce((s, m) => s + (m.duration_ms || 0), 0);
+        const fmtDur = (ms) => ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+        const m2Out = statMap["M2"]?.candidates_out || 0;
+        const finalSize = statMap["M9"]?.candidates_out || statMap["M7"]?.candidates_out || 0;
+
+        return (
+          <div style={{
+            background: "#ffffff", border: `1px solid ${T.border}`, borderRadius: "10px",
+            marginBottom: "24px", overflow: "hidden",
+          }}>
+            {/* Running state — single line, icon+name swipe up */}
+            {!pipeDone && (
+              <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: "14px" }}>
+                <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", animation: "subtlePulse 2s ease-in-out infinite" }}>
+                  <ActiveIcon size={16} color="#111" strokeWidth={1.8} />
+                </div>
+                <div key={pipeStep} style={{ flex: 1, display: "flex", alignItems: "baseline", gap: "8px", animation: "stepSwipeUp 0.25s ease-out" }}>
+                  <span style={{ fontFamily: MONO, fontSize: "11px", color: "#999" }}>{activeModule.id}</span>
+                  <span style={{ fontSize: "13px", fontWeight: 500, color: "#111" }}>{activeModule.name}</span>
+                </div>
+                <span style={{ fontFamily: MONO, fontSize: "11px", color: "#999", fontVariantNumeric: "tabular-nums" }}>{pipeElapsed.toFixed(1)}s</span>
+              </div>
+            )}
+
+            {/* Complete state — summary + logs toggle + CTA */}
+            {pipeDone && (
+              <div style={{ padding: "24px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                  <div>
+                    <div style={{ fontSize: "15px", fontWeight: 700, color: "#111", fontFamily: HEADING }}>Pipeline Complete</div>
+                    <div style={{ fontSize: "12px", color: "#999", fontFamily: MONO, marginTop: "2px" }}>
+                      {totalDuration > 0 ? fmtDur(totalDuration) : `${pipeElapsed.toFixed(1)}s`}
+                      {m2Out > 0 && ` · ${m2Out} candidates`}
+                      {finalSize > 0 && ` · ${finalSize} selected`}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => goTo("results", { jobId: pipeJobId })}
+                    style={{
+                      padding: "8px 20px", borderRadius: "6px",
+                      background: T.primary, color: "#fff", border: "none",
+                      fontSize: "12px", fontWeight: 600, fontFamily: FONT,
+                      cursor: "pointer", transition: "opacity 0.15s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                    onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                  >
+                    View Results →
+                  </button>
+                </div>
+
+                {/* Logs toggle */}
+                <button onClick={() => setShowLog(!showLog)} style={{
+                  background: "none", border: "none", cursor: "pointer", fontFamily: FONT,
+                  fontSize: "11px", color: "#999", display: "flex", alignItems: "center", gap: "4px", padding: 0,
+                }}>
+                  <ChevronDown size={12} style={{ transform: showLog ? "rotate(180deg)" : "none", transition: "0.2s" }} />
+                  {showLog ? "Hide" : "Show"} execution log
+                </button>
+
+                {showLog && (
+                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${T.borderLight}` }}>
+                    {MODULES.map((m, idx) => {
+                      const st = statMap[m.id];
+                      const Icon = m.icon;
+                      const isLast = idx === MODULES.length - 1;
+                      return (
+                        <div key={m.id} style={{ display: "flex", gap: "0" }}>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "20px", flexShrink: 0 }}>
+                            <Icon size={12} color="#111" strokeWidth={1.5} style={{ opacity: 0.6 }} />
+                            {!isLast && <div style={{ width: "1px", flex: 1, minHeight: "6px", background: "#e0e0e0" }} />}
+                          </div>
+                          <div style={{ flex: 1, paddingLeft: "8px", paddingBottom: isLast ? 0 : "2px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", height: "20px" }}>
+                              <span style={{ fontFamily: MONO, fontSize: "10px", color: "#999" }}>{m.id}</span>
+                              <span style={{ fontSize: "11px", fontWeight: 500, color: "#333" }}>{m.name}</span>
+                              {st && <span style={{ fontFamily: MONO, fontSize: "10px", color: "#bbb", marginLeft: "auto" }}>{fmtDur(st.duration_ms)}</span>}
+                            </div>
+                            {st && <div style={{ fontSize: "10px", color: "#999", lineHeight: 1.4, padding: "1px 0 3px" }}>{st.detail}</div>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ═══ HOW IT WORKS — 4-step simplified pipeline ═══ */}
       {sectionTitle("How It Works")}
@@ -1413,288 +1618,17 @@ const EX = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   PIPELINE PAGE — Immersive full-page execution experience
+   PIPELINE PAGE — Redirects to Home (execution is now inline)
    ═══════════════════════════════════════════════════════════════════ */
 const PipelinePage = ({ jobId, connected, goTo }) => {
   const mobile = useIsMobile();
-  const [step, setStep] = useState(0);
-  const [done, setDone] = useState(false);
-  const [jobData, setJobData] = useState(null);
-  const [moduleStats, setModuleStats] = useState([]);
-  const [showLog, setShowLog] = useState(false);
-  const [logExpandedId, setLogExpandedId] = useState(null);
-  const [cardPhase, setCardPhase] = useState("visible");
-  const [elapsed, setElapsed] = useState(0);
-  const wsRef = useRef(null);
-  const pollRef = useRef(null);
-  const startTimeRef = useRef(Date.now());
-  const elapsedRef = useRef(null);
-
-  /* Live elapsed timer */
-  useEffect(() => {
-    if (jobId && !done) {
-      startTimeRef.current = Date.now();
-      elapsedRef.current = setInterval(() => {
-        setElapsed(((Date.now() - startTimeRef.current) / 1000));
-      }, 100);
-      return () => clearInterval(elapsedRef.current);
-    }
-    if (done && elapsedRef.current) clearInterval(elapsedRef.current);
-  }, [jobId, done]);
-
-  /* WebSocket / polling / simulation */
-  useEffect(() => {
-    if (!jobId) return;
-    if (connected) {
-      try {
-        const ws = connectJobWS(jobId,
-          (msg) => {
-            if (msg.current_module) {
-              const idx = MODULE_NAME_MAP[msg.current_module];
-              if (idx !== undefined) setStep(idx);
-            }
-            if (msg.status === "complete" || msg.status === "completed") {
-              setDone(true);
-              setJobData(msg);
-            }
-          },
-          () => { startPolling(); }
-        );
-        wsRef.current = ws;
-      } catch {
-        startPolling();
-      }
-    } else {
-      simulateProgress();
-    }
-    return () => {
-      wsRef.current?.close();
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [jobId, connected]);
-
-  const startPolling = () => {
-    pollRef.current = setInterval(async () => {
-      const { data } = await getJob(jobId);
-      if (data) {
-        const idx = MODULE_NAME_MAP[data.current_module] || 0;
-        setStep(idx);
-        if (data.status === "complete" || data.status === "completed") {
-          setDone(true);
-          setJobData(data);
-          clearInterval(pollRef.current);
-        }
-      }
-    }, 2000);
-  };
-
-  const simulateProgress = () => {
-    let i = 0;
-    const iv = setInterval(() => {
-      if (i >= MODULES.length) { clearInterval(iv); setDone(true); return; }
-      setStep(i);
-      i++;
-    }, 800);
-  };
-
-  /* Vertical fade transition on step change */
-  const prevStepRef = useRef(0);
-  useEffect(() => {
-    if (step !== prevStepRef.current && !done) {
-      setCardPhase("exit");
-      setTimeout(() => {
-        setCardPhase("enter");
-        setTimeout(() => setCardPhase("visible"), 30);
-      }, 200);
-      prevStepRef.current = step;
-    }
-  }, [step, done]);
-
-  /* Completion transition */
-  useEffect(() => {
-    if (done) {
-      setCardPhase("exit");
-      setTimeout(() => {
-        setCardPhase("enter");
-        setTimeout(() => setCardPhase("visible"), 30);
-      }, 250);
-    }
-  }, [done]);
-
-  /* Fetch module stats on completion */
-  useEffect(() => {
-    if (done && jobId) {
-      if (connected) {
-        getResults(jobId).then(({ data }) => {
-          if (data?.module_stats?.length) setModuleStats(data.module_stats);
-        });
-      } else {
-        setModuleStats([
-          { module_id: "M1", detail: "14 mutations resolved on H37Rv", candidates_out: 14, duration_ms: 1 },
-          { module_id: "M2", detail: "34,364 positions scanned, 1,837 PAM sites, 238 candidates", candidates_out: 238, duration_ms: 74 },
-          { module_id: "M3", detail: "238 to 213 (25 removed: GC, homopolymer, Tm)", candidates_out: 213, duration_ms: 87 },
-          { module_id: "M4", detail: "213 to 183 (30 off-target hits, Bowtie2)", candidates_out: 183, duration_ms: 846 },
-          { module_id: "M5", detail: "213 scored (range 0.325 to 0.831)", candidates_out: 213, duration_ms: 4 },
-          { module_id: "M5.5", detail: "213 MUT/WT spacer pairs generated", candidates_out: 213, duration_ms: 3 },
-          { module_id: "M6", detail: "54 evaluated, 42 enhanced (seed positions 2 to 6)", candidates_out: 42, duration_ms: 34 },
-          { module_id: "M6.5", detail: "54 above 2x threshold (48 diagnostic-grade)", candidates_out: 54, duration_ms: 2 },
-          { module_id: "M7", detail: "14 selected (simulated annealing, 10K iterations)", candidates_out: 14, duration_ms: 3500 },
-          { module_id: "M8", detail: "28 primers designed, 378 dimer checks", candidates_out: 14, duration_ms: 3300 },
-          { module_id: "M8.5", detail: "0 crRNA-primer conflicts", candidates_out: 14, duration_ms: 15 },
-          { module_id: "M9", detail: "14 targets + IS6110 control = 15-plex", candidates_out: 15, duration_ms: 15 },
-          { module_id: "M10", detail: "JSON + TSV + FASTA exported", candidates_out: 15, duration_ms: 1 },
-        ]);
-      }
-    }
-  }, [done, jobId, connected]);
-
-  const statMap = {};
-  moduleStats.forEach((s) => { statMap[s.module_id] = s; });
-  const totalDuration = moduleStats.reduce((s, m) => s + (m.duration_ms || 0), 0);
-  const m2Out = statMap["M2"]?.candidates_out || 0;
-  const finalSize = statMap["M9"]?.candidates_out || statMap["M7"]?.candidates_out || 0;
-
-  const fmtDur = (ms) => ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
-
-  /* ── Empty state ── */
-  if (!jobId) {
-    return (
-      <div style={{ padding: mobile ? "16px" : "36px 40px" }}>
-        <div style={{ textAlign: "center", padding: mobile ? "48px 24px" : "80px 24px" }}>
-          <div style={{ width: 64, height: 64, borderRadius: "16px", background: "#f5f5f5", display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "20px" }}>
-            <Cpu size={28} color="#999" strokeWidth={1.5} />
-          </div>
-          <div style={{ fontSize: "18px", fontWeight: 700, color: EX.text, fontFamily: HEADING, marginBottom: "8px" }}>No pipeline running</div>
-          <p style={{ fontSize: "13px", color: EX.textSec, lineHeight: 1.6, maxWidth: 420, margin: "0 auto 24px" }}>
-            Configure your target mutations and launch the GUARD pipeline from the Home page.
-          </p>
-          <button onClick={() => goTo("home")} style={{ padding: "10px 24px", borderRadius: "8px", background: EX.text, color: "#fff", border: "none", fontSize: "13px", fontWeight: 600, fontFamily: FONT, cursor: "pointer" }}>
-            Configure & Launch
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  /* ── Execution ── */
-  const activeModule = MODULES[step] || MODULES[0];
-  const activeStat = statMap[activeModule.id];
-
-  /* Card vertical fade style */
-  const cardStyle = {
-    transform: cardPhase === "exit" ? "translateY(8px)" : cardPhase === "enter" ? "translateY(-8px)" : "translateY(0)",
-    opacity: cardPhase === "visible" ? 1 : 0,
-    transition: cardPhase === "exit" ? "all 0.15s ease-in" : "all 0.2s ease-out",
-  };
-
+  useEffect(() => { goTo("home"); }, []);
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100%", background: EX.bg, fontFamily: FONT, color: EX.text, padding: mobile ? "32px 20px" : "48px 48px" }}>
-
-      {(() => {
-        /* Build step rows — shared between running and complete states */
-        const stepRows = !done ? MODULES.slice(0, step + 1) : MODULES;
-        const totalRows = !done ? step + 1 : MODULES.length;
-        return stepRows.map((m, idx) => {
-          const st = statMap[m.id];
-          const Icon = m.icon;
-          const isActive = !done && idx === step;
-          const isLast = idx === totalRows - 1;
-          const isLogExpanded = done && logExpandedId === m.id;
-          return (
-            <div key={m.id} style={{ display: "flex", gap: "0" }}>
-              {/* Left: icon + vertical line */}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "24px", flexShrink: 0 }}>
-                <div style={{
-                  width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center",
-                  ...(isActive ? { animation: "subtlePulse 2s ease-in-out infinite" } : {}),
-                }}>
-                  <Icon size={14} color={isActive ? EX.nodeDone : (!done && !isActive) ? EX.nodeDone : EX.nodeDone} strokeWidth={isActive ? 1.8 : 1.5} style={{ opacity: isActive || done ? 1 : 0.5 }} />
-                </div>
-                {!isLast && (
-                  <div style={{ width: "1px", flex: 1, minHeight: "8px", background: EX.line }} />
-                )}
-              </div>
-              {/* Right: content */}
-              <div style={{ flex: 1, paddingLeft: "10px", paddingBottom: isLast ? "0" : "4px" }}>
-                <div
-                  onClick={() => done && st && setLogExpandedId(isLogExpanded ? null : m.id)}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "8px", height: "24px",
-                    cursor: done && st ? "pointer" : "default",
-                    opacity: isActive || done ? 1 : 0.5,
-                    ...(!done && isActive ? cardStyle : {}),
-                  }}
-                >
-                  <span style={{ fontFamily: MONO, fontSize: "12px", color: EX.textSec }}>{m.id}</span>
-                  <span style={{ fontSize: "13px", fontWeight: 500, color: EX.text }}>{m.name}</span>
-                  {isActive && <span style={{ fontFamily: MONO, fontSize: "11px", color: EX.textTer, marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>{elapsed.toFixed(1)}s</span>}
-                  {!isActive && st && <span style={{ fontFamily: MONO, fontSize: "11px", color: EX.textTer, marginLeft: "auto" }}>{fmtDur(st.duration_ms)}</span>}
-                </div>
-                {/* Expandable detail (complete state only) */}
-                {done && (
-                  <div style={{
-                    overflow: "hidden", maxHeight: isLogExpanded && st ? "80px" : "0px",
-                    opacity: isLogExpanded ? 1 : 0, transition: "max-height 0.2s ease, opacity 0.15s ease",
-                  }}>
-                    {st && (
-                      <div style={{ fontSize: "12px", fontWeight: 400, color: EX.desc, lineHeight: 1.6, padding: "4px 0 6px" }}>
-                        {st.detail}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        });
-      })()}
-
-      {done && (
-        <>
-          {/* Divider */}
-          <div style={{ height: "1px", background: EX.line, margin: "20px 0" }} />
-
-          {/* Summary */}
-          <div style={{ ...cardStyle }}>
-            <div style={{ fontSize: mobile ? "20px" : "24px", fontWeight: 700, color: EX.text, fontFamily: HEADING, letterSpacing: "-0.02em" }}>
-              Pipeline Complete
-            </div>
-            <div style={{ fontFamily: MONO, fontSize: "13px", color: EX.textTer, marginTop: "4px", fontVariantNumeric: "tabular-nums" }}>
-              {totalDuration > 0 ? fmtDur(totalDuration) : `${elapsed.toFixed(1)}s`}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "20px", marginBottom: "24px" }}>
-              {[
-                statMap["M1"] && `${statMap["M1"].candidates_out} mutations resolved`,
-                m2Out > 0 && `${m2Out} candidates generated`,
-                finalSize > 0 && `${finalSize} selected for panel`,
-                statMap["M8"] && `${statMap["M8"].detail?.match(/(\d+) primers/)?.[0] || "Primers designed"}`,
-              ].filter(Boolean).map((line, i) => (
-                <div key={i} style={{
-                  fontFamily: MONO, fontSize: "13px", fontWeight: 400, color: EX.text, lineHeight: 1.6,
-                  animation: `statFadeIn 0.3s ease-out ${i * 0.06}s both`,
-                }}>
-                  {line}
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={() => goTo("results", { jobId })}
-              style={{
-                padding: "10px 28px", borderRadius: "6px",
-                background: EX.text, color: "#ffffff", border: "none",
-                fontSize: "13px", fontWeight: 600, fontFamily: FONT,
-                cursor: "pointer", transition: "opacity 0.15s ease",
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.8"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
-            >
-              View Results →
-            </button>
-          </div>
-        </>
-      )}
+    <div style={{ padding: mobile ? "16px" : "36px 40px", textAlign: "center" }}>
+      <div style={{ padding: "80px 24px" }}>
+        <Cpu size={28} color="#999" strokeWidth={1.5} />
+        <div style={{ fontSize: "14px", color: "#999", marginTop: "12px" }}>Redirecting to Home…</div>
+      </div>
     </div>
   );
 };
@@ -3878,6 +3812,7 @@ const GUARDPlatform = () => {
         @keyframes pageIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes pulseDot { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
         @keyframes stepSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes stepSwipeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes statReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes subtlePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes indeterminateProgress { 0% { width: 0%; margin-left: 0%; } 50% { width: 60%; margin-left: 20%; } 100% { width: 0%; margin-left: 100%; } }
