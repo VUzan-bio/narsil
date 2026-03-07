@@ -1669,6 +1669,8 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
         });
       })()}
 
+      {done && (
+        <>
           {/* Divider */}
           <div style={{ height: "1px", background: EX.line, margin: "20px 0" }} />
 
