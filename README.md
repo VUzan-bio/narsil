@@ -1,82 +1,39 @@
-# GUARD
+# <img src="logo.png" alt="GUARD logo" height="32" style="vertical-align: middle;"> GUARD
 
 **Guide RNA Automated Resistance Diagnostics**
 
-Computational design of multiplexed CRISPR-Cas12a diagnostic panels for
-drug-resistant *Mycobacterium tuberculosis*
+Computational pipeline for designing multiplexed CRISPR-Cas12a diagnostic panels targeting drug-resistant *Mycobacterium tuberculosis*.
+
 ---
 
-GUARD is an end-to-end computational pipeline that takes WHO-catalogued drug-resistance mutations as input and produces ready-to-order crRNA spacer sequences and RPA primer pairs for a multiplexed CRISPR-Cas12a electrochemical diagnostic panel. The pipeline handles PAM deserts in the GC-rich *M. tuberculosis* genome (65.6% GC) through automatic proximity detection with allele-specific RPA primer design, and integrates biophysical heuristic scoring with a temperature-calibrated convolutional neural network ensemble (Spearman ρ = 0.74 on validation). GUARD designs a complete 15-channel MDR-TB panel — covering rifampicin, isoniazid, ethambutol, pyrazinamide, fluoroquinolone, and aminoglycoside resistance plus an IS6110 species control — in under 15 seconds. The output is compatible with isothermal (37 °C) recombinase polymerase amplification and electrochemical transduction from clinical blood samples.
-
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| Multi-PAM scanning | enAsCas12a expanded PAM recognition (TTTV/TTTN/TTCN/TCTV/CTTV) with variable spacer lengths (18–23 nt) |
-| PAM desert handling | Automatic proximity fallback with allele-specific RPA primer design for high-GC regions |
-| Dual scoring | Heuristic biophysical features + temperature-calibrated SeqCNN ensemble (ρ = 0.74) |
-| Discrimination modelling | Position-dependent mismatch penalties with synthetic mismatch enhancement (2–6× → 10–100×) |
-| Off-target screening | Bowtie2 alignment against complete H37Rv genome (≤3 mismatches, 4.41 Mb) |
-| Multiplex optimisation | Simulated annealing panel selection (10,000 iterations) minimising cross-reactivity |
-| RPA primer co-design | Standard (28–38 nt) + allele-specific primers with crRNA compatibility validation |
-| Pipeline transparency | Per-module statistics with candidate funnel tracking (34,364 → 238 → 15) |
+GUARD takes WHO-catalogued drug-resistance mutations as input and produces ready-to-order crRNA sequences, RPA primer pairs, and a fully optimised multiplex panel for CRISPR-Cas12a electrochemical diagnostics. The pipeline handles PAM deserts in the GC-rich *M. tuberculosis* genome (65.6% GC) through automatic proximity detection with allele-specific RPA primer design. Guide scoring uses a three-level hierarchy — biophysical heuristic, temperature-calibrated SeqCNN, and GUARD-Net (dual-branch CNN + RNA-FM with physics-informed R-loop attention) — blended via Spearman-optimised ensemble weighting. GUARD designs a complete 15-channel MDR-TB panel — covering rifampicin, isoniazid, ethambutol, pyrazinamide, fluoroquinolone, and aminoglycoside resistance plus an IS6110 species control — in under 15 seconds.
 
 ## Pipeline
 
-<img width="3398" height="1147" alt="Gemini_Generated_Image_xkbngfxkbngfxkbn" src="https://github.com/user-attachments/assets/89c58154-ba94-4e98-94ec-c2c8580c4c99" />
+<img width="3398" height="1147" alt="GUARD pipeline architecture" src="https://github.com/user-attachments/assets/89c58154-ba94-4e98-94ec-c2c8580c4c99" />
 
-## Quick Start
+Ten modules execute sequentially:
 
-### Prerequisites
+1. **Target Resolution** — WHO-catalogued mutations → genomic coordinates on H37Rv (5-strategy offset resolver)
+2. **PAM Scanning** — Both strands scanned for Cas12a-compatible PAMs (TTTV canonical + enAsCas12a relaxed: TTTN, TTCN, TCTV, CTTV) with variable spacer lengths (18–23 nt)
+3. **Candidate Filtering** — Biophysical constraints: GC 30–70%, homopolymer < 5, self-complementarity ΔG check
+4. **Off-Target Screening** — Bowtie2 alignment against complete H37Rv genome (4.41 Mb, ≤3 mismatches flagged)
+5. **Scoring** — Three-level hierarchy (see below), producing ranked candidates with calibrated scores
+6. **Mismatch Pairs + SM Enhancement** — WT/MUT spacer pairs generated; synthetic mismatches at seed positions 2–6 boost discrimination from 2–6× to 10–100×
+7. **Discrimination Scoring** — Position-dependent MUT/WT activity ratio quantification
+8. **Multiplex Optimisation** — Simulated annealing over candidate combinations (10,000 iterations), minimising cross-reactivity
+9. **RPA Primer Design** — Standard (28–38 nt, Tm 57–72 °C) + allele-specific primers for proximity candidates, with dimer ΔG checking
+10. **Panel Assembly + Export** — Final panel with crRNA sequences, primer pairs, amplicon maps, discrimination predictions → JSON, TSV, FASTA
 
-- Python ≥ 3.11
-- Node.js ≥ 18 (frontend)
-- Bowtie2 (off-target screening; optional, heuristic fallback available)
+For mutations in PAM-desert regions (e.g. *rpoB* RRDR, 70%+ GC with no T-rich PAM within 50 bp), the pipeline automatically falls back to **proximity detection**: the crRNA targets a nearby accessible site while an allele-specific RPA primer bridges the mutation for discrimination.
 
-### Installation
+## Scoring Hierarchy
 
-```bash
-git clone https://github.com/vuzan/guard.git
-cd guard
+Three scoring levels, each temperature-calibrated. `composite_score` automatically selects the best available: ensemble > calibrated ML > raw ML > heuristic.
 
-# Backend
-pip install -e ".[dev]"
+### Level 1 — Biophysical Heuristic
 
-# Frontend
-cd guard-ui
-npm install
-
-# (Optional) Bowtie2 index for off-target screening
-bowtie2-build data/references/H37Rv.fasta data/references/H37Rv
-```
-
-### Run
-
-```bash
-# Backend (FastAPI)
-uvicorn api.main:app --reload --port 8000
-
-# Frontend (separate terminal)
-cd guard-ui
-npm run dev
-```
-
-Navigate to `http://localhost:5173`.
-
-### CLI
-
-```bash
-guard run-full -c configs/mdr_14plex.yaml    # Modules 1–10 (end-to-end)
-guard run -c configs/mdr_14plex.yaml          # Modules 1–5 (basic)
-guard design -r H37Rv.fasta -g H37Rv.gff3     # 14-plex MDR-TB panel
-guard info                                     # Pipeline version + capabilities
-```
-
-## Scoring Models
-
-### Biophysical Heuristic
-
-Weighted sum of five sequence features derived from high-throughput Cas12a activity profiling:
+Weighted sum of five sequence features from high-throughput Cas12a activity profiling:
 
 | Feature | Weight | Reference |
 |---------|--------|-----------|
@@ -84,27 +41,64 @@ Weighted sum of five sequence features derived from high-throughput Cas12a activ
 | GC content | 0.20 | Kim et al., *Nat Biotechnol* 2018 |
 | Secondary structure (ΔG) | 0.20 | Nearest-neighbour thermodynamics |
 | Homopolymer penalty | 0.10 | Zetsche et al., *Cell* 2015 |
-| Off-target count | 0.15 | Bowtie2; Langmead & Salzberg, *Nat Methods* 2012 |
+| Off-target count | 0.15 | Bowtie2; Langmead & Salzberg 2012 |
 
-### SeqCNN
+### Level 2 — SeqCNN
 
-Convolutional neural network predicting Cas12a guide activity from one-hot encoded 34-nt input sequences.
+Convolutional neural network predicting Cas12a guide activity from one-hot encoded 34-nt input.
 
-- **Architecture**: Multi-scale parallel Conv1d (k=3,5,7) → dilated Conv1d (d=1,2) with residual connections → adaptive average pooling → dense head (128→64→32→1)
-- **Parameters**: 110,009
-- **Training data**: 15,000 AsCas12a guides (Kim et al., *Nat Biotechnol* 2018)
+- **Architecture**: Multi-scale parallel Conv1d (k=3,5,7) → dilated Conv1d (d=1,2) with residual connections → adaptive pooling → dense head (128→64→32→1)
+- **Parameters**: 110K
+- **Training data**: 15,000 AsCas12a guides (Kim et al. 2018 HT-PAMDA)
 - **Loss**: Huber (δ=1.0) + differentiable Spearman regulariser (λ=0.1)
-- **Validation ρ**: 0.74 (Spearman, within-library HT2)
-- **Test ρ**: 0.53 (Spearman, cross-library generalisation HT3)
-- **Calibration**: Temperature scaling (T=7.5) spreads saturated sigmoid outputs from [0.01, 0.97] to [0.36, 0.61]
+- **Validation ρ**: 0.74 · Test ρ: 0.53 (cross-library)
+- **Calibration**: T = 7.53, α = 0.007
 
-### Ensemble
+### Level 3 — GUARD-Net
 
-Final score = α × heuristic + (1 − α) × calibrated CNN, where α = 0.007 is optimised to maximise Spearman ρ on the validation set. The near-zero α reflects the CNN's superior ranking ability over the simplified heuristic applied to raw sequences.
+Dual-branch architecture with physics-informed attention, purpose-built for diagnostic guide scoring.
+
+```
+Target DNA (4×34 one-hot) ──→ [CNN Branch: multi-scale Conv1d] ──→ (B, 34, 64) ─┐
+                                                                                   ├─→ concat ─→ [RLPA] ─→ pool ─→ [Efficiency Head] ─→ score
+crRNA spacer (20×640 RNA-FM) ─→ [Projection + zero-pad to 34] ──→ (B, 34, 64) ─┘
+```
+
+- **CNN branch**: Multi-scale Conv1d (k=3,5,7,9) with batch norm → 64-dim per-position features from target DNA
+- **RNA-FM branch**: Frozen RNA-FM embeddings (640-dim) projected to 64-dim, zero-padded from 20 to 34 positions (crRNA spacer → full target alignment)
+- **RLPA** (R-Loop Propagation Attention): Causal self-attention encoding Cas12a R-loop propagation directionality (PAM-proximal → distal). Biophysically motivated: Cas12a unwinds DNA directionally from the PAM, so position 1 influences all downstream positions but not vice versa
+- **Efficiency head**: 128→64→32→1 with GELU + dropout, sigmoid output
+- **Parameters**: ~235K total (RNA-FM frozen; CNN ~65K, projection ~60K, RLPA ~25K, heads ~85K)
+- **Training data**: Kim et al. 2018 + Huang et al. 2024 (EasyDesign)
+- **Validation ρ**: 0.71 · Test ρ: 0.50
+- **Calibration**: T = 0.74 (quantile-matched), α = 0.028
+
+### Temperature Calibration & Ensemble
+
+Each scorer applies: `calibrated = sigmoid(logit(raw) / T)`, then `ensemble = α × heuristic + (1 − α) × calibrated`.
+
+Temperature calibration maps raw sigmoid outputs onto the target activity distribution via quantile matching at the 10th/25th/50th/75th/90th percentiles. This ensures Block 3 threshold decisions (efficiency ≥ 0.3/0.4/0.6) operate on properly scaled values rather than compressed sigmoid ranges. The near-zero α values reflect the ML scorers' superior ranking ability (ρ > 0.7) over the simplified heuristic (ρ ≈ 0.18).
+
+| Scorer | T | α | Calibrated range | Val ρ |
+|--------|---|---|-----------------|-------|
+| SeqCNN | 7.53 | 0.007 | [0.36, 0.61] | 0.74 |
+| GUARD-Net | 0.74 | 0.028 | [0.01, 0.97] | 0.71 |
+
+## Block 3 — Optimisation & Diagnostics
+
+Three configurable presets control candidate selection stringency:
+
+| Preset | Efficiency ≥ | Discrimination ≥ | Use case |
+|--------|-------------|-------------------|----------|
+| High sensitivity | 0.30 | 2× | Early screening, maximum coverage |
+| Balanced | 0.40 | 3× | WHO TPP-aligned clinical deployment |
+| High specificity | 0.60 | 5× | Confirmatory testing, minimal false positives |
+
+Diagnostic metrics include per-drug-class sensitivity/specificity against WHO Target Product Profiles, coverage gap identification, and per-test cost estimation.
 
 ## Example: 14-plex MDR-TB Panel
 
-Input: 14 WHO-catalogued resistance mutations across 6 drug classes (RIF, INH, EMB, PZA, FQ, AG).
+Input: 14 WHO-catalogued resistance mutations across 6 drug classes.
 
 | Target | Drug | Strategy | Disc. | Score | Primers | SM |
 |--------|------|----------|-------|-------|---------|----|
@@ -124,120 +118,50 @@ Input: 14 WHO-catalogued resistance mutations across 6 drug classes (RIF, INH, E
 | *rrs* A1401G | AG | Direct | 3.3× | 0.598 | Standard | No |
 | IS6110 | Control | Direct | — | — | Standard | No |
 
-15/15 candidates with primers · 6 direct targets with diagnostic-grade discrimination (≥3×) · 42 SM-enhanced candidates · 34,364 positions scanned → 1,037 PAM sites → 238 candidates → 15 selected · 14.4 seconds
+15/15 candidates with primers · 6 direct targets with diagnostic-grade discrimination (≥3×) · 42 SM-enhanced candidates · 34,364 → 1,037 → 238 → 15 · 14.4 s
 
-## Project Structure
+## Training
 
-```
-guard/
-├── core/                       # Data models, config, constants
-│   ├── types.py                # CrRNACandidate, Target, PanelMember
-│   ├── config.py               # YAML-driven PipelineConfig
-│   └── constants.py            # IS6110 control, gene synonyms
-├── targets/                    # M1: target resolution
-│   ├── resolver.py             # 5-strategy offset resolver
-│   └── who_parser.py           # WHO catalogue parser
-├── candidates/                 # M2–M3: generation + filtering
-│   ├── scanner.py              # Multi-PAM scanning
-│   ├── filters.py              # Organism-aware biophysical filtering
-│   ├── mismatch.py             # M5.5: MUT/WT spacer pair generation
-│   └── synthetic_mismatch.py   # M6: SM enhancement engine
-├── offtarget/                  # M4: off-target screening
-│   └── screener.py             # Bowtie2 + heuristic fallback
-├── scoring/                    # M5–M6.5: scoring hierarchy
-│   ├── base.py                 # Abstract Scorer interface
-│   ├── heuristic.py            # Level 1: rule-based composite
-│   ├── seq_cnn.py              # SeqCNN model architecture (PyTorch)
-│   ├── sequence_ml.py          # Level 2: CNN scorer with calibration
-│   ├── preprocessing.py        # One-hot encoding, input windows
-│   ├── train_cnn.py            # Training script (Huber + Spearman loss)
-│   ├── calibrate.py            # Temperature scaling + ensemble optimisation
-│   ├── discrimination.py       # Mismatch discrimination scorer
-│   └── jepa.py                 # Level 3: B-JEPA integration (stub)
-├── multiplex/                  # M7: panel optimisation
-│   └── optimizer.py            # Simulated annealing
-├── primers/                    # M8–M8.5: primer design
-│   ├── standard_rpa.py         # Standard RPA (28–38 nt, Tm 60–65 °C)
-│   ├── as_rpa.py               # AS-RPA with deliberate 3' mismatches
-│   └── coselection.py          # crRNA–primer compatibility
-├── pipeline/                   # Orchestration
-│   ├── runner.py               # GUARDPipeline.run_full() — M1–M10
-│   └── cli.py                  # CLI entry points
-├── data/
-│   ├── references/             # H37Rv FASTA + Bowtie2 index
-│   └── kim2018/                # Training data (not tracked — see README)
-├── weights/
-│   ├── seq_cnn_best.pt         # Trained CNN checkpoint
-│   └── calibration.json        # Temperature + ensemble parameters
-├── viz/                        # Publication figure modules
-│   └── style.py                # Nature Methods–style plotting
-└── panels/                     # Pre-defined panel configurations
-    └── mdr_tb.py               # 14-plex MDR-TB definitions
-
-api/                            # FastAPI backend
-├── main.py                     # Application factory + CORS + SPA middleware
-├── routes/                     # REST endpoints (pipeline, results, figures)
-├── schemas.py                  # Pydantic response models
-├── state.py                    # Job queue + AppState
-└── ws.py                       # WebSocket progress streaming
-
-guard-ui/                       # React + Vite frontend
-└── src/App.jsx                 # Single-page application
-```
-
-## Training Data
-
-The CNN is trained on the Seq-deepCpf1 dataset:
-
-> Kim HK, Min S, Song M, et al. Deep learning improves prediction of CRISPR–Cpf1 guide RNA activity. *Nature Biotechnology* **36**, 239–241 (2018). DOI: [10.1038/nbt.4061](https://doi.org/10.1038/nbt.4061)
-
-Data source: [Paired-Library (GitHub)](https://github.com/MyungjaeSong/Paired-Library)
-
-Three independent HEK293T libraries (HT1/HT2/HT3) with ~15,000 AsCas12a guides each. HT1 is used for training, HT2 for validation and hyperparameter tuning, HT3 for held-out testing. Labels are log₂-transformed indel frequencies normalised to [0, 1].
-
-To train from scratch:
+### SeqCNN
 
 ```bash
 python -m guard.scoring.train_cnn --data-dir guard/data/kim2018/ --epochs 200
 python -m guard.scoring.calibrate
 ```
 
+### GUARD-Net
+
+```bash
+# Phase 1: CNN + RNA-FM + RLPA
+cd guard-net && python scripts/run_phase1_rlpa.py
+
+# Temperature calibration (quantile-matched on Kim 2018 validation)
+python -m guard.scoring.calibrate_guard_net
+```
+
+Training data: Kim et al. 2018 HT-PAMDA — three independent HEK293T libraries (HT1/HT2/HT3) with ~15,000 AsCas12a guides each. HT1 for training, HT2 for validation and calibration, HT3 for held-out testing. Labels are log₂-transformed indel frequencies normalised to [0, 1]. Source: [Paired-Library (GitHub)](https://github.com/MyungjaeSong/Paired-Library).
+
 ## References
 
-1. Kim HK, Min S, Song M, et al. Deep learning improves prediction of CRISPR–Cpf1 guide RNA activity. *Nat Biotechnol* **36**, 239–241 (2018). [DOI](https://doi.org/10.1038/nbt.4061)
-
-2. Strohkendl I, Saifuddin FA, Rybarski JR, et al. Kinetic basis for DNA target specificity of CRISPR-Cas12a. *Mol Cell* **71**, 816–824 (2018). [DOI](https://doi.org/10.1016/j.molcel.2018.06.043)
-
-3. Kleinstiver BP, Sobers AN, Calvo SE, et al. Engineered CRISPR-Cas12a variants with increased activities and improved targeting ranges. *Nat Biotechnol* **37**, 276–282 (2019). [DOI](https://doi.org/10.1038/s41587-018-0011-0)
-
-4. Chen JS, Ma E, Harrington LB, et al. CRISPR-Cas12a target binding unleashes indiscriminate single-stranded DNase activity. *Science* **360**, 436–439 (2018). [DOI](https://doi.org/10.1126/science.aar6245)
-
-5. Zetsche B, Gootenberg JS, Abudayyeh OO, et al. Cpf1 is a single RNA-guided endonuclease of a class 2 CRISPR-Cas system. *Cell* **163**, 759–771 (2015). [DOI](https://doi.org/10.1016/j.cell.2015.09.038)
-
+1. Kim HK, et al. Deep learning improves prediction of CRISPR–Cpf1 guide RNA activity. *Nat Biotechnol* **36**, 239–241 (2018). [DOI](https://doi.org/10.1038/nbt.4061)
+2. Strohkendl I, et al. Kinetic basis for DNA target specificity of CRISPR-Cas12a. *Mol Cell* **71**, 816–824 (2018). [DOI](https://doi.org/10.1016/j.molcel.2018.06.043)
+3. Kleinstiver BP, et al. Engineered CRISPR-Cas12a variants with increased activities and improved targeting ranges. *Nat Biotechnol* **37**, 276–282 (2019). [DOI](https://doi.org/10.1038/s41587-018-0011-0)
+4. Chen JS, et al. CRISPR-Cas12a target binding unleashes indiscriminate single-stranded DNase activity. *Science* **360**, 436–439 (2018). [DOI](https://doi.org/10.1126/science.aar6245)
+5. Zetsche B, et al. Cpf1 is a single RNA-guided endonuclease of a class 2 CRISPR-Cas system. *Cell* **163**, 759–771 (2015). [DOI](https://doi.org/10.1016/j.cell.2015.09.038)
 6. Langmead B, Salzberg SL. Fast gapped-read alignment with Bowtie 2. *Nat Methods* **9**, 357–359 (2012). [DOI](https://doi.org/10.1038/nmeth.1923)
-
-7. Piepenburg O, Williams CH, Stemple DL, Armes NA. DNA detection using recombination proteins. *PLoS Biol* **4**, e204 (2006). [DOI](https://doi.org/10.1371/journal.pbio.0040204)
-
-8. Ai JW, Zhou X, Xu T, et al. CRISPR-based rapid and ultra-sensitive diagnostic test for *Mycobacterium tuberculosis*. *Emerg Microbes Infect* **8**, 1361–1369 (2019). [DOI](https://doi.org/10.1080/22221751.2019.1664939)
-
-9. Broughton JP, Deng X, Yu G, et al. CRISPR–Cas12-based detection of SARS-CoV-2. *Nat Biotechnol* **38**, 870–874 (2020). [DOI](https://doi.org/10.1038/s41587-020-0513-4)
-
-10. Gootenberg JS, Abudayyeh OO, Kellner MJ, et al. Multiplexed and portable nucleic acid detection platform with Cas13, Cas12a, and Csm6. *Science* **360**, 439–444 (2018). [DOI](https://doi.org/10.1126/science.aaq0179)
-
-11. Huang B, Guo L, Yin H, et al. Deep learning enhancing guide RNA design for CRISPR/Cas12a-based diagnostics. *iMeta* **3**, e214 (2024). [DOI](https://doi.org/10.1002/imt2.214)
-
-12. WHO. Catalogue of mutations in *Mycobacterium tuberculosis* complex and their association with drug resistance, 2nd edition. Geneva: World Health Organization (2023).
+7. Chen J, et al. Interpretable RNA Foundation Model from Unannotated Data for Highly Accurate RNA Structure and Function Predictions. *arXiv:2204.00300* (2022). [arXiv](https://arxiv.org/abs/2204.00300)
+8. Huang B, et al. Deep learning enhancing guide RNA design for CRISPR/Cas12a-based diagnostics. *iMeta* **3**, e214 (2024). [DOI](https://doi.org/10.1002/imt2.214)
+9. Broughton JP, et al. CRISPR–Cas12-based detection of SARS-CoV-2. *Nat Biotechnol* **38**, 870–874 (2020). [DOI](https://doi.org/10.1038/s41587-020-0513-4)
+10. WHO. Catalogue of mutations in *Mycobacterium tuberculosis* complex and their association with drug resistance, 2nd edition. Geneva: World Health Organization (2023).
 
 ## Citation
-
-If you use GUARD in your research, please cite:
 
 ```bibtex
 @software{guard2025,
   author = {Uzan, Valentin},
   title = {GUARD: Guide RNA Automated Resistance Diagnostics},
   year = {2025},
-  url = {https://github.com/vuzan/guard},
+  url = {https://github.com/VUzan-bio/guard},
   note = {Computational pipeline for multiplexed CRISPR-Cas12a MDR-TB diagnostics}
 }
 ```
