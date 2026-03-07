@@ -524,12 +524,19 @@ class ScoredCandidate(BaseModel):
 
     @property
     def composite_score(self) -> float:
-        """Heuristic composite score for ranking.
+        """Best available score for ranking and threshold decisions.
 
-        Always uses heuristic — CNN score is displayed separately for comparison.
+        Priority: ensemble_score > calibrated ML > raw ML > heuristic.
         Proximity candidates get a 0.8× penalty to prefer direct when both exist.
         """
-        base = self.heuristic.composite
+        if self.ensemble_score is not None:
+            base = self.ensemble_score
+        elif self.cnn_calibrated is not None:
+            base = self.cnn_calibrated
+        elif self.ml_scores:
+            base = max(s.predicted_efficiency for s in self.ml_scores)
+        else:
+            base = self.heuristic.composite
         if self.candidate.is_proximity:
             return base * 0.8
         return base

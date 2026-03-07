@@ -1,0 +1,23 @@
+{
+  "model": "guard_net",
+  "temperature": 0.7448,
+  "alpha": 0.0281,
+  "use_rnafm": true,
+  "use_rlpa": true,
+  "val_rho_gn_raw": 0.7057,
+  "val_rho_gn_calibrated": 0.7057,
+  "val_rho_heuristic": 0.1837,
+  "val_rho_ensemble": 0.706,
+  "test_rho_gn_raw": 0.5003,
+  "test_rho_gn_calibrated": 0.5003,
+  "test_rho_ensemble": 0.5014,
+  "val_gn_raw_range": [
+    0.0272,
+    0.9317
+  ],
+  "val_gn_calibrated_range": [
+    0.0082,
+    0.9709
+  ],
+  "val_rho_from_checkpoint": 0.7362
+}

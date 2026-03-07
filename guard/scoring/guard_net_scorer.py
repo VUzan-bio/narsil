@@ -22,7 +22,9 @@ Usage in runner.py:
 
 from __future__ import annotations
 
+import json
 import logging
+import math
 import sys
 from pathlib import Path
 from typing import Optional
@@ -44,6 +46,7 @@ logger = logging.getLogger(__name__)
 _CONTEXT_LENGTH = 34
 _GUARD_NET_DIR = Path(__file__).resolve().parent.parent.parent / "guard-net"
 _DEFAULT_WEIGHTS = Path(__file__).resolve().parent.parent / "weights" / "guard_net_best.pt"
+_DEFAULT_CALIBRATION = Path(__file__).resolve().parent.parent / "weights" / "guard_net_calibration.json"
 
 # Complement tables
 _DNA_COMPLEMENT = {"A": "T", "T": "A", "C": "G", "G": "C", "N": "N"}
@@ -65,6 +68,7 @@ class GUARDNetScorer(Scorer):
         weights_path: Optional[str | Path] = None,
         heuristic_fallback: Optional[Scorer] = None,
         rnafm_cache_dir: Optional[str | Path] = None,
+        calibration_path: Optional[str | Path] = None,
         use_rlpa: bool = True,
         use_rnafm: bool = True,
         multitask: bool = False,
@@ -80,6 +84,12 @@ class GUARDNetScorer(Scorer):
         self._multitask = multitask
         self._rnafm_cache = None
 
+        # Calibration parameters
+        self.temperature: float = 1.0
+        self.alpha: float = 0.0
+        self.calibrated: bool = False
+        self._calibration_meta: dict = {}
+
         # Resolve weights path
         if weights_path is None:
             weights_path = _DEFAULT_WEIGHTS
@@ -92,6 +102,10 @@ class GUARDNetScorer(Scorer):
                 "GUARD-Net weights not found at %s — scorer will use heuristic fallback",
                 weights_path,
             )
+
+        # Load calibration
+        cal_path = Path(calibration_path) if calibration_path else _DEFAULT_CALIBRATION
+        self._load_calibration(cal_path)
 
         # Load RNA-FM embedding cache
         if use_rnafm and rnafm_cache_dir is not None:
@@ -108,6 +122,26 @@ class GUARDNetScorer(Scorer):
     def validation_rho(self) -> Optional[float]:
         return self._val_rho
 
+    @property
+    def calibration_meta(self) -> dict:
+        return dict(self._calibration_meta)
+
+    def calibrated_score(self, raw_score: float) -> float:
+        """Apply temperature calibration: sigmoid(logit(raw) / T).
+
+        Spreads compressed sigmoid outputs so threshold decisions
+        (efficiency >= 0.4, etc.) work on a properly scaled range.
+        """
+        if not self.calibrated or self.temperature <= 0:
+            return raw_score
+        clamped = max(1e-7, min(1 - 1e-7, raw_score))
+        logit = math.log(clamped / (1 - clamped))
+        return 1.0 / (1.0 + math.exp(-logit / self.temperature))
+
+    def ensemble_score_val(self, heuristic_score: float, gn_calibrated: float) -> float:
+        """Compute ensemble: alpha * heuristic + (1 - alpha) * calibrated_gn."""
+        return self.alpha * heuristic_score + (1 - self.alpha) * gn_calibrated
+
     def score(
         self,
         candidate: CrRNACandidate,
@@ -117,6 +151,8 @@ class GUARDNetScorer(Scorer):
 
         Always computes heuristic as the base score (composite_score uses it).
         Adds GUARD-Net prediction as an MLScore if model is available.
+        When calibrated, populates cnn_calibrated and ensemble_score fields
+        so composite_score and Block 3 thresholds use calibrated values.
         """
         # Heuristic baseline (required — composite_score delegates to it)
         if self._fallback:
@@ -133,6 +169,14 @@ class GUARDNetScorer(Scorer):
                 predicted_efficiency=prediction,
             ))
             base.cnn_score = prediction
+
+            # Apply calibration
+            if self.calibrated:
+                cal = self.calibrated_score(prediction)
+                base.cnn_calibrated = cal
+                base.ensemble_score = self.ensemble_score_val(
+                    base.heuristic.composite, cal,
+                )
 
         return base
 
@@ -155,6 +199,15 @@ class GUARDNetScorer(Scorer):
             s = self.score(c, o)
             s.ml_scores = [MLScore(model_name="guard_net", predicted_efficiency=pred)]
             s.cnn_score = pred
+
+            # Apply calibration to batch predictions
+            if self.calibrated:
+                cal = self.calibrated_score(pred)
+                s.cnn_calibrated = cal
+                s.ensemble_score = self.ensemble_score_val(
+                    s.heuristic.composite, cal,
+                )
+
             scored.append(s)
 
         scored.sort(key=lambda s: self._sort_key(s), reverse=True)
@@ -321,6 +374,27 @@ class GUARDNetScorer(Scorer):
             )
         except Exception as e:
             logger.warning("Failed to load RNA-FM cache: %s", e)
+
+    def _load_calibration(self, path: Path) -> None:
+        """Load temperature and ensemble weight from calibration JSON."""
+        if not path.exists():
+            logger.info("No GUARD-Net calibration at %s — using raw scores", path)
+            return
+        try:
+            with open(path) as f:
+                cal = json.load(f)
+            self.temperature = cal.get("temperature", 1.0)
+            self.alpha = cal.get("alpha", 0.0)
+            self.calibrated = True
+            self._calibration_meta = cal
+            logger.info(
+                "Loaded GUARD-Net calibration: T=%.2f, alpha=%.4f (val ensemble rho=%.4f)",
+                self.temperature,
+                self.alpha,
+                cal.get("val_rho_ensemble", 0.0),
+            )
+        except Exception as e:
+            logger.warning("Failed to load GUARD-Net calibration from %s: %s", path, e)
 
     # ------------------------------------------------------------------
     # Private — encoding

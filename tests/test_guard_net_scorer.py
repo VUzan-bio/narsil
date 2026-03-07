@@ -371,6 +371,116 @@ class TestRealModelIntegration:
 
 
 # ---------------------------------------------------------------------------
+# Test: Calibration
+# ---------------------------------------------------------------------------
+
+class TestCalibration:
+    """Test temperature calibration and ensemble scoring."""
+
+    def test_no_calibration_file_uses_raw(self):
+        from guard.scoring.guard_net_scorer import GUARDNetScorer
+        scorer = GUARDNetScorer(
+            weights_path="/nonexistent/path.pt",
+            calibration_path="/nonexistent/cal.json",
+        )
+        assert not scorer.calibrated
+        assert scorer.temperature == 1.0
+        assert scorer.alpha == 0.0
+
+    def test_calibrated_score_identity_when_uncalibrated(self):
+        from guard.scoring.guard_net_scorer import GUARDNetScorer
+        scorer = GUARDNetScorer(
+            weights_path="/nonexistent/path.pt",
+            calibration_path="/nonexistent/cal.json",
+        )
+        assert scorer.calibrated_score(0.7) == 0.7
+
+    def test_calibrated_score_spreads_distribution(self):
+        from guard.scoring.guard_net_scorer import GUARDNetScorer
+        scorer = GUARDNetScorer(weights_path="/nonexistent/path.pt")
+        scorer.calibrated = True
+        scorer.temperature = 5.0
+
+        # T > 1 should spread scores toward 0.5
+        high = scorer.calibrated_score(0.9)
+        low = scorer.calibrated_score(0.1)
+        # Spread should be narrower than original [0.1, 0.9]
+        assert high < 0.9
+        assert low > 0.1
+        # But ordering preserved
+        assert high > low
+
+    def test_ensemble_score_blends(self):
+        from guard.scoring.guard_net_scorer import GUARDNetScorer
+        scorer = GUARDNetScorer(weights_path="/nonexistent/path.pt")
+        scorer.alpha = 0.35
+        result = scorer.ensemble_score_val(0.8, 0.6)
+        expected = 0.35 * 0.8 + 0.65 * 0.6
+        assert abs(result - expected) < 1e-6
+
+    def test_calibration_loads_from_json(self, tmp_path):
+        import json
+        from guard.scoring.guard_net_scorer import GUARDNetScorer
+
+        cal_file = tmp_path / "guard_net_calibration.json"
+        cal_file.write_text(json.dumps({
+            "model": "guard_net",
+            "temperature": 4.5,
+            "alpha": 0.30,
+            "val_rho_ensemble": 0.72,
+        }))
+
+        scorer = GUARDNetScorer(
+            weights_path="/nonexistent/path.pt",
+            calibration_path=str(cal_file),
+        )
+        assert scorer.calibrated is True
+        assert scorer.temperature == 4.5
+        assert scorer.alpha == 0.30
+        assert scorer.calibration_meta["val_rho_ensemble"] == 0.72
+
+    def test_score_populates_calibrated_fields(self):
+        """When calibrated, score() should populate cnn_calibrated and ensemble_score."""
+        import torch
+        from guard.scoring.guard_net_scorer import GUARDNetScorer
+
+        scorer = GUARDNetScorer(weights_path="/nonexistent/path.pt")
+
+        # Mock model
+        mock_model = MagicMock()
+        mock_model.eval = MagicMock(return_value=mock_model)
+        mock_model.to = MagicMock(return_value=mock_model)
+
+        def mock_forward(**kwargs):
+            batch_size = kwargs["target_onehot"].shape[0]
+            return {"efficiency": torch.tensor([[0.72]] * batch_size)}
+
+        mock_model.side_effect = mock_forward
+        mock_model.__call__ = mock_forward
+        scorer.model = mock_model
+        scorer._device = torch.device("cpu")
+        scorer._use_rnafm = False
+
+        # Enable calibration
+        scorer.calibrated = True
+        scorer.temperature = 3.0
+        scorer.alpha = 0.35
+
+        candidate = _make_candidate()
+        ot = _make_offtarget(candidate.candidate_id)
+        result = scorer.score(candidate, ot)
+
+        assert result.cnn_calibrated is not None
+        assert result.ensemble_score is not None
+        assert result.cnn_score == pytest.approx(0.72, abs=0.01)
+        # Calibrated should differ from raw (T != 1)
+        assert result.cnn_calibrated != result.cnn_score
+        # Ensemble should blend heuristic and calibrated
+        expected_ensemble = 0.35 * result.heuristic.composite + 0.65 * result.cnn_calibrated
+        assert result.ensemble_score == pytest.approx(expected_ensemble, abs=1e-6)
+
+
+# ---------------------------------------------------------------------------
 # Test: Config integration
 # ---------------------------------------------------------------------------
 
