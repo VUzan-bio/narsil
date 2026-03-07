@@ -251,6 +251,29 @@ const Btn = ({ children, variant = "primary", onClick, disabled, icon: Icon, ful
 
 const tooltipStyle = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: "8px", fontSize: "12px", boxShadow: "0 4px 16px rgba(0,0,0,0.06)", fontFamily: FONT };
 
+/* Gaussian KDE for smooth density estimation */
+function gaussianKDE(data, bandwidth = 0.05, nPoints = 100) {
+  const min = 0, max = 1;
+  const step = (max - min) / nPoints;
+  const points = [];
+  for (let x = min; x <= max; x += step) {
+    let density = 0;
+    for (const d of data) {
+      const z = (x - d) / bandwidth;
+      density += Math.exp(-0.5 * z * z) / (bandwidth * Math.sqrt(2 * Math.PI));
+    }
+    density /= data.length;
+    points.push({ x: parseFloat(x.toFixed(3)), density: parseFloat(density.toFixed(4)) });
+  }
+  return points;
+}
+
+function stdDev(arr) {
+  if (arr.length < 2) return 0;
+  const m = arr.reduce((a, b) => a + b, 0) / arr.length;
+  return Math.sqrt(arr.reduce((a, v) => a + (v - m) ** 2, 0) / (arr.length - 1));
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    TOAST NOTIFICATION SYSTEM
    ═══════════════════════════════════════════════════════════════════ */
@@ -1751,6 +1774,92 @@ const OverviewTab = ({ results, scorer }) => {
         </div>
       )}
 
+      {/* KDE Score Distribution */}
+      {!mobile && (() => {
+        const scores = results.map(r => usesGuardNet ? (r.ensembleScore || r.score) : r.score);
+        const kde = gaussianKDE(scores, 0.05, 100);
+        const sigma = stdDev(scores);
+        const scoreMin = Math.min(...scores).toFixed(2);
+        const scoreMax = Math.max(...scores).toFixed(2);
+        const effThreshold = 0.4;
+        return (
+          <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "20px" : "28px 32px", marginBottom: "24px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
+              <span style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Score Distribution</span>
+              <span style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO }}>Range: {scoreMin}–{scoreMax} | σ = {sigma.toFixed(3)}</span>
+            </div>
+            <ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={kde} margin={{ top: 5, right: 10, bottom: 20, left: 10 }}>
+                <defs>
+                  <linearGradient id="kdeGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#111827" stopOpacity={0.08} />
+                    <stop offset="100%" stopColor="#111827" stopOpacity={0.02} />
+                  </linearGradient>
+                  <linearGradient id="kdeDanger" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#DC2626" stopOpacity={0.08} />
+                    <stop offset="100%" stopColor="#DC2626" stopOpacity={0.02} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="x" type="number" domain={[0, 1]} tick={{ fontSize: 10, fill: T.textTer, fontFamily: MONO }} tickCount={11} axisLine={{ stroke: T.borderLight }} tickLine={false} label={{ value: "Score", position: "insideBottom", offset: -10, fontSize: 10, fill: T.textTer }} />
+                <YAxis hide domain={[0, "auto"]} />
+                <Tooltip contentStyle={{ ...tooltipStyle, padding: "8px 12px" }} formatter={(v) => [v.toFixed(4), "Density"]} labelFormatter={(l) => `Score: ${l}`} />
+                <ReferenceLine x={effThreshold} stroke="#9CA3AF" strokeDasharray="4 3" strokeWidth={1} label={{ value: `${effThreshold} threshold`, position: "top", fontSize: 10, fill: "#9CA3AF" }} />
+                <Line type="monotone" dataKey="density" stroke="#111827" strokeWidth={2} dot={false} isAnimationActive={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+            {/* Rug plot */}
+            <div style={{ position: "relative", height: "12px", marginTop: "-18px", marginLeft: "10px", marginRight: "10px" }}>
+              {scores.map((s, i) => (
+                <div key={i} style={{ position: "absolute", left: `${s * 100}%`, bottom: 0, width: "1px", height: "8px", background: "#111827", opacity: 0.5 }} />
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Drug Class Score Distribution — Box Plot */}
+      {!mobile && (() => {
+        const getScore = (r) => usesGuardNet ? (r.ensembleScore || r.score) : r.score;
+        const drugOrder = [...new Set(results.map(r => r.drug))];
+        const drugData = drugOrder.map(d => {
+          const scores = results.filter(r => r.drug === d).map(r => getScore(r)).sort((a, b) => a - b);
+          return { drug: d, min: scores[0], max: scores[scores.length - 1], avg: +(scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(3), scores };
+        });
+        return (
+          <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "20px" : "28px 32px", marginBottom: "24px" }}>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "16px" }}>Score by Drug Class</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {drugData.map(d => {
+                const rangeStart = d.min;
+                const rangeEnd = d.max;
+                return (
+                  <div key={d.drug} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: "40px", fontSize: "11px", fontWeight: 700, color: T.textSec, fontFamily: MONO, textAlign: "right" }}>{d.drug}</div>
+                    <div style={{ flex: 1, position: "relative", height: "20px", background: T.bgSub, borderRadius: "4px" }}>
+                      {/* Range bar */}
+                      <div style={{ position: "absolute", top: "8px", left: `${rangeStart * 100}%`, width: `${Math.max((rangeEnd - rangeStart) * 100, 0.5)}%`, height: "4px", background: "#111827", borderRadius: "2px", opacity: 0.3 }} />
+                      {/* Individual dots */}
+                      {d.scores.map((s, i) => (
+                        <div key={i} style={{ position: "absolute", top: "6px", left: `${s * 100}%`, width: "8px", height: "8px", borderRadius: "50%", background: "#111827", transform: "translateX(-4px)", opacity: 0.7 }} />
+                      ))}
+                    </div>
+                    <div style={{ width: "110px", fontSize: "10px", color: T.textTer, fontFamily: MONO, whiteSpace: "nowrap" }}>{rangeStart.toFixed(2)} — {rangeEnd.toFixed(2)}</div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Scale */}
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px" }}>
+              <div style={{ width: "40px" }} />
+              <div style={{ flex: 1, display: "flex", justifyContent: "space-between", fontSize: "9px", color: T.textTer, fontFamily: MONO }}>
+                <span>0.0</span><span>0.2</span><span>0.4</span><span>0.6</span><span>0.8</span><span>1.0</span>
+              </div>
+              <div style={{ width: "110px" }} />
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Score distribution chart — Adaptyv style: light bars + scatter dots + reference zones */}
       {(() => {
         /* Build per-candidate chart data: use ensemble when ML active, otherwise heuristic */
@@ -2835,6 +2944,8 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
   const [loadingDiag, setLoadingDiag] = useState(false);
   const [sweepLoading, setSweepLoading] = useState(false);
   const [paretoLoading, setParetoLoading] = useState(false);
+  const [expandedTargets, setExpandedTargets] = useState({});
+  const [topKData, setTopKData] = useState({});
 
   // Detect which scorer produced the results
   const scorerInfo = useMemo(() => {
@@ -3068,6 +3179,43 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             ))}
           </div>
 
+          {/* MUT vs WT Activity Distribution */}
+          {!mobile && (() => {
+            const mutScores = results.map(r => r.ensembleScore || r.score);
+            const wtScores = results.map(r => {
+              const eff = r.ensembleScore || r.score;
+              const disc = r.disc > 0 && r.disc < 900 ? r.disc : 0.9;
+              return eff / disc;
+            });
+            const kdeMut = gaussianKDE(mutScores, 0.05, 100);
+            const kdeWt = gaussianKDE(wtScores, 0.05, 100);
+            const combined = kdeMut.map((p, i) => ({ x: p.x, mut: p.density, wt: kdeWt[i]?.density || 0 }));
+            const meanMut = +(mutScores.reduce((a, b) => a + b, 0) / mutScores.length).toFixed(3);
+            const meanWt = +(wtScores.reduce((a, b) => a + b, 0) / wtScores.length).toFixed(3);
+            const separation = +(meanMut - meanWt).toFixed(3);
+            return (
+              <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: "20px 24px", marginBottom: "24px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "12px" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>MUT vs WT Predicted Activity</span>
+                  <span style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO }}>Separation = {separation}</span>
+                </div>
+                <ResponsiveContainer width="100%" height={200}>
+                  <ComposedChart data={combined} margin={{ top: 5, right: 10, bottom: 20, left: 10 }}>
+                    <XAxis dataKey="x" type="number" domain={[0, 1]} tick={{ fontSize: 10, fill: T.textTer, fontFamily: MONO }} tickCount={11} axisLine={{ stroke: T.borderLight }} tickLine={false} label={{ value: "Predicted activity", position: "insideBottom", offset: -10, fontSize: 10, fill: T.textTer }} />
+                    <YAxis hide domain={[0, "auto"]} />
+                    <Tooltip contentStyle={{ ...tooltipStyle, padding: "8px 12px" }} formatter={(v, name) => [v.toFixed(4), name === "mut" ? "Mutant" : "Wildtype"]} labelFormatter={(l) => `Activity: ${l}`} />
+                    <Line type="monotone" dataKey="mut" stroke="#111827" strokeWidth={2} dot={false} isAnimationActive={false} name="Mutant" />
+                    <Line type="monotone" dataKey="wt" stroke="#9CA3AF" strokeWidth={2} dot={false} isAnimationActive={false} name="Wildtype" strokeDasharray="5 3" />
+                    <Legend wrapperStyle={{ fontSize: "11px" }} formatter={(v) => v === "mut" ? "Mutant (A_MUT)" : "Wildtype (A_WT)"} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+                <div style={{ fontSize: "11px", color: T.textSec, fontFamily: MONO, marginTop: "4px", textAlign: "center" }}>
+                  Mean MUT: {meanMut} | Mean WT: {meanWt} | Separation: {separation}
+                </div>
+              </div>
+            );
+          })()}
+
           {/* B2: Understanding Discrimination Scores — collapsible explainer */}
           <CollapsibleSection title="Understanding Discrimination Scores" defaultOpen={false}>
             <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7 }}>
@@ -3130,28 +3278,89 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             </div>
           )}
 
-          {/* D: Per-Target Breakdown */}
+          {/* D: Per-Target Breakdown with Top-K */}
           {diagnostics.per_target && diagnostics.per_target.length > 0 && (
             <CollapsibleSection title={`Per-Target Breakdown (${diagnostics.per_target.length} targets)`} defaultOpen={false}>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT, fontSize: "12px" }}>
                   <thead>
                     <tr style={{ background: T.bgSub }}>
-                      {["Target", "Efficiency", "Discrimination", "Primers", "Assay-Ready"].map(h => (
+                      {["", "Target", "Efficiency", "Discrimination", "Primers", "Assay-Ready"].map(h => (
                         <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: T.textSec, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {diagnostics.per_target.map(t => (
-                      <tr key={t.target_label} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
-                        <td style={{ padding: "8px 12px", fontWeight: 600, fontFamily: MONO, fontSize: "11px" }}>{t.target_label}</td>
-                        <td style={{ padding: "8px 12px", fontFamily: MONO, color: t.efficiency >= 0.7 ? T.success : t.efficiency >= 0.5 ? T.warning : T.danger }}>{t.efficiency.toFixed(3)}</td>
-                        <td style={{ padding: "8px 12px", fontFamily: MONO, color: t.discrimination >= 3 ? T.success : t.discrimination >= 2 ? T.warning : T.danger }}>{typeof t.discrimination === "number" ? `${t.discrimination.toFixed(1)}×` : "—"}</td>
-                        <td style={{ padding: "8px 12px" }}>{t.has_primers ? <Badge variant="success">Yes</Badge> : <Badge variant="danger">No</Badge>}</td>
-                        <td style={{ padding: "8px 12px" }}>{t.is_assay_ready ? <Badge variant="success">Ready</Badge> : <Badge>Not ready</Badge>}</td>
-                      </tr>
-                    ))}
+                    {diagnostics.per_target.map(t => {
+                      const isExpanded = expandedTargets[t.target_label];
+                      const topK = topKData[t.target_label];
+                      const toggleExpand = () => {
+                        setExpandedTargets(prev => ({ ...prev, [t.target_label]: !prev[t.target_label] }));
+                        if (!topKData[t.target_label] && connected && jobId) {
+                          getTopK(jobId, t.target_label, 5).then(({ data }) => {
+                            if (data) setTopKData(prev => ({ ...prev, [t.target_label]: data.alternatives || data }));
+                          });
+                        }
+                      };
+                      return (
+                        <React.Fragment key={t.target_label}>
+                          <tr style={{ borderBottom: `1px solid ${T.borderLight}`, cursor: "pointer" }} onClick={toggleExpand}>
+                            <td style={{ padding: "8px 6px", width: "20px" }}>{isExpanded ? <ChevronDown size={12} color={T.textTer} /> : <ChevronRight size={12} color={T.textTer} />}</td>
+                            <td style={{ padding: "8px 12px", fontWeight: 600, fontFamily: MONO, fontSize: "11px" }}>{t.target_label}</td>
+                            <td style={{ padding: "8px 12px", fontFamily: MONO, color: t.efficiency >= 0.7 ? T.success : t.efficiency >= 0.5 ? T.warning : T.danger }}>{t.efficiency.toFixed(3)}</td>
+                            <td style={{ padding: "8px 12px", fontFamily: MONO, color: t.discrimination >= 3 ? T.success : t.discrimination >= 2 ? T.warning : T.danger }}>{typeof t.discrimination === "number" ? `${t.discrimination.toFixed(1)}×` : "—"}</td>
+                            <td style={{ padding: "8px 12px" }}>{t.has_primers ? <Badge variant="success">Yes</Badge> : <Badge variant="danger">No</Badge>}</td>
+                            <td style={{ padding: "8px 12px" }}>{t.is_assay_ready ? <Badge variant="success">Ready</Badge> : <Badge>Not ready</Badge>}</td>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={6} style={{ padding: "12px 16px", background: T.bgSub }}>
+                                {!topK ? (
+                                  <div style={{ fontSize: "11px", color: T.textTer }}><Loader2 size={12} style={{ animation: "spin 1s linear infinite", display: "inline-block", marginRight: "6px" }} />Loading alternatives…</div>
+                                ) : topK.length === 0 ? (
+                                  <div style={{ fontSize: "11px", color: T.textTer }}>No alternative candidates available.</div>
+                                ) : (
+                                  <div>
+                                    {/* Dot strip */}
+                                    <div style={{ position: "relative", height: "24px", background: T.bg, borderRadius: "4px", marginBottom: "10px", border: `1px solid ${T.borderLight}` }}>
+                                      {topK.map((alt, i) => {
+                                        const s = alt.efficiency || alt.score || alt.composite_score || 0;
+                                        return (
+                                          <div key={i} style={{ position: "absolute", top: "6px", left: `${Math.max(0, Math.min(s, 1)) * 100}%`, width: i === 0 ? "10px" : "8px", height: i === 0 ? "10px" : "8px", borderRadius: "50%", background: i === 0 ? "#111827" : "transparent", border: i === 0 ? "none" : "2px solid #9CA3AF", transform: "translateX(-50%)" }} title={`#${i + 1}: ${s.toFixed(3)}`} />
+                                        );
+                                      })}
+                                      {/* Scale ticks */}
+                                      {[0.4, 0.5, 0.6, 0.7, 0.8].map(v => (
+                                        <div key={v} style={{ position: "absolute", bottom: "-14px", left: `${v * 100}%`, fontSize: "8px", color: T.textTer, fontFamily: MONO, transform: "translateX(-50%)" }}>{v}</div>
+                                      ))}
+                                    </div>
+                                    {/* List */}
+                                    <div style={{ marginTop: "18px" }}>
+                                      {topK.slice(0, 5).map((alt, i) => {
+                                        const s = alt.efficiency || alt.score || alt.composite_score || 0;
+                                        const disc = alt.discrimination_ratio || alt.discrimination || 0;
+                                        const strategy = alt.strategy || alt.detection_strategy || "";
+                                        const notes = alt.tradeoff_note || alt.notes || "";
+                                        return (
+                                          <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "4px 0", fontSize: "11px", fontFamily: MONO, color: i === 0 ? T.text : T.textSec }}>
+                                            <span style={{ width: "20px", fontWeight: 700 }}>#{i + 1}</span>
+                                            <span style={{ width: "10px" }}>{i === 0 ? "●" : "○"}</span>
+                                            <span style={{ width: "50px" }}>{s.toFixed(3)}</span>
+                                            <span style={{ width: "50px", color: T.textTer }}>{disc > 0 ? `${disc.toFixed(1)}×` : "—"}</span>
+                                            <span style={{ width: "70px", color: T.textTer }}>{typeof strategy === "string" ? (strategy.charAt(0).toUpperCase() + strategy.slice(1)).replace("direct", "Direct").replace("proximity", "Proximity") : ""}</span>
+                                            <span style={{ flex: 1, fontSize: "10px", color: T.textTer }}>{notes}</span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
