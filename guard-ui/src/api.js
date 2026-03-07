@@ -124,6 +124,29 @@ export async function runPareto(jobId, discValues = null, scoreValues = null) {
   });
 }
 
+// Research
+export async function compareScorers(jobId, modelA = "heuristic", modelB = "guard_net") {
+  return request("/api/research/compare", {
+    method: "POST",
+    body: JSON.stringify({ job_id: jobId, model_a: modelA, model_b: modelB }),
+  });
+}
+
+export async function getThermoProfile(jobId, targetLabel) {
+  return request(`/api/research/thermo/${jobId}/${encodeURIComponent(targetLabel)}`);
+}
+
+export async function getAblation() {
+  return request("/api/research/ablation");
+}
+
+export async function addAblationRow(row) {
+  return request("/api/research/ablation", {
+    method: "POST",
+    body: JSON.stringify(row),
+  });
+}
+
 // WebSocket for live progress
 export function connectJobWS(jobId, onMessage, onClose) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";

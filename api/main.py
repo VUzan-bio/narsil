@@ -70,12 +70,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("GUARD Platform starting — results at %s", _state.results_dir)
 
     # Wire state into route modules
-    from api.routes import figures, pipeline, results
+    from api.routes import figures, pipeline, research, results
     from api import ws
 
     pipeline.init(_state)
     results.init(_state)
     figures.init(_state)
+    research.init(_state)
     ws.init(_state)
 
     yield
@@ -168,7 +169,7 @@ async def rate_limit(request: Request, call_next: object) -> Response:
     return await call_next(request)  # type: ignore[operator]
 
 # Include routers
-from api.routes import figures, optimisation, panels, pipeline, results, scoring, validation
+from api.routes import figures, optimisation, panels, pipeline, research, results, scoring, validation
 from api import ws
 
 app.include_router(pipeline.router)
@@ -176,6 +177,7 @@ app.include_router(results.router)
 app.include_router(panels.router)
 app.include_router(figures.router)
 app.include_router(scoring.router)
+app.include_router(research.router)
 app.include_router(validation.router)
 app.include_router(optimisation.router)
 app.include_router(ws.router)

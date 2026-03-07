@@ -18,6 +18,7 @@ import {
   getFigureUrl, listPanels, createPanel, listJobs, connectJobWS,
   listScoringModels, getPresets, getDiagnostics, getWHOCompliance,
   getTopK, runSweep, runPareto,
+  compareScorers, getThermoProfile, getAblation,
 } from "./api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -644,6 +645,7 @@ const NAV = [
   ]},
   { section: "Models", items: [
     { id: "scoring", label: "Scoring", icon: Brain },
+    { id: "research", label: "Research", icon: FlaskConical },
   ]},
 ];
 
@@ -3756,6 +3758,247 @@ const ScoringPage = ({ connected }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
+   RESEARCH PAGE — Experimental sandbox for scoring R&D
+   ═══════════════════════════════════════════════════════════════════ */
+const ResearchPage = ({ connected }) => {
+  const mobile = useIsMobile();
+  const [jobs, setJobs] = useState([]);
+  const [selectedJob, setSelectedJob] = useState("");
+  const [comparison, setComparison] = useState(null);
+  const [modelA, setModelA] = useState("heuristic");
+  const [modelB, setModelB] = useState("guard_net");
+  const [comparing, setComparing] = useState(false);
+  const [thermoTarget, setThermoTarget] = useState("");
+  const [thermoData, setThermoData] = useState(null);
+  const [thermoLoading, setThermoLoading] = useState(false);
+  const [ablation, setAblation] = useState([]);
+
+  useEffect(() => {
+    if (connected) {
+      listJobs().then(({ data }) => {
+        if (data) {
+          const completed = (data.jobs || data || []).filter(j => j.status === "completed");
+          setJobs(completed);
+          if (completed.length > 0 && !selectedJob) setSelectedJob(completed[0].job_id);
+        }
+      });
+      getAblation().then(({ data }) => { if (data) setAblation(data); });
+    }
+  }, [connected]);
+
+  const handleCompare = async () => {
+    if (!selectedJob) return;
+    setComparing(true);
+    const { data } = await compareScorers(selectedJob, modelA, modelB);
+    if (data) setComparison(data);
+    setComparing(false);
+  };
+
+  const handleThermo = async (label) => {
+    if (!selectedJob || !label) return;
+    setThermoLoading(true);
+    setThermoTarget(label);
+    const { data } = await getThermoProfile(selectedJob, label);
+    if (data) setThermoData(data);
+    setThermoLoading(false);
+  };
+
+  const selectStyle = { padding: "6px 10px", borderRadius: "6px", border: `1px solid ${T.border}`, fontSize: "12px", fontFamily: MONO, background: T.bg, color: T.text };
+  const btnStyle = { padding: "6px 14px", borderRadius: "6px", border: "none", background: T.primary, color: "#fff", fontSize: "12px", fontWeight: 600, cursor: "pointer" };
+
+  return (
+    <div style={{ padding: mobile ? "24px 16px" : "48px 40px" }}>
+      <div style={{ marginBottom: "24px" }}>
+        <div style={{ fontSize: "11px", fontWeight: 700, color: T.purple, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>Research</div>
+        <h2 style={{ fontSize: mobile ? "22px" : "28px", fontWeight: 800, color: T.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>Scoring R&D Sandbox</h2>
+        <p style={{ fontSize: "13px", color: T.textSec, marginTop: "4px" }}>Compare scorers, explore thermodynamic profiles, track ablation experiments</p>
+      </div>
+
+      {/* Job selector */}
+      <div style={{ marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "12px", fontWeight: 600, color: T.textSec }}>Panel run:</span>
+        <select value={selectedJob} onChange={(e) => { setSelectedJob(e.target.value); setComparison(null); setThermoData(null); }} style={selectStyle}>
+          {jobs.length === 0 && <option value="">No completed jobs</option>}
+          {jobs.map(j => <option key={j.job_id} value={j.job_id}>{j.name || j.job_id}</option>)}
+        </select>
+      </div>
+
+      {/* Section 1: Scorer Comparison */}
+      <CollapsibleSection title="Scorer Comparison" defaultOpen={true}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", marginBottom: "16px" }}>
+          <select value={modelA} onChange={(e) => setModelA(e.target.value)} style={selectStyle}>
+            <option value="heuristic">Heuristic</option>
+            <option value="guard_net">GUARD-Net</option>
+            <option value="guard_net_diagnostic">GUARD-Net Diagnostic</option>
+          </select>
+          <span style={{ fontSize: "12px", color: T.textSec }}>vs</span>
+          <select value={modelB} onChange={(e) => setModelB(e.target.value)} style={selectStyle}>
+            <option value="guard_net">GUARD-Net</option>
+            <option value="heuristic">Heuristic</option>
+            <option value="guard_net_diagnostic">GUARD-Net Diagnostic</option>
+          </select>
+          <button onClick={handleCompare} disabled={comparing || !selectedJob} style={{ ...btnStyle, opacity: comparing || !selectedJob ? 0.5 : 1 }}>
+            {comparing ? "Comparing..." : "Compare"}
+          </button>
+        </div>
+
+        {comparison && (
+          <div>
+            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginBottom: "16px" }}>
+              <div style={{ background: T.primaryLight, borderRadius: "8px", padding: "12px 16px", flex: 1, minWidth: "140px" }}>
+                <div style={{ fontSize: "11px", color: T.primaryDark, fontWeight: 600 }}>Rank Agreement</div>
+                <div style={{ fontSize: "20px", fontWeight: 800, color: T.text, fontFamily: HEADING }}>{comparison.summary.rank_agreement}/{comparison.summary.total_targets}</div>
+              </div>
+              <div style={{ background: T.purpleLight, borderRadius: "8px", padding: "12px 16px", flex: 1, minWidth: "140px" }}>
+                <div style={{ fontSize: "11px", color: T.purple, fontWeight: 600 }}>Mean Score Delta</div>
+                <div style={{ fontSize: "20px", fontWeight: 800, color: T.text, fontFamily: HEADING }}>{comparison.summary.mean_score_delta?.toFixed(4) || "0"}</div>
+              </div>
+            </div>
+
+            {/* Comparison table */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", fontFamily: MONO }}>
+                <thead>
+                  <tr style={{ background: T.bgSub }}>
+                    <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: T.textSec }}>Target</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: T.textSec }}>{comparison.model_a} score</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: T.textSec }}>{comparison.model_b} score</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: T.textSec }}>Delta</th>
+                    <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, color: T.textSec }}>Rank A</th>
+                    <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, color: T.textSec }}>Rank B</th>
+                    <th style={{ padding: "8px 12px", textAlign: "center", fontWeight: 600, color: T.textSec }}>Thermo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparison.targets.map((t, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}`, background: t.rank_changed ? T.warningLight : "transparent" }}>
+                      <td style={{ padding: "8px 12px", fontWeight: 600, color: T.text }}>{t.label}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: T.text }}>{t.model_a.score?.toFixed(4) ?? "-"}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: T.text }}>{t.model_b.score?.toFixed(4) ?? "-"}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: t.score_delta > 0 ? T.success : t.score_delta < 0 ? T.danger : T.textSec }}>{t.score_delta?.toFixed(4) ?? "-"}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "center" }}>{t.model_a.rank ?? "-"}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "center" }}>{t.model_b.rank ?? "-"}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "center" }}>
+                        <button onClick={() => handleThermo(t.label)} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "4px", padding: "2px 8px", cursor: "pointer", fontSize: "11px", color: T.primary }}>View</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {/* Section 2: Thermodynamic Profile */}
+      <CollapsibleSection title="Thermodynamic Feature Explorer" defaultOpen={false}>
+        {thermoLoading && <div style={{ fontSize: "12px", color: T.textSec }}>Loading profile...</div>}
+        {!thermoData && !thermoLoading && (
+          <div style={{ fontSize: "12px", color: T.textSec }}>
+            Click "View" on a target in the comparison table above, or select a target:
+            <div style={{ marginTop: "8px", display: "flex", gap: "8px", alignItems: "center" }}>
+              <input value={thermoTarget} onChange={(e) => setThermoTarget(e.target.value)} placeholder="e.g. rpoB_S531L" style={{ ...selectStyle, flex: 1, maxWidth: "240px" }} />
+              <button onClick={() => handleThermo(thermoTarget)} disabled={!thermoTarget || !selectedJob} style={{ ...btnStyle, opacity: !thermoTarget || !selectedJob ? 0.5 : 1 }}>Load</button>
+            </div>
+          </div>
+        )}
+        {thermoData && (
+          <div>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, marginBottom: "12px", fontFamily: HEADING }}>
+              {thermoTarget} — Per-position dG profile
+            </div>
+
+            {/* Scalar features */}
+            {thermoData.features && (
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "16px" }}>
+                {Object.entries(thermoData.features).map(([k, v]) => (
+                  <div key={k} style={{ background: T.bgSub, borderRadius: "6px", padding: "8px 12px" }}>
+                    <div style={{ fontSize: "10px", color: T.textSec, fontWeight: 600 }}>{k}</div>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: MONO }}>{typeof v === "number" ? v.toFixed(2) : v}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* dG chart */}
+            {thermoData.mutant_profile && (
+              <div style={{ height: "250px" }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={thermoData.mutant_profile.map((dg, i) => ({
+                    pos: i + 1,
+                    mutant: dg,
+                    wildtype: thermoData.wildtype_profile ? thermoData.wildtype_profile[i] : null,
+                  }))}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={T.borderLight} />
+                    <XAxis dataKey="pos" tick={{ fontSize: 10 }} label={{ value: "Position", fontSize: 11, position: "insideBottom", offset: -5 }} />
+                    <YAxis tick={{ fontSize: 10 }} label={{ value: "Cumulative dG (kcal/mol)", fontSize: 11, angle: -90, position: "insideLeft" }} />
+                    <Tooltip contentStyle={{ fontSize: "11px", fontFamily: MONO }} />
+                    <Line type="monotone" dataKey="mutant" stroke={T.primary} strokeWidth={2} dot={false} name="Mutant" />
+                    {thermoData.wildtype_profile && <Line type="monotone" dataKey="wildtype" stroke={T.danger} strokeWidth={2} dot={false} name="Wildtype" strokeDasharray="5 5" />}
+                    {thermoData.snp_position != null && <ReferenceLine x={thermoData.snp_position} stroke={T.warning} strokeDasharray="3 3" label={{ value: "SNP", fontSize: 10 }} />}
+                    <Legend wrapperStyle={{ fontSize: "11px" }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        )}
+      </CollapsibleSection>
+
+      {/* Section 3: Ablation Tracker */}
+      <CollapsibleSection title="Ablation Tracker" defaultOpen={false}>
+        {ablation.length === 0 ? (
+          <div style={{ fontSize: "12px", color: T.textSec }}>No ablation data available.</div>
+        ) : (
+          <div>
+            {/* Chart */}
+            <div style={{ height: "220px", marginBottom: "16px" }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ablation} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke={T.borderLight} />
+                  <XAxis type="number" domain={[0, 0.6]} tick={{ fontSize: 10 }} label={{ value: "Spearman rho", fontSize: 11, position: "insideBottom", offset: -5 }} />
+                  <YAxis dataKey="label" type="category" width={160} tick={{ fontSize: 10 }} />
+                  <Tooltip contentStyle={{ fontSize: "11px", fontFamily: MONO }} />
+                  <Bar dataKey="kim_rho" fill={T.primary} name="Kim rho" barSize={10} radius={[0, 3, 3, 0]} />
+                  <Bar dataKey="ed_rho" fill={T.purple} name="ED rho" barSize={10} radius={[0, 3, 3, 0]} />
+                  <Legend wrapperStyle={{ fontSize: "11px" }} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Table */}
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", fontFamily: MONO }}>
+                <thead>
+                  <tr style={{ background: T.bgSub }}>
+                    <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: T.textSec }}>Model</th>
+                    <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: T.textSec }}>Features</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: T.textSec }}>Kim rho</th>
+                    <th style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: T.textSec }}>ED rho</th>
+                    <th style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: T.textSec }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ablation.map((row, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                      <td style={{ padding: "8px 12px", fontWeight: 600, color: T.text }}>{row.label}</td>
+                      <td style={{ padding: "8px 12px", color: T.textSec }}>{row.features}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: T.text }}>{row.kim_rho?.toFixed(3) ?? "-"}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "right", color: row.ed_rho ? T.text : T.textTer }}>{row.ed_rho?.toFixed(3) ?? "-"}</td>
+                      <td style={{ padding: "8px 12px", color: T.textSec, fontSize: "11px" }}>{row.notes}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </CollapsibleSection>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════
    GUARD PLATFORM — Root component
    ═══════════════════════════════════════════════════════════════════ */
 const GUARDPlatform = () => {
@@ -3816,6 +4059,7 @@ const GUARDPlatform = () => {
             {page === "panels" && <PanelsPage connected={connected} />}
             {page === "mutations" && <MutationsPage />}
             {page === "scoring" && <ScoringPage connected={connected} />}
+            {page === "research" && <ResearchPage connected={connected} />}
           </div>
         </main>
       </div>
