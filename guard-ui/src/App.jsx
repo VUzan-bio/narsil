@@ -919,7 +919,10 @@ const HomePage = ({ goTo, connected }) => {
       {/* Hero */}
       <div style={{ marginBottom: mobile ? "28px" : "48px" }}>
         <div style={{ maxWidth: "100%" }}>
-          <h1 style={{ fontSize: mobile ? "26px" : "38px", fontWeight: 800, color: T.text, margin: "0 0 8px", lineHeight: 1.15, letterSpacing: "-0.03em", fontFamily: HEADING }}>
+          <h1 style={{ fontSize: mobile ? "26px" : "38px", fontWeight: 800, color: T.text, margin: "0 0 8px", lineHeight: 1.15, letterSpacing: "-0.03em", fontFamily: HEADING, display: "flex", alignItems: "center", gap: "2px" }}>
+            <div style={{ width: mobile ? "26px" : "38px", height: mobile ? "26px" : "38px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <img src="/logo.png" alt="" style={{ height: mobile ? "46px" : "68px", objectFit: "contain" }} />
+            </div>
             GUARD
           </h1>
           <p style={{ fontSize: mobile ? "14px" : "16px", color: T.textSec, lineHeight: 1.7, margin: 0, maxWidth: 680 }}>
