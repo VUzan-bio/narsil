@@ -122,19 +122,19 @@ RESULTS.push({
 });
 
 const MODULES = [
-  { id: "M1", name: "Target Resolution", desc: "WHO mutations → genomic coordinates", icon: Target },
-  { id: "M2", name: "PAM Scanning", desc: "Multi-PAM, multi-length spacer search", icon: Search },
-  { id: "M3", name: "Candidate Filtering", desc: "Biophysical constraints (GC, homopolymer, Tm)", icon: Filter },
-  { id: "M4", name: "Off-Target Screening", desc: "Bowtie2 alignment + heuristic fallback", icon: Shield },
-  { id: "M5", name: "Heuristic Scoring", desc: "Position-weighted composite scoring", icon: BarChart3 },
-  { id: "M5.5", name: "Mismatch Pairs", desc: "WT/MUT spacer pair generation", icon: GitBranch },
-  { id: "M6", name: "SM Enhancement", desc: "Synthetic mismatch for 10–100× discrimination", icon: Zap },
-  { id: "M6.5", name: "Discrimination", desc: "MUT/WT activity ratio quantification", icon: TrendingUp },
-  { id: "M7", name: "Multiplex Optimization", desc: "Simulated annealing panel selection", icon: Grid3x3 },
-  { id: "M8", name: "RPA Primer Design", desc: "Standard + allele-specific RPA", icon: Crosshair },
-  { id: "M8.5", name: "Co-Selection", desc: "crRNA–primer compatibility check", icon: Check },
-  { id: "M9", name: "Panel Assembly", desc: "MultiplexPanel + IS6110 control", icon: Package },
-  { id: "M10", name: "Export", desc: "JSON, TSV, FASTA structured output", icon: Download },
+  { id: "M1", name: "Target Resolution", desc: "WHO mutations → genomic coordinates", icon: Target, execDesc: "Resolving WHO-catalogued resistance mutations to genomic coordinates on H37Rv" },
+  { id: "M2", name: "PAM Scanning", desc: "Multi-PAM, multi-length spacer search", icon: Search, execDesc: "Scanning both strands for Cas12a-compatible PAM sites (TTTV canonical + relaxed)" },
+  { id: "M3", name: "Candidate Filtering", desc: "Biophysical constraints (GC, homopolymer, Tm)", icon: Filter, execDesc: "Applying biophysical filters: GC content, homopolymer runs, self-complementarity" },
+  { id: "M4", name: "Off-Target Screening", desc: "Bowtie2 alignment + heuristic fallback", icon: Shield, execDesc: "Bowtie2 alignment against H37Rv genome, flagging off-target binding sites" },
+  { id: "M5", name: "Heuristic Scoring", desc: "Position-weighted composite scoring", icon: BarChart3, execDesc: "Position-weighted composite scoring across 5 biophysical features" },
+  { id: "M5.5", name: "Mismatch Pairs", desc: "WT/MUT spacer pair generation", icon: GitBranch, execDesc: "Generating wildtype spacers for each mutant candidate (MUT/WT discrimination pairs)" },
+  { id: "M6", name: "SM Enhancement", desc: "Synthetic mismatch for 10–100× discrimination", icon: Zap, execDesc: "Engineering synthetic mismatches at seed positions 2–6 for enhanced discrimination" },
+  { id: "M6.5", name: "Discrimination", desc: "MUT/WT activity ratio quantification", icon: TrendingUp, execDesc: "Quantifying MUT/WT activity ratios for diagnostic-grade discrimination assessment" },
+  { id: "M7", name: "Multiplex Optimization", desc: "Simulated annealing panel selection", icon: Grid3x3, execDesc: "Simulated annealing over candidate combinations for optimal panel selection" },
+  { id: "M8", name: "RPA Primer Design", desc: "Standard + allele-specific RPA", icon: Crosshair, execDesc: "Designing RPA primers (25–38 nt, Tm 57–72 °C) with dimer checking" },
+  { id: "M8.5", name: "Co-Selection", desc: "crRNA–primer compatibility check", icon: Check, execDesc: "Validating crRNA–primer compatibility and amplicon overlap constraints" },
+  { id: "M9", name: "Panel Assembly", desc: "MultiplexPanel + IS6110 control", icon: Package, execDesc: "Assembling final panel: crRNA sequences, primer pairs, amplicon maps, discrimination predictions" },
+  { id: "M10", name: "Export", desc: "JSON, TSV, FASTA structured output", icon: Download, execDesc: "Exporting structured output: JSON, TSV, FASTA" },
 ];
 
 const MODULE_NAME_MAP = {
@@ -1381,7 +1381,18 @@ const HomePage = ({ goTo, connected }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   PIPELINE PAGE — Real-time progress via WS + polling fallback
+   EXECUTION DARK THEME TOKENS
+   ═══════════════════════════════════════════════════════════════════ */
+const EX = {
+  bg: "#0a0a0f", card: "#12121a", cardBorder: "#1e1e2e",
+  text: "#e8e8ed", textSec: "#6b6b7b", textMono: "#a0a0b0",
+  accent: "#3b82f6", accentGlow: "rgba(59,130,246,0.15)", accentSoft: "rgba(59,130,246,0.08)",
+  success: "#22c55e", rail: "#1e1e2e", railActive: "#3b82f6",
+  progressBg: "#1e1e2e", progressFill: "#3b82f6",
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   PIPELINE PAGE — Immersive full-page execution experience
    ═══════════════════════════════════════════════════════════════════ */
 const PipelinePage = ({ jobId, connected, goTo }) => {
   const mobile = useIsMobile();
@@ -1389,14 +1400,31 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
   const [done, setDone] = useState(false);
   const [jobData, setJobData] = useState(null);
   const [moduleStats, setModuleStats] = useState([]);
-  const [revealedStats, setRevealedStats] = useState(0);
-  const [revealDone, setRevealDone] = useState(false);
+  const [celebrating, setCelebrating] = useState(false);
+  const [showLog, setShowLog] = useState(false);
+  const [logExpandedId, setLogExpandedId] = useState(null);
+  const [cardPhase, setCardPhase] = useState("enter"); // "enter" | "visible" | "exit"
+  const [elapsed, setElapsed] = useState(0);
   const wsRef = useRef(null);
   const pollRef = useRef(null);
+  const startTimeRef = useRef(Date.now());
+  const elapsedRef = useRef(null);
 
+  /* Live elapsed timer */
+  useEffect(() => {
+    if (jobId && !done) {
+      startTimeRef.current = Date.now();
+      elapsedRef.current = setInterval(() => {
+        setElapsed(((Date.now() - startTimeRef.current) / 1000));
+      }, 100);
+      return () => clearInterval(elapsedRef.current);
+    }
+    if (done && elapsedRef.current) clearInterval(elapsedRef.current);
+  }, [jobId, done]);
+
+  /* WebSocket / polling / simulation */
   useEffect(() => {
     if (!jobId) return;
-
     if (connected) {
       try {
         const ws = connectJobWS(jobId,
@@ -1419,7 +1447,6 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
     } else {
       simulateProgress();
     }
-
     return () => {
       wsRef.current?.close();
       if (pollRef.current) clearInterval(pollRef.current);
@@ -1450,7 +1477,33 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
     }, 800);
   };
 
-  /* Fetch module stats when pipeline completes — mock if offline */
+  /* Card transition on step change */
+  const prevStepRef = useRef(0);
+  useEffect(() => {
+    if (step !== prevStepRef.current && !done) {
+      setCardPhase("exit");
+      setTimeout(() => {
+        setCardPhase("enter");
+        setTimeout(() => setCardPhase("visible"), 30);
+      }, 220);
+      prevStepRef.current = step;
+    }
+  }, [step, done]);
+
+  /* Celebration on completion */
+  useEffect(() => {
+    if (done) {
+      setCelebrating(true);
+      setCardPhase("exit");
+      setTimeout(() => {
+        setCelebrating(false);
+        setCardPhase("enter");
+        setTimeout(() => setCardPhase("visible"), 30);
+      }, 600);
+    }
+  }, [done]);
+
+  /* Fetch module stats on completion */
   useEffect(() => {
     if (done && jobId) {
       if (connected) {
@@ -1458,83 +1511,35 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
           if (data?.module_stats?.length) setModuleStats(data.module_stats);
         });
       } else {
-        /* Realistic mock stats for offline demo */
         setModuleStats([
-          { module_id: "M1", detail: "14 mutations → 14 genomic targets resolved", candidates_out: 14, duration_ms: 120, breakdown: {} },
-          { module_id: "M2", detail: "842,106 positions scanned → 3,847 PAM hits → 1,206 candidates", candidates_out: 1206, duration_ms: 4230, breakdown: { positions_scanned: 842106, pam_hits: 3847 } },
-          { module_id: "M3", detail: "GC 30–70%, homopolymer ≤4, Tm filter → 847 passed", candidates_out: 847, duration_ms: 310 },
-          { module_id: "M4", detail: "Bowtie2 ≤3mm screen → 12 off-target hits removed", candidates_out: 835, duration_ms: 8920 },
-          { module_id: "M5", detail: "5-feature composite scoring complete", candidates_out: 835, duration_ms: 190 },
-          { module_id: "M5.5", detail: "835 WT/MUT spacer pairs generated", candidates_out: 835, duration_ms: 280 },
-          { module_id: "M6", detail: "SM enhancement: 4 candidates improved (avg 12× → 47×)", candidates_out: 835, duration_ms: 1540 },
-          { module_id: "M6.5", detail: "Discrimination scored: 11 diagnostic-grade (≥3×)", candidates_out: 835, duration_ms: 420 },
-          { module_id: "M7", detail: "Simulated annealing: 14-plex panel selected (score 0.847)", candidates_out: 14, duration_ms: 3200 },
-          { module_id: "M8", detail: "RPA primers: 12/14 successful (2 high-GC failures)", candidates_out: 14, duration_ms: 6100 },
-          { module_id: "M8.5", detail: "Co-selection: 0 crRNA–primer conflicts", candidates_out: 14, duration_ms: 150 },
-          { module_id: "M9", detail: "Panel assembled: 14 targets + IS6110 control = 15-plex", candidates_out: 15, duration_ms: 80 },
-          { module_id: "M10", detail: "Exported JSON + TSV + FASTA", candidates_out: 15, duration_ms: 45 },
+          { module_id: "M1", detail: "14 mutations → 14 genomic targets resolved", candidates_out: 14, duration_ms: 3010, breakdown: {} },
+          { module_id: "M2", detail: "34,364 positions → 1,837 PAM sites → 238 candidates", candidates_out: 238, duration_ms: 119, breakdown: { positions_scanned: 34364, pam_hits: 1837 } },
+          { module_id: "M3", detail: "238 → 213 (25 removed: GC, homopolymer, Tm)", candidates_out: 213, duration_ms: 155 },
+          { module_id: "M4", detail: "213 → 183 (30 off-target hits, Bowtie2 ≤3mm)", candidates_out: 183, duration_ms: 1420 },
+          { module_id: "M5", detail: "213 candidates scored (range 0.325–0.831, mean 0.576)", candidates_out: 213, duration_ms: 19 },
+          { module_id: "M5.5", detail: "213 MUT/WT spacer pairs (54 direct, 159 proximity)", candidates_out: 213, duration_ms: 4 },
+          { module_id: "M6", detail: "54 evaluated, 42 enhanced (seed positions 2–6)", candidates_out: 42, duration_ms: 72 },
+          { module_id: "M6.5", detail: "213 → 54 above 2× threshold (48 diagnostic-grade ≥3×)", candidates_out: 54, duration_ms: 18 },
+          { module_id: "M7", detail: "213 → 14 selected (simulated annealing, 10,000 iterations)", candidates_out: 14, duration_ms: 2240 },
+          { module_id: "M8", detail: "28 primers designed, 378 dimer checks (ΔG > -6.0 kcal/mol)", candidates_out: 14, duration_ms: 4110 },
+          { module_id: "M8.5", detail: "0 crRNA–primer conflicts", candidates_out: 14, duration_ms: 32 },
+          { module_id: "M9", detail: "14 targets + IS6110 control = 15-plex assembled", candidates_out: 15, duration_ms: 48 },
+          { module_id: "M10", detail: "JSON + TSV + FASTA exported", candidates_out: 15, duration_ms: 12 },
         ]);
       }
     }
   }, [done, jobId, connected]);
 
-  /* Staggered reveal of stats (350ms per module) */
-  useEffect(() => {
-    if (moduleStats.length > 0) {
-      let i = 0;
-      const interval = setInterval(() => {
-        i++;
-        setRevealedStats(i);
-        if (i >= MODULES.length) {
-          clearInterval(interval);
-          setRevealDone(true);
-        }
-      }, 350);
-      return () => clearInterval(interval);
-    }
-  }, [moduleStats]);
-
-  /* Build stat lookup by module_id */
   const statMap = {};
   moduleStats.forEach((s) => { statMap[s.module_id] = s; });
-  const maxCandidates = statMap["M2"]?.candidates_out || 1;
   const totalDuration = moduleStats.reduce((s, m) => s + (m.duration_ms || 0), 0);
+  const maxCandidates = Math.max(1, ...moduleStats.map(s => s.candidates_out || 0));
   const m2Out = statMap["M2"]?.candidates_out || 0;
-  const positionsScanned = statMap["M2"]?.breakdown?.positions_scanned || 0;
-  const pamHits = statMap["M2"]?.breakdown?.pam_hits || 0;
   const finalSize = statMap["M9"]?.candidates_out || statMap["M7"]?.candidates_out || 0;
 
-  const pct = Math.min(100, Math.round(((step + (done ? 1 : 0)) / MODULES.length) * 100));
+  const fmtDur = (ms) => ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
 
-  /* Track which module rows are expanded (Claude Code style) */
-  const [expanded, setExpanded] = useState({});
-  const toggleExpand = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
-
-  /* Auto-expand the active step, collapse previous when moving forward */
-  const prevStepRef = useRef(-1);
-  useEffect(() => {
-    if (step !== prevStepRef.current) {
-      const activeId = MODULES[step]?.id;
-      const prevId = MODULES[prevStepRef.current]?.id;
-      setExpanded(prev => ({
-        ...prev,
-        ...(prevId ? { [prevId]: false } : {}),
-        ...(activeId ? { [activeId]: true } : {}),
-      }));
-      prevStepRef.current = step;
-    }
-  }, [step]);
-
-  /* When done, expand all completed modules that have stats */
-  useEffect(() => {
-    if (revealDone) {
-      const all = {};
-      MODULES.forEach(m => { if (statMap[m.id]) all[m.id] = true; });
-      setExpanded(all);
-    }
-  }, [revealDone]);
-
-  /* Empty state — no job launched */
+  /* ── Empty state ── */
   if (!jobId) {
     return (
       <div style={{ padding: mobile ? "16px" : "36px 40px" }}>
@@ -1544,7 +1549,7 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
           </div>
           <div style={{ fontSize: "18px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>No pipeline running</div>
           <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.6, maxWidth: 420, margin: "0 auto 24px" }}>
-            Configure your target mutations and launch the GUARD pipeline from the Home page. Real-time progress will appear here as each module executes.
+            Configure your target mutations and launch the GUARD pipeline from the Home page.
           </p>
           <Btn icon={Play} onClick={() => goTo("home")}>Configure & Launch</Btn>
         </div>
@@ -1552,168 +1557,284 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
     );
   }
 
-  return (
-    <div style={{ padding: mobile ? "20px 16px" : "40px 48px", width: "100%" }}>
-      {/* Header — title + subtitle, full width */}
-      <div style={{ marginBottom: "32px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
-          {done
-            ? <Check size={20} color={T.primary} strokeWidth={2.5} />
-            : <Loader2 size={20} color={T.primary} strokeWidth={2.5} style={{ animation: "spin 1s linear infinite" }} />
-          }
-          <h2 style={{ fontSize: mobile ? "20px" : "26px", fontWeight: 800, color: T.text, margin: 0, fontFamily: HEADING, letterSpacing: "-0.02em" }}>
-            {done ? "Pipeline Complete" : "Running Pipeline"}
-          </h2>
-        </div>
-        <div style={{ fontSize: "12px", color: T.textTer, fontFamily: MONO, marginLeft: "30px" }}>
-          {jobId}{done && totalDuration > 0 ? `  ·  ${(totalDuration / 1000).toFixed(1)}s total` : ""}
-        </div>
+  /* ── Full-page dark execution overlay ── */
+  const activeModule = MODULES[step] || MODULES[0];
+  const activeStat = statMap[activeModule.id];
+
+  const overlay = (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999,
+      background: EX.bg, display: "flex", flexDirection: "column",
+      fontFamily: FONT, color: EX.text, overflow: "hidden",
+    }}>
+      {/* Subtle dot grid background */}
+      <div style={{
+        position: "absolute", inset: 0, opacity: 0.03,
+        backgroundImage: "radial-gradient(circle, #ffffff 1px, transparent 1px)",
+        backgroundSize: "24px 24px", pointerEvents: "none",
+      }} />
+
+      {/* ── HORIZONTAL RAIL ── */}
+      <div style={{
+        position: "relative", zIndex: 2, padding: mobile ? "24px 16px 16px" : "40px 48px 24px",
+        display: "flex", flexDirection: "column", alignItems: "center",
+      }}>
+        {/* Rail nodes + connectors */}
+        {mobile ? (
+          /* Mobile: compact counter */
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontFamily: MONO, fontSize: "14px", fontWeight: 600, color: EX.accent }}>{step + 1}</span>
+            <span style={{ fontSize: "12px", color: EX.textSec }}>/</span>
+            <span style={{ fontFamily: MONO, fontSize: "14px", color: EX.textSec }}>{MODULES.length}</span>
+            <span style={{ fontSize: "12px", color: EX.textSec, marginLeft: "8px" }}>{done ? "Complete" : activeModule.name}</span>
+          </div>
+        ) : (
+          /* Desktop: full horizontal rail */
+          <div style={{ display: "flex", alignItems: "center", maxWidth: 900, width: "100%" }}>
+            {MODULES.map((m, i) => {
+              const nodeStatus = i < step ? "done" : i === step && !done ? "active" : done ? "done" : "upcoming";
+              const nodeStat = statMap[m.id];
+              return (
+                <React.Fragment key={m.id}>
+                  {/* Connector line (before each node except first) */}
+                  {i > 0 && (
+                    <div style={{
+                      flex: 1, height: "2px", minWidth: 8,
+                      background: (i <= step || done)
+                        ? (celebrating ? EX.accent : (nodeStatus === "active" ? `linear-gradient(90deg, ${EX.success}, ${EX.accent})` : EX.success))
+                        : EX.rail,
+                      transition: "background 0.4s ease",
+                      ...(nodeStatus === "active" ? { animation: "railPulse 2s ease-in-out infinite" } : {}),
+                    }} />
+                  )}
+                  {/* Node */}
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
+                    <div style={{
+                      width: nodeStatus === "active" ? 14 : 10,
+                      height: nodeStatus === "active" ? 14 : 10,
+                      borderRadius: "50%",
+                      background: nodeStatus === "done" ? EX.success
+                        : nodeStatus === "active" ? EX.accent
+                        : EX.rail,
+                      border: nodeStatus === "upcoming" ? `1.5px solid ${EX.textSec}40` : "none",
+                      transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      ...(nodeStatus === "active" ? {
+                        boxShadow: `0 0 0 4px ${EX.accentGlow}, 0 0 16px ${EX.accentGlow}`,
+                        animation: "nodePulse 2s ease-in-out infinite",
+                      } : {}),
+                      ...(celebrating ? { background: EX.accent, animation: "railCelebrate 0.6s ease-out" } : {}),
+                    }}>
+                      {nodeStatus === "done" && <Check size={6} color="#fff" strokeWidth={3} />}
+                    </div>
+                    {/* Module label below */}
+                    <span style={{
+                      fontFamily: MONO, fontSize: "9px", color: nodeStatus === "active" ? EX.accent : EX.textSec,
+                      marginTop: "6px", letterSpacing: "0.02em", fontWeight: nodeStatus === "active" ? 600 : 400,
+                      whiteSpace: "nowrap",
+                    }}>{m.id}</span>
+                    {/* Duration below completed nodes */}
+                    {nodeStatus === "done" && nodeStat && (
+                      <span style={{ fontFamily: MONO, fontSize: "8px", color: EX.textSec, marginTop: "1px" }}>
+                        {fmtDur(nodeStat.duration_ms)}
+                      </span>
+                    )}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Module list — full-width collapsible rows */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "0px" }}>
-        {MODULES.map((m, i) => {
-          const status = i < step ? "done" : i === step && !done ? "active" : done ? "done" : "pending";
-          const stat = statMap[m.id];
-          const statsVisible = i < revealedStats && stat;
-          const isExpanded = expanded[m.id] || false;
-          const barWidth = stat ? Math.max(2, (stat.candidates_out / maxCandidates) * 100) : 0;
-          const durationLabel = stat ? (stat.duration_ms >= 1000 ? `${(stat.duration_ms / 1000).toFixed(1)}s` : `${stat.duration_ms}ms`) : null;
-
-          return (
-            <div key={m.id}>
-              {/* Clickable header row */}
-              <button
-                onClick={() => (status !== "pending") && toggleExpand(m.id)}
-                style={{
-                  display: "flex", alignItems: "center", gap: mobile ? "10px" : "14px",
-                  width: "100%", padding: mobile ? "10px 0" : "12px 0",
-                  background: "none", border: "none", borderBottom: `1px solid ${T.borderLight}`,
-                  cursor: status !== "pending" ? "pointer" : "default",
-                  fontFamily: FONT, textAlign: "left",
-                  opacity: status === "pending" ? 0.45 : 1,
-                  transition: "opacity 0.3s ease",
-                }}
-              >
-                {/* Status indicator — small icon */}
-                <div style={{ width: 20, display: "flex", justifyContent: "center", flexShrink: 0 }}>
-                  {status === "done"
-                    ? <Check size={16} color={T.primary} strokeWidth={2.5} />
-                    : status === "active"
-                      ? <Loader2 size={16} color={T.primary} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
-                      : <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.border }} />
-                  }
-                </div>
-
-                {/* Module ID badge + name + description */}
-                <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
-                  <span style={{
-                    fontFamily: MONO, fontSize: "11px", fontWeight: 700,
-                    color: status === "active" ? T.primary : status === "done" ? T.primary : T.textTer,
-                  }}>{m.id}</span>
-                  <span style={{
-                    fontSize: mobile ? "13px" : "14px", fontWeight: 600, color: T.text,
-                  }}>{m.name}</span>
-                  {!isExpanded && (
-                    <span style={{ fontSize: "12px", color: T.textTer }}>{m.desc}</span>
-                  )}
-                </div>
-
-                {/* Duration (right side) */}
-                {durationLabel && (
-                  <span style={{ fontFamily: MONO, fontSize: "11px", color: T.textTer, flexShrink: 0 }}>
-                    {durationLabel}
-                  </span>
-                )}
-
-                {/* Expand chevron */}
-                {status !== "pending" && (
-                  <div style={{ flexShrink: 0, color: T.textTer, transition: "transform 0.2s ease", transform: isExpanded ? "rotate(180deg)" : "rotate(0)" }}>
-                    <ChevronDown size={14} />
-                  </div>
-                )}
-              </button>
-
-              {/* Expandable detail panel */}
+      {/* ── CENTER AREA: Active step card / Completion card ── */}
+      <div style={{
+        flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+        position: "relative", zIndex: 2, padding: mobile ? "0 16px" : "0 48px",
+      }}>
+        {!done ? (
+          /* ── ACTIVE STEP CARD ── */
+          <div style={{
+            background: EX.card, border: `1px solid ${EX.cardBorder}`,
+            borderRadius: "16px", padding: mobile ? "28px 24px" : "36px 40px",
+            maxWidth: 560, width: "100%",
+            transform: cardPhase === "exit" ? "translateX(-60px)" : cardPhase === "enter" ? "translateX(60px)" : "translateX(0)",
+            opacity: cardPhase === "visible" ? 1 : 0,
+            transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease",
+          }}>
+            {/* Module number */}
+            <div style={{ fontFamily: MONO, fontSize: "13px", fontWeight: 600, color: EX.accent, letterSpacing: "0.05em", marginBottom: "6px" }}>
+              {activeModule.id}
+            </div>
+            {/* Module name */}
+            <div style={{ fontSize: mobile ? "20px" : "24px", fontWeight: 700, color: EX.text, fontFamily: HEADING, letterSpacing: "-0.02em", marginBottom: "8px" }}>
+              {activeModule.name}
+            </div>
+            {/* Description */}
+            <div style={{ fontSize: "13px", color: EX.textSec, lineHeight: 1.6, marginBottom: "24px" }}>
+              {activeModule.execDesc}
+            </div>
+            {/* Progress bar */}
+            <div style={{ height: "3px", background: EX.progressBg, borderRadius: "2px", marginBottom: "24px", overflow: "hidden" }}>
               <div style={{
-                overflow: "hidden",
-                maxHeight: isExpanded ? "400px" : "0px",
-                opacity: isExpanded ? 1 : 0,
-                transition: "max-height 0.3s ease, opacity 0.2s ease",
+                height: "100%", borderRadius: "2px", background: EX.progressFill,
+                width: "60%", animation: "indeterminateProgress 1.8s ease-in-out infinite",
+              }} />
+            </div>
+            {/* Elapsed time */}
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <span style={{ fontFamily: MONO, fontSize: "13px", color: EX.accent, fontVariantNumeric: "tabular-nums" }}>
+                {elapsed.toFixed(1)}s
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* ── COMPLETION CARD ── */
+          <div style={{
+            background: EX.card, border: `1px solid ${EX.cardBorder}`,
+            borderRadius: "16px", padding: mobile ? "32px 24px" : "40px 48px",
+            maxWidth: 560, width: "100%",
+            transform: cardPhase === "exit" ? "translateX(-60px)" : cardPhase === "enter" ? "translateX(60px)" : "translateX(0)",
+            opacity: cardPhase === "visible" ? 1 : 0,
+            transition: "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease",
+          }}>
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: "28px" }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: "50%", background: EX.success + "22",
+                display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: "12px",
               }}>
-                <div style={{
-                  padding: mobile ? "12px 0 12px 30px" : "16px 0 16px 34px",
-                  borderBottom: `1px solid ${T.borderLight}`,
-                }}>
-                  {/* Description */}
-                  <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.6, marginBottom: statsVisible ? "12px" : 0 }}>
-                    {m.desc}
-                  </div>
-
-                  {/* Stats detail (after pipeline completes) */}
-                  {statsVisible && (
-                    <div style={{ fontFamily: MONO, fontSize: "12px", color: T.text, lineHeight: 1.8 }}>
-                      {stat.detail}
-                      {/* Candidates funnel bar */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px" }}>
-                        <span style={{ fontSize: "11px", color: T.textTer, minWidth: 36 }}>
-                          {stat.candidates_out.toLocaleString()}
-                        </span>
-                        <div style={{ flex: 1, maxWidth: 400, height: 5, background: T.borderLight, borderRadius: 3, overflow: "hidden" }}>
-                          <div style={{
-                            width: `${barWidth}%`, height: "100%", borderRadius: 3,
-                            background: T.primary,
-                            transition: "width 0.6s ease-out",
-                          }} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Running indicator for active step */}
-                  {status === "active" && !stat && (
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
-                      <div style={{ display: "flex", gap: "3px" }}>
-                        {[0, 1, 2].map(d => (
-                          <div key={d} style={{
-                            width: 4, height: 4, borderRadius: "50%", background: T.primary,
-                            animation: `pulseDot 1.2s ease-in-out ${d * 0.2}s infinite`,
-                          }} />
-                        ))}
-                      </div>
-                      <span style={{ fontSize: "12px", color: T.textTer }}>Processing...</span>
-                    </div>
-                  )}
-                </div>
+                <Check size={20} color={EX.success} strokeWidth={2.5} />
+              </div>
+              <div style={{ fontSize: mobile ? "22px" : "26px", fontWeight: 700, color: EX.text, fontFamily: HEADING, letterSpacing: "-0.02em" }}>
+                Pipeline Complete
+              </div>
+              <div style={{ fontFamily: MONO, fontSize: "15px", color: EX.accent, marginTop: "4px", fontVariantNumeric: "tabular-nums" }}>
+                {totalDuration > 0 ? fmtDur(totalDuration) : `${elapsed.toFixed(1)}s`}
               </div>
             </div>
-          );
-        })}
+
+            {/* Divider */}
+            <div style={{ height: "1px", background: EX.cardBorder, marginBottom: "20px" }} />
+
+            {/* Summary stats */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "28px" }}>
+              {[
+                statMap["M1"] && `${statMap["M1"].candidates_out} mutations resolved`,
+                m2Out > 0 && `${m2Out} candidates generated`,
+                finalSize > 0 && `${finalSize} selected for panel`,
+                statMap["M8"] && `${statMap["M8"].detail?.match(/(\d+) primers/)?.[0] || "Primers designed"}`,
+              ].filter(Boolean).map((line, i) => (
+                <div key={i} style={{
+                  fontFamily: MONO, fontSize: "13px", color: EX.textMono, lineHeight: 1.6,
+                  animation: `statFadeIn 0.3s ease-out ${i * 0.08}s both`,
+                }}>
+                  {line}
+                </div>
+              ))}
+            </div>
+
+            {/* View Results button */}
+            <button
+              onClick={() => goTo("results", { jobId })}
+              style={{
+                width: "100%", padding: "14px", borderRadius: "10px",
+                background: EX.accent, color: "#fff", border: "none",
+                fontSize: "14px", fontWeight: 700, fontFamily: FONT,
+                cursor: "pointer", letterSpacing: "-0.01em",
+                transition: "opacity 0.15s ease",
+                marginBottom: "16px",
+              }}
+              onMouseEnter={e => e.currentTarget.style.opacity = "0.9"}
+              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+            >
+              View Results →
+            </button>
+
+            {/* Show execution log toggle */}
+            <button
+              onClick={() => setShowLog(!showLog)}
+              style={{
+                background: "none", border: "none", color: EX.textSec,
+                fontSize: "12px", fontFamily: FONT, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: "6px",
+                padding: "4px 0", width: "100%",
+              }}
+            >
+              <ChevronRight size={12} style={{ transition: "transform 0.2s ease", transform: showLog ? "rotate(90deg)" : "rotate(0)" }} />
+              {showLog ? "Hide" : "Show"} execution log
+            </button>
+
+            {/* Execution log (collapsible) */}
+            <div style={{
+              overflow: "hidden",
+              maxHeight: showLog ? "400px" : "0px",
+              opacity: showLog ? 1 : 0,
+              transition: "max-height 0.35s ease, opacity 0.25s ease",
+            }}>
+              <div style={{ marginTop: "12px", maxHeight: "360px", overflowY: "auto" }}>
+                {MODULES.map((m, i) => {
+                  const st = statMap[m.id];
+                  const isLogExpanded = logExpandedId === m.id;
+                  const barW = st ? Math.max(2, (st.candidates_out / maxCandidates) * 100) : 0;
+                  return (
+                    <div key={m.id}>
+                      <button
+                        onClick={() => setLogExpandedId(isLogExpanded ? null : m.id)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: "10px",
+                          width: "100%", padding: "6px 0", background: "none", border: "none",
+                          borderBottom: `1px solid ${EX.cardBorder}`, cursor: st ? "pointer" : "default",
+                          fontFamily: MONO, fontSize: "11px", color: EX.textMono, textAlign: "left",
+                        }}
+                      >
+                        <Check size={10} color={EX.success} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                        <span style={{ color: EX.accent, fontWeight: 600, minWidth: 32 }}>{m.id}</span>
+                        <span style={{ color: EX.text, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
+                        {st && <span style={{ color: EX.textSec, flexShrink: 0 }}>{fmtDur(st.duration_ms)}</span>}
+                      </button>
+                      {/* Expanded detail */}
+                      <div style={{
+                        overflow: "hidden", maxHeight: isLogExpanded && st ? "120px" : "0px",
+                        opacity: isLogExpanded ? 1 : 0, transition: "max-height 0.25s ease, opacity 0.2s ease",
+                      }}>
+                        {st && (
+                          <div style={{ padding: "8px 0 8px 22px", fontSize: "11px", color: EX.textSec, lineHeight: 1.7 }}>
+                            {st.detail}
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "6px" }}>
+                              <span style={{ fontSize: "10px", color: EX.textSec, minWidth: 28 }}>{st.candidates_out}</span>
+                              <div style={{ flex: 1, maxWidth: 200, height: 3, background: EX.rail, borderRadius: 2, overflow: "hidden" }}>
+                                <div style={{ width: `${barW}%`, height: "100%", borderRadius: 2, background: EX.accent }} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Summary + View Results — appears after all stats revealed */}
-      {revealDone && (
-        <div style={{ marginTop: "32px", animation: "stepSlideIn 0.4s ease-out forwards" }}>
-          <div style={{ fontFamily: MONO, fontSize: mobile ? "12px" : "13px", color: T.textSec, lineHeight: 1.8, marginBottom: "20px" }}>
-            {positionsScanned > 0 && <span>{positionsScanned.toLocaleString()} positions → </span>}
-            {pamHits > 0 && <span>{pamHits.toLocaleString()} PAM hits → </span>}
-            <span>{m2Out.toLocaleString()} candidates → <strong style={{ color: T.text }}>{finalSize} selected</strong></span>
-          </div>
-          <button
-            onClick={() => goTo("results", { jobId })}
-            style={{
-              background: T.primary, color: "#fff", border: "none", borderRadius: 8,
-              padding: mobile ? "12px 24px" : "12px 32px", fontSize: "14px", fontWeight: 700,
-              cursor: "pointer", fontFamily: FONT, letterSpacing: "-0.01em",
-              width: mobile ? "100%" : "auto",
-            }}
-          >
-            View Results →
-          </button>
-        </div>
-      )}
+      {/* ── BOTTOM BAR ── */}
+      <div style={{
+        position: "relative", zIndex: 2, padding: mobile ? "16px" : "20px 48px",
+        display: "flex", justifyContent: "center",
+      }}>
+        <span style={{ fontFamily: MONO, fontSize: "11px", color: EX.textSec, fontVariantNumeric: "tabular-nums" }}>
+          {done
+            ? (totalDuration > 0 ? `${fmtDur(totalDuration)} total` : `${elapsed.toFixed(1)}s total`)
+            : `${elapsed.toFixed(1)}s elapsed`
+          }
+        </span>
+      </div>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 };
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3841,6 +3962,11 @@ const GUARDPlatform = () => {
         @keyframes pulseDot { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
         @keyframes stepSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes statReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes nodePulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(59,130,246,0.15), 0 0 16px rgba(59,130,246,0.1); } 50% { box-shadow: 0 0 0 8px rgba(59,130,246,0), 0 0 24px rgba(59,130,246,0.2); } }
+        @keyframes railPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+        @keyframes railCelebrate { 0% { filter: brightness(1); } 50% { filter: brightness(1.8); } 100% { filter: brightness(1); } }
+        @keyframes indeterminateProgress { 0% { width: 0%; margin-left: 0%; } 50% { width: 60%; margin-left: 20%; } 100% { width: 0%; margin-left: 100%; } }
+        @keyframes statFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         .spin { animation: spin 1s linear infinite; }
         *, *::before, *::after { box-sizing: border-box; }
         body { margin: 0; padding: 0; overflow: hidden; }
