@@ -1610,25 +1610,24 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
   }
 
   return (
-    <div style={{ padding: mobile ? "24px 16px" : "48px 40px", maxWidth: 900, width: "100%" }}>
-      {/* Header */}
-      <div style={{ marginBottom: "28px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+    <div style={{ padding: mobile ? "20px 16px" : "40px 48px", width: "100%" }}>
+      {/* Header — title + subtitle, full width */}
+      <div style={{ marginBottom: "32px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
           {done
-            ? <Check size={18} color={T.success} strokeWidth={2.5} />
-            : <Loader2 size={18} color={T.primary} strokeWidth={2.5} style={{ animation: "spin 1s linear infinite" }} />
+            ? <Check size={20} color={T.primary} strokeWidth={2.5} />
+            : <Loader2 size={20} color={T.primary} strokeWidth={2.5} style={{ animation: "spin 1s linear infinite" }} />
           }
-          <span style={{ fontSize: mobile ? "18px" : "22px", fontWeight: 800, color: T.text, fontFamily: HEADING, letterSpacing: "-0.02em" }}>
+          <h2 style={{ fontSize: mobile ? "20px" : "26px", fontWeight: 800, color: T.text, margin: 0, fontFamily: HEADING, letterSpacing: "-0.02em" }}>
             {done ? "Pipeline Complete" : "Running Pipeline"}
-          </span>
-          {!done && <span style={{ fontSize: "12px", color: T.textTer, fontFamily: MONO }}>{pct}%</span>}
+          </h2>
         </div>
-        <div style={{ fontSize: "12px", color: T.textTer, fontFamily: MONO, marginLeft: "28px" }}>
-          {jobId}{done && totalDuration > 0 ? ` · ${(totalDuration / 1000).toFixed(1)}s` : ""}
+        <div style={{ fontSize: "12px", color: T.textTer, fontFamily: MONO, marginLeft: "30px" }}>
+          {jobId}{done && totalDuration > 0 ? `  ·  ${(totalDuration / 1000).toFixed(1)}s total` : ""}
         </div>
       </div>
 
-      {/* Module list — Claude Code style collapsible steps */}
+      {/* Module list — full-width collapsible rows */}
       <div style={{ display: "flex", flexDirection: "column", gap: "0px" }}>
         {MODULES.map((m, i) => {
           const status = i < step ? "done" : i === step && !done ? "active" : done ? "done" : "pending";
@@ -1636,83 +1635,58 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
           const statsVisible = i < revealedStats && stat;
           const isExpanded = expanded[m.id] || false;
           const barWidth = stat ? Math.max(2, (stat.candidates_out / maxCandidates) * 100) : 0;
-
-          /* Connector line color */
-          const lineColor = status === "done" ? T.success + "44" : status === "active" ? T.primary + "44" : T.border;
+          const durationLabel = stat ? (stat.duration_ms >= 1000 ? `${(stat.duration_ms / 1000).toFixed(1)}s` : `${stat.duration_ms}ms`) : null;
 
           return (
-            <div key={m.id} style={{ position: "relative" }}>
-              {/* Vertical connector line (except last) */}
-              {i < MODULES.length - 1 && (
-                <div style={{
-                  position: "absolute", left: mobile ? 14 : 16, top: mobile ? 28 : 32,
-                  width: "2px", bottom: 0, background: lineColor,
-                  transition: "background 0.4s ease",
-                }} />
-              )}
-
+            <div key={m.id}>
               {/* Clickable header row */}
               <button
                 onClick={() => (status !== "pending") && toggleExpand(m.id)}
                 style={{
                   display: "flex", alignItems: "center", gap: mobile ? "10px" : "14px",
-                  width: "100%", padding: mobile ? "8px 0" : "10px 0",
-                  background: "none", border: "none", cursor: status !== "pending" ? "pointer" : "default",
-                  fontFamily: FONT, textAlign: "left", position: "relative", zIndex: 1,
+                  width: "100%", padding: mobile ? "10px 0" : "12px 0",
+                  background: "none", border: "none", borderBottom: `1px solid ${T.borderLight}`,
+                  cursor: status !== "pending" ? "pointer" : "default",
+                  fontFamily: FONT, textAlign: "left",
+                  opacity: status === "pending" ? 0.45 : 1,
+                  transition: "opacity 0.3s ease",
                 }}
               >
-                {/* Status icon */}
-                <div style={{
-                  width: mobile ? 28 : 32, height: mobile ? 28 : 32, borderRadius: "50%",
-                  display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                  background: status === "done" ? T.successLight : status === "active" ? T.primaryLight : T.bgSub,
-                  border: `2px solid ${status === "done" ? T.success : status === "active" ? T.primary : T.border}`,
-                  transition: "all 0.3s ease",
-                  ...(status === "active" ? { boxShadow: `0 0 0 4px ${T.primary}22` } : {}),
-                }}>
+                {/* Status indicator — small icon */}
+                <div style={{ width: 20, display: "flex", justifyContent: "center", flexShrink: 0 }}>
                   {status === "done"
-                    ? <Check size={mobile ? 12 : 14} color={T.success} strokeWidth={2.5} />
+                    ? <Check size={16} color={T.primary} strokeWidth={2.5} />
                     : status === "active"
-                      ? <Loader2 size={mobile ? 12 : 14} color={T.primary} strokeWidth={2.5} style={{ animation: "spin 1s linear infinite" }} />
-                      : <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.textTer, opacity: 0.4 }} />
+                      ? <Loader2 size={16} color={T.primary} strokeWidth={2} style={{ animation: "spin 1s linear infinite" }} />
+                      : <div style={{ width: 8, height: 8, borderRadius: "50%", background: T.border }} />
                   }
                 </div>
 
-                {/* Module name + ID */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{
-                      fontFamily: MONO, fontSize: "10px", fontWeight: 600,
-                      color: status === "done" ? T.success : status === "active" ? T.primary : T.textTer,
-                      background: status === "done" ? T.successLight : status === "active" ? T.primaryLight : T.bgSub,
-                      padding: "1px 6px", borderRadius: "4px",
-                    }}>{m.id}</span>
-                    <span style={{
-                      fontSize: mobile ? "12px" : "13px", fontWeight: status === "active" ? 700 : 600,
-                      color: status === "pending" ? T.textTer : T.text,
-                      transition: "color 0.3s ease",
-                    }}>{m.name}</span>
-                  </div>
-                  {/* Short description visible when collapsed and not pending */}
-                  {!isExpanded && status !== "pending" && (
-                    <div style={{ fontSize: "11px", color: T.textTer, marginTop: "2px" }}>{m.desc}</div>
+                {/* Module ID badge + name + description */}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
+                  <span style={{
+                    fontFamily: MONO, fontSize: "11px", fontWeight: 700,
+                    color: status === "active" ? T.primary : status === "done" ? T.primary : T.textTer,
+                  }}>{m.id}</span>
+                  <span style={{
+                    fontSize: mobile ? "13px" : "14px", fontWeight: 600, color: T.text,
+                  }}>{m.name}</span>
+                  {!isExpanded && (
+                    <span style={{ fontSize: "12px", color: T.textTer }}>{m.desc}</span>
                   )}
                 </div>
 
-                {/* Duration badge (right side) */}
-                {statsVisible && (
-                  <span style={{
-                    fontFamily: MONO, fontSize: "10px", color: T.textTer, flexShrink: 0,
-                    background: T.bgSub, padding: "2px 8px", borderRadius: "4px",
-                  }}>
-                    {stat.duration_ms >= 1000 ? `${(stat.duration_ms / 1000).toFixed(1)}s` : `${stat.duration_ms}ms`}
+                {/* Duration (right side) */}
+                {durationLabel && (
+                  <span style={{ fontFamily: MONO, fontSize: "11px", color: T.textTer, flexShrink: 0 }}>
+                    {durationLabel}
                   </span>
                 )}
 
                 {/* Expand chevron */}
                 {status !== "pending" && (
-                  <div style={{ flexShrink: 0, color: T.textTer, transition: "transform 0.2s ease", transform: isExpanded ? "rotate(90deg)" : "rotate(0)" }}>
-                    <ChevronRight size={14} />
+                  <div style={{ flexShrink: 0, color: T.textTer, transition: "transform 0.2s ease", transform: isExpanded ? "rotate(180deg)" : "rotate(0)" }}>
+                    <ChevronDown size={14} />
                   </div>
                 )}
               </button>
@@ -1720,52 +1694,42 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
               {/* Expandable detail panel */}
               <div style={{
                 overflow: "hidden",
-                maxHeight: isExpanded ? "300px" : "0px",
+                maxHeight: isExpanded ? "400px" : "0px",
                 opacity: isExpanded ? 1 : 0,
-                transition: "max-height 0.35s ease, opacity 0.25s ease",
-                marginLeft: mobile ? 38 : 46,
+                transition: "max-height 0.3s ease, opacity 0.2s ease",
               }}>
                 <div style={{
-                  background: T.bgSub, borderRadius: "8px", padding: "12px 16px", marginBottom: "8px",
-                  borderLeft: `3px solid ${status === "active" ? T.primary : status === "done" ? T.success : T.border}`,
+                  padding: mobile ? "12px 0 12px 30px" : "16px 0 16px 34px",
+                  borderBottom: `1px solid ${T.borderLight}`,
                 }}>
                   {/* Description */}
-                  <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, marginBottom: statsVisible ? "10px" : 0 }}>
+                  <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.6, marginBottom: statsVisible ? "12px" : 0 }}>
                     {m.desc}
                   </div>
 
                   {/* Stats detail (after pipeline completes) */}
                   {statsVisible && (
-                    <>
-                      <div style={{
-                        fontFamily: MONO, fontSize: "11px", color: T.text, lineHeight: 1.7,
-                        padding: "8px 0", borderTop: `1px solid ${T.borderLight}`,
-                      }}>
-                        {stat.detail}
-                      </div>
-
+                    <div style={{ fontFamily: MONO, fontSize: "12px", color: T.text, lineHeight: 1.8 }}>
+                      {stat.detail}
                       {/* Candidates funnel bar */}
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-                        <span style={{ fontSize: "10px", color: T.textTer, fontFamily: MONO, flexShrink: 0, minWidth: 48 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "8px" }}>
+                        <span style={{ fontSize: "11px", color: T.textTer, minWidth: 36 }}>
                           {stat.candidates_out.toLocaleString()}
                         </span>
-                        <div style={{ flex: 1, height: 4, background: T.borderLight, borderRadius: 2, overflow: "hidden" }}>
+                        <div style={{ flex: 1, maxWidth: 400, height: 5, background: T.borderLight, borderRadius: 3, overflow: "hidden" }}>
                           <div style={{
-                            width: `${barWidth}%`, height: "100%", borderRadius: 2,
-                            background: status === "done" ? T.success : T.primary,
+                            width: `${barWidth}%`, height: "100%", borderRadius: 3,
+                            background: T.primary,
                             transition: "width 0.6s ease-out",
                           }} />
                         </div>
                       </div>
-                    </>
+                    </div>
                   )}
 
                   {/* Running indicator for active step */}
                   {status === "active" && !stat && (
-                    <div style={{
-                      display: "flex", alignItems: "center", gap: "8px", marginTop: "8px",
-                      padding: "6px 0",
-                    }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
                       <div style={{ display: "flex", gap: "3px" }}>
                         {[0, 1, 2].map(d => (
                           <div key={d} style={{
@@ -1774,7 +1738,7 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
                           }} />
                         ))}
                       </div>
-                      <span style={{ fontSize: "11px", color: T.textTer }}>Processing...</span>
+                      <span style={{ fontSize: "12px", color: T.textTer }}>Processing...</span>
                     </div>
                   )}
                 </div>
@@ -1784,32 +1748,24 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
         })}
       </div>
 
-      {/* Summary strip — appears after all stats revealed */}
+      {/* Summary + View Results — appears after all stats revealed */}
       {revealDone && (
-        <div style={{
-          marginTop: "24px", background: T.bgSub, borderRadius: "10px", padding: mobile ? "16px" : "20px 24px",
-          border: `1px solid ${T.success}33`, animation: "stepSlideIn 0.4s ease-out forwards",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-            <Check size={16} color={T.success} strokeWidth={2.5} />
-            <span style={{ fontSize: "13px", fontWeight: 700, color: T.text }}>Pipeline Summary</span>
-          </div>
-          <div style={{ fontFamily: MONO, fontSize: mobile ? "11px" : "12px", color: T.textSec, lineHeight: 1.8 }}>
-            {positionsScanned > 0 && <div>{positionsScanned.toLocaleString()} positions scanned</div>}
-            {pamHits > 0 && <div>{pamHits.toLocaleString()} PAM hits found</div>}
-            <div>{m2Out.toLocaleString()} candidates generated → {finalSize} selected for panel</div>
-            <div style={{ color: T.textTer, marginTop: "4px" }}>Completed in {(totalDuration / 1000).toFixed(1)}s</div>
+        <div style={{ marginTop: "32px", animation: "stepSlideIn 0.4s ease-out forwards" }}>
+          <div style={{ fontFamily: MONO, fontSize: mobile ? "12px" : "13px", color: T.textSec, lineHeight: 1.8, marginBottom: "20px" }}>
+            {positionsScanned > 0 && <span>{positionsScanned.toLocaleString()} positions → </span>}
+            {pamHits > 0 && <span>{pamHits.toLocaleString()} PAM hits → </span>}
+            <span>{m2Out.toLocaleString()} candidates → <strong style={{ color: T.text }}>{finalSize} selected</strong></span>
           </div>
           <button
             onClick={() => goTo("results", { jobId })}
             style={{
-              marginTop: "16px", background: T.primary, color: "#fff", border: "none", borderRadius: 8,
-              padding: mobile ? "10px 20px" : "12px 28px", fontSize: mobile ? "13px" : "14px", fontWeight: 700,
-              cursor: "pointer", fontFamily: FONT, letterSpacing: "-0.01em", width: mobile ? "100%" : "auto",
-              display: "flex", alignItems: "center", gap: "8px", justifyContent: "center",
+              background: T.primary, color: "#fff", border: "none", borderRadius: 8,
+              padding: mobile ? "12px 24px" : "12px 32px", fontSize: "14px", fontWeight: 700,
+              cursor: "pointer", fontFamily: FONT, letterSpacing: "-0.01em",
+              width: mobile ? "100%" : "auto",
             }}
           >
-            View Results <ChevronRight size={16} />
+            View Results →
           </button>
         </div>
       )}
