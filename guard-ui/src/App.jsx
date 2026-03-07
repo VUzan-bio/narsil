@@ -919,11 +919,8 @@ const HomePage = ({ goTo, connected }) => {
       {/* Hero */}
       <div style={{ marginBottom: mobile ? "28px" : "48px" }}>
         <div style={{ maxWidth: "100%" }}>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: "6px", marginBottom: "4px" }}>
-            <div style={{ width: mobile ? "36px" : "48px", height: mobile ? "36px" : "48px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <img src="/logo.png" alt="" style={{ height: mobile ? "64px" : "86px", objectFit: "contain" }} />
-            </div>
-            <span style={{ fontSize: mobile ? "20px" : "28px", fontWeight: 800, color: T.text, lineHeight: 1, letterSpacing: "-0.03em", fontFamily: HEADING }}>GUARD</span>
+          <div style={{ marginBottom: "4px" }}>
+            <img src="/guard-logo.png" alt="GUARD" style={{ height: mobile ? "28px" : "40px", objectFit: "contain", display: "block" }} />
           </div>
           <p style={{ fontSize: mobile ? "12px" : "14px", fontWeight: 600, color: T.textSec, margin: "0 0 2px", letterSpacing: "0.02em" }}>
             Guide RNA Automated Resistance Diagnostics
