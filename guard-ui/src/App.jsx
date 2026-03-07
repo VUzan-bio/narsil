@@ -3031,20 +3031,22 @@ const DiagnosticsTab = ({ results, jobId, connected }) => {
       return { target_label: r.label, drug: r.drug, efficiency: eff, discrimination: disc, is_assay_ready: ready, has_primers: r.hasPrimers, strategy: r.strategy };
     });
 
-    const assayReady = perTarget.filter(t => t.is_assay_ready).length;
-    const directTargets = perTarget.filter(t => t.strategy === "Direct" && t.discrimination > 0);
+    // Exclude species control (IS6110) from resistance metrics
+    const resistanceTargets = perTarget.filter(t => t.drug !== "OTHER");
+    const assayReady = resistanceTargets.filter(t => t.is_assay_ready).length;
+    const directTargets = resistanceTargets.filter(t => t.strategy === "Direct" && t.discrimination > 0);
     const meanDisc = directTargets.length ? directTargets.reduce((a, t) => a + t.discrimination, 0) / directTargets.length : 0;
     const specificity = directTargets.length ? directTargets.reduce((a, t) => a + Math.max(0, 1 - 1 / t.discrimination), 0) / directTargets.length : 0;
-    const sensitivity = res.length ? assayReady / res.length : 0;
+    const sensitivity = resistanceTargets.length ? assayReady / resistanceTargets.length : 0;
 
     setDiagnostics({
-      sensitivity, specificity, coverage: assayReady, total_targets: res.length,
+      sensitivity, specificity, coverage: assayReady, total_targets: resistanceTargets.length,
       assay_ready: assayReady, mean_efficiency: +(res.reduce((a, r) => a + (r.ensembleScore || r.score), 0) / res.length).toFixed(3),
       mean_discrimination: +meanDisc.toFixed(1), per_target: perTarget,
     });
 
-    // WHO compliance by drug class
-    const drugs = [...new Set(res.map(r => r.drug))];
+    // WHO compliance by drug class (exclude species control)
+    const drugs = [...new Set(res.map(r => r.drug))].filter(d => d !== "OTHER");
     const whoComp = {};
     for (const drug of drugs) {
       const drugTargets = perTarget.filter(t => t.drug === drug);
@@ -3102,18 +3104,19 @@ const DiagnosticsTab = ({ results, jobId, connected }) => {
 
     const computeLocalSweep = () => {
       if (!results?.length) { setSweepLoading(false); return; }
+      const resistanceResults = results.filter(r => r.drug !== "OTHER");
       const baseP = presets.find(x => x.name === activePreset) || { efficiency_threshold: 0.4, discrimination_threshold: 3.0 };
       const points = values.map(v => {
         const effT = paramName === "efficiency_threshold" ? v : baseP.efficiency_threshold;
         const discT = paramName === "discrimination_threshold" ? v : baseP.discrimination_threshold;
-        const ready = results.filter(r => {
+        const ready = resistanceResults.filter(r => {
           const eff = r.ensembleScore || r.score;
           const disc = r.disc != null && r.disc < 900 ? r.disc : 0;
           return r.hasPrimers && eff >= effT && (r.strategy === "Proximity" || disc >= discT);
         }).length;
-        const directOk = results.filter(r => r.strategy === "Direct" && r.disc < 900 && r.disc >= discT);
+        const directOk = resistanceResults.filter(r => r.strategy === "Direct" && r.disc < 900 && r.disc >= discT);
         const spec = directOk.length ? directOk.reduce((a, r) => a + Math.max(0, 1 - 1 / r.disc), 0) / directOk.length : 0;
-        return { value: v, sensitivity: +(ready / results.length).toFixed(3), specificity: +spec.toFixed(3), coverage: ready, assay_ready: ready };
+        return { value: v, sensitivity: +(ready / resistanceResults.length).toFixed(3), specificity: +spec.toFixed(3), coverage: ready, assay_ready: ready };
       });
       setSweepData({ parameter_name: paramName, points });
       setSweepLoading(false);
@@ -3136,18 +3139,19 @@ const DiagnosticsTab = ({ results, jobId, connected }) => {
     const computeLocalPareto = () => {
       if (!results?.length) { setParetoLoading(false); return; }
       const frontier = [];
+      const resistanceResults = results.filter(r => r.drug !== "OTHER");
       const discGrid = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0, 10.0];
       const effGrid = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8];
       for (const dT of discGrid) {
         for (const eT of effGrid) {
-          const ready = results.filter(r => {
+          const ready = resistanceResults.filter(r => {
             const eff = r.ensembleScore || r.score;
             const disc = r.disc != null && r.disc < 900 ? r.disc : 0;
             return r.hasPrimers && eff >= eT && (r.strategy === "Proximity" || disc >= dT);
           }).length;
-          const directOk = results.filter(r => r.strategy === "Direct" && r.disc < 900 && r.disc >= dT);
+          const directOk = resistanceResults.filter(r => r.strategy === "Direct" && r.disc < 900 && r.disc >= dT);
           const spec = directOk.length ? directOk.reduce((a, r) => a + Math.max(0, 1 - 1 / r.disc), 0) / directOk.length : 0;
-          const sens = ready / results.length;
+          const sens = ready / resistanceResults.length;
           frontier.push({ sensitivity: +sens.toFixed(3), specificity: +spec.toFixed(3), efficiency_threshold: eT, discrimination_threshold: dT, coverage: ready });
         }
       }
