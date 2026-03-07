@@ -3280,7 +3280,10 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
 
           {/* D: Per-Target Breakdown with Top-K */}
           {diagnostics.per_target && diagnostics.per_target.length > 0 && (
-            <CollapsibleSection title={`Per-Target Breakdown (${diagnostics.per_target.length} targets)`} defaultOpen={false}>
+            <CollapsibleSection title={`Per-Target Breakdown (${diagnostics.per_target.length} targets) — click a row to see Top-K alternatives`} defaultOpen={false}>
+              <div style={{ padding: "8px 12px", marginBottom: "10px", background: T.primaryLight, borderRadius: "6px", fontSize: "11px", color: T.primaryDark, fontWeight: 500 }}>
+                Click any target row to expand and view the top 5 alternative candidates with their scores, discrimination ratios, and detection strategies.
+              </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT, fontSize: "12px" }}>
                   <thead>
