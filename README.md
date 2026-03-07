@@ -23,7 +23,7 @@ GUARD is an end-to-end computational pipeline that takes WHO-catalogued drug-res
 
 ## Pipeline
 
-<img width="2784" height="1358" alt="555309559-a7a695f4-2f14-48da-a9dd-1c7d16aee951" src="https://github.com/user-attachments/assets/a7956fda-835c-45d0-aa42-9f31ebadbb73" />
+<img width="3398" height="1147" alt="Gemini_Generated_Image_xkbngfxkbngfxkbn" src="https://github.com/user-attachments/assets/89c58154-ba94-4e98-94ec-c2c8580c4c99" />
 
 ## Quick Start
 
