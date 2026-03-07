@@ -99,9 +99,9 @@ const RESULTS = MUTATIONS.map((m, i) => {
   const wtSpacer = spacer.split("").map((c, j) => j === 10 ? (c === "A" ? "G" : c === "T" ? "C" : c === "G" ? "A" : "T") : c).join("");
   const refKey = `${m.gene}_${m.ref}${m.pos}${m.alt}`;
   const heuristic = +(0.6 + Math.random() * 0.35).toFixed(3);
-  const cnnRaw = +(0.35 + Math.random() * 0.25).toFixed(4);
-  const cnnCal = +(cnnRaw * 1.4 + 0.15).toFixed(4);
-  const ensemble = +(heuristic * 0.993 + cnnCal * 0.007).toFixed(4);
+  const cnnRaw = +(0.5 + Math.random() * 0.4).toFixed(4);
+  const cnnCal = +(cnnRaw * 0.8 + 0.18).toFixed(4);
+  const ensemble = +(heuristic * 0.35 + cnnCal * 0.65).toFixed(4);
   return {
     ...m, label: refKey,
     strategy: i % 3 === 0 ? "Direct" : i % 3 === 1 ? "Proximity" : "Direct",
@@ -121,7 +121,7 @@ const RESULTS = MUTATIONS.map((m, i) => {
 RESULTS.push({
   gene: "IS6110", ref: "N", pos: 0, alt: "N", drug: "OTHER", drugFull: "Other", conf: "N/A", tier: 0,
   label: "IS6110_NON", strategy: "Direct", spacer: "AATGTCGCCGCGATCGAGCG", wtSpacer: "AATGTCGCCGCGATCGAGCG",
-  pam: "TTTG", score: 0.95, cnnScore: 0.88, cnnCalibrated: 0.91, ensembleScore: 0.95,
+  pam: "TTTG", score: 0.95, cnnScore: 0.88, cnnCalibrated: 0.91, ensembleScore: 0.924,
   mlScores: [{ model_name: "guard_net", predicted_efficiency: 0.88 }],
   disc: 999, gc: 0.65, ot: 0, hasPrimers: true, hasSM: false,
   fwd: seq(30), rev: seq(30), amplicon: 142, mutActivity: 0.95, wtActivity: 0.001,
@@ -1225,7 +1225,7 @@ const HomePage = ({ goTo, connected }) => {
                     </div>
                   </div>
                   <button
-                    onClick={() => goTo("results", { jobId: pipeJobId })}
+                    onClick={() => goTo("results", { jobId: pipeJobId, scorer })}
                     style={{
                       padding: "8px 20px", borderRadius: "6px",
                       background: T.primary, color: "#fff", border: "none",
@@ -1636,28 +1636,30 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
 /* ═══════════════════════════════════════════════════════════════════
    RESULT TABS
    ═══════════════════════════════════════════════════════════════════ */
-const OverviewTab = ({ results }) => {
+const OverviewTab = ({ results, scorer }) => {
   const mobile = useIsMobile();
+
+  // Detect scorer from prop (primary) or ml_scores (fallback)
+  const usesGuardNet = scorer === "guard_net" || results.some(r => r.mlScores?.some(m => (m.model_name || m.modelName) === "guard_net"));
+  const mlModelLabel = usesGuardNet ? "GUARD-Net" : "Heuristic";
+  const mlModelDetail = usesGuardNet ? "235K params · CNN + RNA-FM + RLPA" : "Biophysical features";
+
+  const getResultScore = (r) => usesGuardNet ? (r.ensembleScore || r.score) : r.score;
   const drugs = [...new Set(results.map((r) => r.drug))];
-  const byDrug = drugs.map((d) => ({ drug: d, count: results.filter((r) => r.drug === d).length, avgScore: +(results.filter((r) => r.drug === d).reduce((a, r) => a + r.score, 0) / results.filter((r) => r.drug === d).length).toFixed(3) }));
+  const byDrug = drugs.map((d) => ({ drug: d, count: results.filter((r) => r.drug === d).length, avgScore: +(results.filter((r) => r.drug === d).reduce((a, r) => a + getResultScore(r), 0) / results.filter((r) => r.drug === d).length).toFixed(3) }));
   const withPrimers = results.filter((r) => r.hasPrimers).length;
   const directResults = results.filter((r) => r.strategy === "Direct" && r.disc < 900);
   const avgDisc = directResults.length ? +(directResults.reduce((a, r) => a + r.disc, 0) / directResults.length).toFixed(1) : 0;
   const highDisc = directResults.filter((r) => r.disc >= 3).length;
   const directCount = results.filter((r) => r.strategy === "Direct").length;
   const proximityCount = results.filter((r) => r.strategy === "Proximity").length;
-  const avgScore = results.length ? +(results.reduce((a, r) => a + r.score, 0) / results.length).toFixed(3) : 0;
-  const minScore = results.length ? Math.min(...results.map(r => r.score)).toFixed(3) : "0";
-  const maxScore = results.length ? Math.max(...results.map(r => r.score)).toFixed(3) : "0";
+  const avgScore = results.length ? +(results.reduce((a, r) => a + getResultScore(r), 0) / results.length).toFixed(3) : 0;
+  const minScore = results.length ? Math.min(...results.map(r => getResultScore(r))).toFixed(3) : "0";
+  const maxScore = results.length ? Math.max(...results.map(r => getResultScore(r))).toFixed(3) : "0";
   const cnnResults = results.filter(r => r.cnnCalibrated != null);
   const avgCNN = cnnResults.length ? +(cnnResults.reduce((a, r) => a + r.cnnCalibrated, 0) / cnnResults.length).toFixed(3) : null;
   const ensResults = results.filter(r => r.ensembleScore != null);
   const avgEnsemble = ensResults.length ? +(ensResults.reduce((a, r) => a + r.ensembleScore, 0) / ensResults.length).toFixed(3) : null;
-
-  // Detect scorer from ml_scores
-  const usesGuardNet = results.some(r => r.mlScores?.some(m => (m.model_name || m.modelName) === "guard_net"));
-  const mlModelLabel = usesGuardNet ? "GUARD-Net" : "Heuristic";
-  const mlModelDetail = usesGuardNet ? "235K params · CNN + RNA-FM + RLPA" : "Biophysical features";
 
   /* Adaptyv-style grouped stat section */
   const StatGroup = ({ title, items }) => (
@@ -2135,10 +2137,10 @@ const CandidateAccordion = ({ r }) => {
   );
 };
 
-const CandidatesTab = ({ results, jobId, connected }) => {
+const CandidatesTab = ({ results, jobId, connected, scorer }) => {
   const mobile = useIsMobile();
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState("score");
+  const [sortKey, setSortKey] = useState(scorer === "guard_net" ? "ensembleScore" : "score");
   const [sortDir, setSortDir] = useState(-1);
   const [drugFilter, setDrugFilter] = useState("ALL");
   const [expanded, setExpanded] = useState(null);
@@ -2191,8 +2193,8 @@ const CandidatesTab = ({ results, jobId, connected }) => {
     else { setSortKey(key); setSortDir(-1); }
   };
 
-  const hasGuardNet = results.some(r => r.mlScores?.some(m => (m.model_name || m.modelName) === "guard_net"));
-  const hasML = results.some(r => r.cnnCalibrated != null);
+  const hasGuardNet = scorer === "guard_net" || results.some(r => r.mlScores?.some(m => (m.model_name || m.modelName) === "guard_net"));
+  const hasML = hasGuardNet || results.some(r => r.cnnCalibrated != null);
   const mlColLabel = hasGuardNet ? "GN" : "CNN";
 
   const cols = [
@@ -2262,7 +2264,7 @@ const CandidatesTab = ({ results, jobId, connected }) => {
                   </div>
                   <div style={{ display: "flex", gap: "16px", fontSize: "11px" }}>
                     <div>
-                      <span style={{ color: T.textTer }}>Score </span>
+                      <span style={{ color: T.textTer }}>{hasML ? "Ensemble" : "Score"} </span>
                       <span style={{ fontFamily: MONO, fontWeight: 700, color: scoreVal > 0.8 ? T.primary : scoreVal > 0.65 ? T.warning : T.danger }}>{scoreVal.toFixed(3)}</span>
                     </div>
                     <div>
@@ -2816,7 +2818,7 @@ const MultiplexTab = ({ results }) => {
 /* ═══════════════════════════════════════════════════════════════════
    DIAGNOSTICS TAB — Block 3 Sensitivity-Specificity Optimization
    ═══════════════════════════════════════════════════════════════════ */
-const DiagnosticsTab = ({ results, jobId, connected }) => {
+const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
   const mobile = useIsMobile();
 
   // State
@@ -2832,6 +2834,7 @@ const DiagnosticsTab = ({ results, jobId, connected }) => {
 
   // Detect which scorer produced the results
   const scorerInfo = useMemo(() => {
+    if (scorer === "guard_net") return { name: "GUARD-Net", level: 3 };
     if (!results?.length) return { name: "Heuristic", level: 1 };
     const first = results.find(r => r.mlScores?.length > 0);
     if (first) {
@@ -2839,7 +2842,7 @@ const DiagnosticsTab = ({ results, jobId, connected }) => {
       if (model === "guard_net") return { name: "GUARD-Net", level: 3 };
     }
     return { name: "Heuristic", level: 1 };
-  }, [results]);
+  }, [results, scorer]);
 
   // Compute diagnostics client-side from results prop + preset thresholds
   const computeLocalDiagnostics = useCallback((preset, res) => {
@@ -3239,7 +3242,7 @@ const RESULT_TABS = [
   { id: "diagnostics", label: "Diagnostics", icon: Shield },
 ];
 
-const ResultsPage = ({ connected, jobId, goTo }) => {
+const ResultsPage = ({ connected, jobId, scorer: scorerProp, goTo }) => {
   const mobile = useIsMobile();
   const toast = useToast();
   const [tab, setTab] = useState("overview");
@@ -3402,12 +3405,12 @@ const ResultsPage = ({ connected, jobId, goTo }) => {
           </div>
 
           {/* Tab content */}
-          {tab === "overview" && <OverviewTab results={results} />}
-          {tab === "candidates" && <CandidatesTab results={results} jobId={activeJob} connected={connected} />}
+          {tab === "overview" && <OverviewTab results={results} scorer={scorerProp} />}
+          {tab === "candidates" && <CandidatesTab results={results} jobId={activeJob} connected={connected} scorer={scorerProp} />}
           {tab === "discrimination" && <DiscriminationTab results={results} />}
           {tab === "primers" && <PrimersTab results={results} />}
           {tab === "multiplex" && <MultiplexTab results={results} />}
-          {tab === "diagnostics" && <DiagnosticsTab results={results} jobId={activeJob} connected={connected} />}
+          {tab === "diagnostics" && <DiagnosticsTab results={results} jobId={activeJob} connected={connected} scorer={scorerProp} />}
         </>
       )}
 
@@ -3759,6 +3762,7 @@ const GUARDPlatform = () => {
   const [connected, setConnected] = useState(false);
   const [pipelineJobId, setPipelineJobId] = useState(null);
   const [resultsJobId, setResultsJobId] = useState(null);
+  const [resultsScorer, setResultsScorer] = useState("heuristic");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -3778,6 +3782,7 @@ const GUARDPlatform = () => {
   const goTo = (pg, opts) => {
     if (opts?.jobId && pg === "pipeline") setPipelineJobId(opts.jobId);
     if (opts?.jobId && pg === "results") setResultsJobId(opts.jobId);
+    if (opts?.scorer && pg === "results") setResultsScorer(opts.scorer);
     setPage(pg);
   };
 
@@ -3805,7 +3810,7 @@ const GUARDPlatform = () => {
           <div key={page} style={{ animation: "pageIn 0.15s ease-out" }}>
             {page === "home" && <HomePage goTo={goTo} connected={connected} />}
             {page === "pipeline" && <PipelinePage jobId={pipelineJobId} connected={connected} goTo={goTo} />}
-            {page === "results" && <ResultsPage connected={connected} jobId={resultsJobId} goTo={goTo} />}
+            {page === "results" && <ResultsPage connected={connected} jobId={resultsJobId} scorer={resultsScorer} goTo={goTo} />}
             {page === "panels" && <PanelsPage connected={connected} />}
             {page === "mutations" && <MutationsPage />}
             {page === "scoring" && <ScoringPage connected={connected} />}
