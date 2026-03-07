@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 _CONTEXT_LENGTH = 34
 _GUARD_NET_DIR = Path(__file__).resolve().parent.parent.parent / "guard-net"
-_DEFAULT_WEIGHTS = Path(__file__).resolve().parent.parent / "weights" / "guard_net_best.pt"
+_DEFAULT_WEIGHTS = Path(__file__).resolve().parent.parent / "weights" / "guard_net_diagnostic.pt"
 _DEFAULT_CALIBRATION = Path(__file__).resolve().parent.parent / "weights" / "guard_net_calibration.json"
 
 # Complement tables

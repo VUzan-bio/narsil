@@ -1,23 +1,23 @@
 {
   "model": "guard_net",
-  "temperature": 0.7448,
-  "alpha": 0.0281,
+  "temperature": 1.0734,
+  "alpha": 0.0454,
   "use_rnafm": true,
   "use_rlpa": true,
-  "val_rho_gn_raw": 0.7057,
-  "val_rho_gn_calibrated": 0.7057,
+  "val_rho_gn_raw": 0.6172,
+  "val_rho_gn_calibrated": 0.6172,
   "val_rho_heuristic": 0.1837,
-  "val_rho_ensemble": 0.706,
-  "test_rho_gn_raw": 0.5003,
-  "test_rho_gn_calibrated": 0.5003,
-  "test_rho_ensemble": 0.5014,
+  "val_rho_ensemble": 0.6179,
+  "test_rho_gn_raw": 0.4866,
+  "test_rho_gn_calibrated": 0.4866,
+  "test_rho_ensemble": 0.4895,
   "val_gn_raw_range": [
-    0.0272,
-    0.9317
+    0.1077,
+    0.7919
   ],
   "val_gn_calibrated_range": [
-    0.0082,
-    0.9709
+    0.1225,
+    0.7765
   ],
-  "val_rho_from_checkpoint": 0.7362
+  "val_rho_from_checkpoint": 0.7409
 }

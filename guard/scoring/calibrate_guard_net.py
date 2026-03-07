@@ -28,7 +28,7 @@ from scipy.stats import spearmanr
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_WEIGHTS = Path(__file__).resolve().parent.parent / "weights" / "guard_net_best.pt"
+_DEFAULT_WEIGHTS = Path(__file__).resolve().parent.parent / "weights" / "guard_net_diagnostic.pt"
 _DEFAULT_OUTPUT = Path(__file__).resolve().parent.parent / "weights" / "guard_net_calibration.json"
 
 

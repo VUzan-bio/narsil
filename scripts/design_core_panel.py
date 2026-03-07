@@ -229,6 +229,9 @@ def run_panel(reference: str, gff: str, output_dir: str) -> None:
             use_heuristic=True,
             use_discrimination=True,
             discrimination_min_ratio=2.0,
+            scorer="guard_net",
+            guard_net_weights=Path("guard/weights/guard_net_diagnostic.pt"),
+            rnafm_cache_dir=Path("E:/guard-net-data/cache/rnafm"),
         ),
         multiplex=MultiplexConfig(
             max_plex=14,
