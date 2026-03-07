@@ -5,11 +5,18 @@
  * The frontend falls back to mock data if the API is unreachable.
  */
 
+// API key from environment — Vite exposes VITE_ prefixed vars
+const API_KEY = import.meta.env.VITE_GUARD_API_KEY || "";
+
 async function request(url, options = {}) {
   try {
     const res = await fetch(url, {
-      headers: { "Content-Type": "application/json", ...options.headers },
       ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(API_KEY ? { "X-API-Key": API_KEY } : {}),
+        ...options.headers,
+      },
     });
     if (!res.ok) {
       const body = await res.text();

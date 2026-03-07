@@ -75,3 +75,13 @@ logs/
 .coverage
 htmlcov/
 .tox/
+
+# Model weights (large binaries — download separately)
+*.pt
+*.pth
+*.onnx
+!guard/weights/.gitkeep
+
+# RNA-FM embedding cache
+guard-net/data/embeddings/
+guard-net/data/external/

@@ -9,16 +9,23 @@ import json
 import logging
 import math
 import os
+import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import Response
 
 from api.state import AppState
+
+# ── Security configuration from environment ──
+API_KEY = os.environ.get("GUARD_API_KEY", "")
+RATE_LIMIT = int(os.environ.get("GUARD_RATE_LIMIT", "120"))  # requests per minute
 
 
 class SafeJSONResponse(JSONResponse):
@@ -101,9 +108,64 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["X-API-Key", "Content-Type", "Authorization"],
 )
+
+
+# ── API key authentication middleware ──
+_AUTH_SKIP_PATHS = {"/api/health", "/docs", "/openapi.json", "/redoc"}
+
+
+@app.middleware("http")
+async def check_api_key(request: Request, call_next: object) -> Response:
+    """Require X-API-Key header when GUARD_API_KEY is set."""
+    # Skip auth if no API key configured (local development)
+    if not API_KEY:
+        return await call_next(request)  # type: ignore[operator]
+
+    # Skip auth for health check, docs, static files, and websocket
+    path = request.url.path
+    if path in _AUTH_SKIP_PATHS or not path.startswith("/api"):
+        return await call_next(request)  # type: ignore[operator]
+
+    provided = request.headers.get("X-API-Key", "")
+    if provided != API_KEY:
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Invalid or missing API key"},
+        )
+
+    return await call_next(request)  # type: ignore[operator]
+
+
+# ── Rate limiter middleware ──
+_rate_store: dict[str, list[float]] = defaultdict(list)
+
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next: object) -> Response:
+    """Simple in-memory per-IP rate limiter."""
+    # Skip rate limiting for static files and websocket
+    if not request.url.path.startswith("/api"):
+        return await call_next(request)  # type: ignore[operator]
+
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+
+    # Prune entries older than 60 seconds
+    _rate_store[client_ip] = [
+        t for t in _rate_store[client_ip] if now - t < 60
+    ]
+
+    if len(_rate_store[client_ip]) >= RATE_LIMIT:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Rate limit exceeded. Try again in a minute."},
+        )
+
+    _rate_store[client_ip].append(now)
+    return await call_next(request)  # type: ignore[operator]
 
 # Include routers
 from api.routes import figures, optimisation, panels, pipeline, results, scoring, validation
