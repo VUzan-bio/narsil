@@ -1774,10 +1774,10 @@ const OverviewTab = ({ results, scorer }) => {
             The pipeline evaluates every candidate on four axes:
           </p>
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "6px 24px", fontSize: "12px" }}>
-            <div><strong>Score</strong> (0–1) — {usesGuardNet ? "ensemble of GUARD-Net neural network prediction and heuristic biophysical features" : "heuristic composite of position-weighted biophysical features"}. Used as the primary ranking metric.</div>
-            <div><strong>Discrimination</strong> (×) — predicted ratio of mutant vs wildtype cleavage activity. ≥ 3× is diagnostic-grade.</div>
-            <div><strong>RPA Primers</strong> — isothermal amplification primers for the target region (37°C, no thermal cycler). A candidate without primers cannot be used as a complete assay.</div>
-            <div><strong>Drug class</strong> — which antibiotic the mutation confers resistance to (e.g. RIF = rifampicin, INH = isoniazid).</div>
+            <div><strong>Score</strong> (0–1) — predicted Cas12a trans-cleavage activity. A score of 0.8 means the crRNA is expected to trigger strong collateral cleavage of the fluorescent reporter, producing a bright signal in ~10 min. Below 0.4, the guide may not generate a detectable signal within a clinically useful timeframe. {usesGuardNet ? "Computed as an ensemble of GUARD-Net (trained on 25K+ activity measurements) and heuristic biophysical features." : "Computed from position-weighted biophysical features."}</div>
+            <div><strong>Discrimination</strong> (×) — fold-difference in cleavage activity between the mutant (resistant) and wildtype (susceptible) template. A 5× ratio means the guide cleaves 5× faster on the mutant — so the assay signal from a resistant sample is 5× stronger than from a susceptible sample. ≥ 3× is diagnostic-grade.</div>
+            <div><strong>RPA Primers</strong> — isothermal amplification primers (37°C, no thermal cycler). RPA amplifies the target region in 15–20 min, then Cas12a detects the amplified product. A candidate without primers cannot be used as a complete assay.</div>
+            <div><strong>Drug class</strong> — which antibiotic the mutation confers resistance to (e.g. RIF = rifampicin, INH = isoniazid). A 14-plex panel covers all 6 WHO priority drug classes for MDR/XDR-TB.</div>
           </div>
         </div>
       </div>
@@ -1800,8 +1800,8 @@ const OverviewTab = ({ results, scorer }) => {
           { l: "Diagnostic-grade", v: highDisc, sub: "≥ 3× threshold" },
         ]} />
         <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "auto", background: T.border, flexShrink: 0 }} />
-        <StatGroup title={usesGuardNet ? "GUARD-Net Scoring" : "Heuristic Scoring"} items={[
-          { l: "Avg. score", v: usesGuardNet && avgEnsemble ? avgEnsemble : avgScore },
+        <StatGroup title="Predicted Activity" items={[
+          { l: "Avg. activity", v: usesGuardNet && avgEnsemble ? avgEnsemble : avgScore },
           { l: "Range", v: `${minScore} – ${maxScore}`, sub: "min – max" },
         ]} />
       </div>
@@ -1811,7 +1811,7 @@ const OverviewTab = ({ results, scorer }) => {
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "20px" : "28px 32px", marginBottom: "24px" }}>
           <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, marginBottom: "6px", fontFamily: HEADING }}>Scoring Model Comparison</div>
           <div style={{ fontSize: "12px", color: T.textSec, marginBottom: "20px", lineHeight: 1.6 }}>
-            Each candidate is scored by the heuristic (biophysical features) and GUARD-Net (CNN + RNA-FM + RLPA, trained on 25K+ cis- and trans-cleavage measurements). The ensemble blends both for improved ranking.
+            Two models independently predict each crRNA's trans-cleavage activity: a heuristic (biophysical features: seed position, GC, secondary structure) and GUARD-Net (CNN + RNA-FM + RLPA, trained on 25K+ activity measurements). The ensemble blends both to produce the final predicted activity score used for panel selection.
           </div>
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "16px" }}>
             <div style={{ background: T.bgSub, borderRadius: "10px", padding: "20px" }}>
@@ -1848,10 +1848,10 @@ const OverviewTab = ({ results, scorer }) => {
           <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "28px 32px", marginBottom: "24px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
               <div>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Score Distribution</div>
+                <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Predicted Activity Distribution</div>
                 <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5 }}>
-                  Kernel density estimation of {usesGuardNet ? "ensemble" : "heuristic"} scores across all candidates.
-                  A wider spread indicates the model differentiates strongly between targets.
+                  Distribution of predicted Cas12a trans-cleavage activity across all candidates. Higher scores = stronger fluorescent signal = faster time-to-result.
+                  Scores below 0.4 may not produce detectable signal; above 0.7 indicates high-confidence diagnostic performance.
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "20px" }}>
@@ -2384,9 +2384,9 @@ const generateInterpretation = (r) => {
   }
 
   // Overall assessment
-  if (eff >= 0.7) lines.push("Strong candidate. High predicted trans-cleavage activity — expected to generate robust fluorescent signal in the DETECTR assay.");
-  else if (eff >= 0.5) lines.push("Moderate candidate. Predicted activity is sufficient for detection but not optimal — signal intensity may require longer incubation.");
-  else lines.push("Weak candidate. Low predicted cleavage activity — consider alternatives from the top-K list or adjust the scoring weights.");
+  if (eff >= 0.7) lines.push(`Strong candidate (activity score ${eff.toFixed(3)}). High predicted Cas12a trans-cleavage rate — expected to generate a clear fluorescent signal within 10–15 min in the DETECTR assay, well above the limit of detection.`);
+  else if (eff >= 0.5) lines.push(`Moderate candidate (activity score ${eff.toFixed(3)}). Predicted trans-cleavage is sufficient for detection but not optimal — the fluorescent signal may require 20–30 min to reach a confident positive call, or may produce a weaker band on lateral flow.`);
+  else lines.push(`Weak candidate (activity score ${eff.toFixed(3)}). Low predicted trans-cleavage rate — the collateral cleavage signal may be near the detection limit, risking false negatives. Consider alternatives from the top-K list or synthetic mismatch optimisation.`);
 
   // PAM quality
   const pam = (r.pam || "").toUpperCase();
@@ -2718,10 +2718,10 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
       <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "10px", padding: mobile ? "14px" : "18px 22px", marginBottom: "16px" }}>
         <div style={{ fontSize: "13px", fontWeight: 700, color: T.primaryDark, fontFamily: HEADING, marginBottom: "6px" }}>Reading the table</div>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : hasML ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr", gap: "6px 20px", fontSize: "12px", color: T.primaryDark, lineHeight: 1.5, opacity: 0.85 }}>
-          <div><strong>Score</strong> — {hasML ? `ensemble (heuristic + ${hasGuardNet ? "GUARD-Net" : "CNN"})` : "heuristic composite (0–1)"}.</div>
-          <div><strong>Disc</strong> — MUT/WT discrimination ratio. ≥ 3× is diagnostic-grade.</div>
-          {hasML && <div><strong>{mlColLabel}</strong> — {hasGuardNet ? "GUARD-Net (CNN + RNA-FM + RLPA)" : "ML calibrated"} prediction.</div>}
-          <div><strong>Expand</strong> — click any row for full crRNA, amplicon map, primers, and scoring breakdown.</div>
+          <div><strong>Score</strong> — predicted trans-cleavage activity (0–1). Higher = stronger fluorescent signal. {hasML ? `Ensemble of heuristic + ${hasGuardNet ? "GUARD-Net" : "CNN"}.` : "Heuristic composite."}</div>
+          <div><strong>Disc</strong> — fold-difference in cleavage between MUT and WT templates. ≥ 3× = diagnostic-grade specificity.</div>
+          {hasML && <div><strong>{mlColLabel}</strong> — {hasGuardNet ? "GUARD-Net neural network" : "ML calibrated"} activity prediction (before ensemble).</div>}
+          <div><strong>Expand</strong> — click any row for full interpretation, crRNA architecture, primers, and alternatives.</div>
         </div>
       </div>
 
@@ -3707,9 +3707,8 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
                   <div>
                     <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>MUT vs WT Predicted Activity</div>
-                    <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5, maxWidth: "500px" }}>
-                      Density curves for predicted cleavage activity on mutant (resistant) vs wildtype (susceptible) templates.
-                      Curve separation = panel-level discrimination power.
+                    <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5, maxWidth: "540px" }}>
+                      How strongly will each crRNA cleave the mutant (resistant) vs wildtype (susceptible) template? Greater separation between curves means the panel can better distinguish drug-resistant from drug-susceptible TB. Overlap represents the diagnostic grey zone where false results are most likely.
                     </div>
                   </div>
                   <Badge variant={separation >= 0.15 ? "success" : separation >= 0.08 ? "warning" : "danger"}>
