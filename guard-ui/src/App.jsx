@@ -660,6 +660,21 @@ const CandidateViewer = ({ r, onClose }) => {
                 <div style={{ fontWeight: 700, color: r.hasSM ? T.primaryDark : T.textTer }}>{r.hasSM ? "Applied" : "None"}</div>
               </div>
             </div>
+            {/* Shared amplicon warning for same-codon targets */}
+            {(() => {
+              const codonGroups = { "rpoB_H445": ["rpoB_H445D", "rpoB_H445Y"], "rpoB_S450": ["rpoB_S450L", "rpoB_S450W"] };
+              for (const [, group] of Object.entries(codonGroups)) {
+                if (group.includes(r.label)) {
+                  const siblings = group.filter(l => l !== r.label);
+                  return (
+                    <div style={{ marginTop: "10px", padding: "8px 12px", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", borderRadius: "6px", fontSize: "11px", color: T.textSec, lineHeight: 1.6 }}>
+                      <strong style={{ color: T.warning }}>Shared amplicon:</strong> This target shares the same amplicon region with {siblings.join(", ")}. In a single-pot assay both mutations produce a positive drug-class signal, but the specific amino acid change cannot be resolved without additional crRNA reporters.
+                    </div>
+                  );
+                }
+              }
+              return null;
+            })()}
           </div>
         )}
       </div>
@@ -1687,11 +1702,19 @@ const HomePage = ({ goTo, connected }) => {
             },
             {
               title: "Multiplex compatibility",
-              text: "Cross-reactivity is assessed by sequence homology (Bowtie2). Primer dimer stability is now predicted using SantaLucia nearest-neighbour thermodynamics. Enzyme competition and amplification bias are not modelled.",
+              text: "Cross-reactivity is assessed by sequence homology (Bowtie2). Primer dimer stability is predicted using SantaLucia nearest-neighbour thermodynamics (post-optimization analysis \u2014 not yet integrated into the simulated annealing cost function). Enzyme competition and amplification bias are not modelled.",
+            },
+            {
+              title: "Shared amplicons & cross-priming",
+              text: "Targets at the same codon (e.g., rpoB_H445D/H445Y, rpoB_S450L/S450W) may share the same amplicon and primers. In a single-pot multiplex, both mutations produce a positive drug-class signal but the specific amino acid change cannot be resolved without distinct crRNA reporters. Near-identical AS-RPA primers (differing only at the 3\u2032 base) competing for the same template region pose cross-priming risk not captured by the inter-oligo dimer analysis.",
+            },
+            {
+              title: "Amplicon secondary structure",
+              text: "No amplicon \u0394G_fold calculation is performed. RPA at 37 \u00b0C on GC-rich M. tuberculosis DNA (some amplicons >70% GC) risks stable hairpin formation that blocks recombinase strand invasion. Amplicons with \u0394G_fold < \u221210 kcal/mol should be flagged \u2014 requires ViennaRNA or NUPACK integration (planned).",
             },
             {
               title: "Specificity estimates",
-              text: "The proxy formula (1\u22121/disc) converts discrimination ratios to specificity-like values but is not a clinical measurement. WHO TPP compliance requires experimental validation on clinical isolate panels. All specificity statuses are marked \u201CPending\u201D accordingly.",
+              text: "The proxy formula (1\u22121/disc) assumes perfectly separated signal distributions with a midpoint threshold. In practice, specificity depends on signal variance and threshold selection \u2014 a target with disc = 7\u00d7 and high activity variance could have worse specificity than disc = 5\u00d7 with low variance. WHO TPP compliance requires experimental validation on clinical isolate panels. All specificity statuses are marked \u201cPending\u201d accordingly.",
             },
           ].map((item, i) => (
             <div key={i} style={{ background: T.bgSub, borderRadius: "8px", padding: "12px 16px", border: `1px solid ${T.borderLight}` }}>
@@ -2139,7 +2162,7 @@ const OverviewTab = ({ results, scorer }) => {
                     const proxCount = rows.filter(r => r.strategy === "Proximity").length;
                     if (directRows.length > 0) {
                       const avg = (directRows.reduce((a, r) => a + r.disc, 0) / directRows.length).toFixed(1);
-                      return <td style={{ padding: "12px 24px", fontFamily: MONO }}>{avg}×{proxCount > 0 && <span style={{ fontSize: "9px", color: T.textTer, marginLeft: "4px" }}>+{proxCount} AS-RPA</span>}</td>;
+                      return <td style={{ padding: "12px 24px", fontFamily: MONO }}>{avg}×<span style={{ fontSize: "9px", color: T.textTer, marginLeft: "3px" }}>({directRows.length})</span>{proxCount > 0 && <span style={{ fontSize: "9px", color: T.textTer, marginLeft: "4px" }}>+{proxCount} AS-RPA</span>}</td>;
                     }
                     return <td style={{ padding: "12px 24px", fontSize: "10px", color: T.purple, fontWeight: 600 }}>AS-RPA only</td>;
                   })()}
@@ -2232,13 +2255,17 @@ const OverviewTab = ({ results, scorer }) => {
               const topLeft = scatterData.filter(d => d.score < 0.4 && d.disc >= 3);
               const bestCandidate = [...scatterData].sort((a, b) => (b.score * b.disc) - (a.score * a.disc))[0];
               const worstCandidate = [...scatterData].sort((a, b) => (a.score * a.disc) - (b.score * b.disc))[0];
+              const proximityCands = results.filter(r => r.strategy === "Proximity" && r.gene !== "IS6110");
+              const viableProx = proximityCands.filter(r => !r.asrpaDiscrimination || r.asrpaDiscrimination.block_class !== "none");
+              const nonViableProx = proximityCands.length - viableProx.length;
               return (
                 <div style={{ marginTop: "14px", padding: "12px 16px", background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "8px", fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
-                  <strong style={{ color: T.primary }}>Interpretation:</strong> {topRight.length}/{scatterData.length} candidates are diagnostic-ready (score ≥ 0.4, disc ≥ 3×).
+                  <strong style={{ color: T.primary }}>Interpretation:</strong> {topRight.length}/{scatterData.length} Direct candidates are diagnostic-ready (score ≥ 0.4, disc ≥ 3×).
                   {bestCandidate ? ` Best overall: ${bestCandidate.label} (${bestCandidate.score.toFixed(3)}, ${bestCandidate.disc.toFixed(1)}×).` : ""}
-                  {bottomRight.length > 0 ? ` ${bottomRight.length} candidate${bottomRight.length > 1 ? "s have" : " has"} good scores but low discrimination (${bottomRight.slice(0, 2).map(d => d.label).join(", ")}${bottomRight.length > 2 ? "…" : ""}) — SM enhancement would move these into the diagnostic-ready quadrant.` : ""}
+                  {bottomRight.length > 0 ? ` ${bottomRight.length} Direct candidate${bottomRight.length > 1 ? "s have" : " has"} good scores but low Cas12a discrimination (${bottomRight.slice(0, 2).map(d => d.label).join(", ")}${bottomRight.length > 2 ? "…" : ""}) — synthetic mismatch enhancement may improve these.` : ""}
                   {topLeft.length > 0 ? ` ${topLeft.length} candidate${topLeft.length > 1 ? "s" : ""} ${topLeft.length > 1 ? "have" : "has"} strong discrimination but weak scores — alternative spacers may help.` : ""}
-                  {worstCandidate && worstCandidate !== bestCandidate ? ` Weakest: ${worstCandidate.label} (${worstCandidate.score.toFixed(3)}, ${worstCandidate.disc.toFixed(1)}×).` : ""}
+                  {proximityCands.length > 0 ? ` ${proximityCands.length} Proximity candidate${proximityCands.length > 1 ? "s are" : " is"} not plotted — their discrimination comes from AS-RPA primers, not crRNA mismatch. Of these, ${viableProx.length} show viable AS-RPA discrimination${nonViableProx > 0 ? ` and ${nonViableProx} ha${nonViableProx > 1 ? "ve" : "s"} no viable discrimination pathway (WC pair)` : ""}.` : ""}
+                  {worstCandidate && worstCandidate !== bestCandidate ? ` Weakest Direct: ${worstCandidate.label} (${worstCandidate.score.toFixed(3)}, ${worstCandidate.disc.toFixed(1)}×).` : ""}
                 </div>
               );
             })()}
@@ -3922,8 +3949,20 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
 
           {/* MUT vs WT Activity Distribution */}
           {!mobile && (() => { try {
-            const mutScores = results.map(r => r.ensembleScore || r.score);
-            const wtScores = results.map(r => {
+            const p = presets.find(x => x.name === activePreset) || { efficiency_threshold: 0.4, discrimination_threshold: 3.0 };
+            const effT = p.efficiency_threshold || 0.4;
+            const discT = p.discrimination_threshold || 3.0;
+            // Filter to candidates that pass the active preset's thresholds
+            const filtered = results.filter(r => {
+              const eff = r.ensembleScore || r.score;
+              if (eff < effT) return false;
+              if (r.gene === "IS6110") return false; // species control
+              if (r.strategy === "Proximity") return !(r.asrpaDiscrimination?.block_class === "none");
+              return (r.disc > 0 && r.disc < 900) ? r.disc >= discT : false;
+            });
+            const plotResults = filtered.length >= 2 ? filtered : results.filter(r => r.gene !== "IS6110"); // fallback to all if <2 pass
+            const mutScores = plotResults.map(r => r.ensembleScore || r.score);
+            const wtScores = plotResults.map(r => {
               const eff = r.ensembleScore || r.score;
               const disc = r.disc > 0 && r.disc < 900 ? r.disc : 0.9;
               return eff / disc;
@@ -3948,7 +3987,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <div>
                     <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>MUT vs WT Predicted Activity</div>
                     <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5, maxWidth: "540px" }}>
-                      How strongly will each crRNA cleave the mutant (resistant) vs wildtype (susceptible) template? Greater separation between curves means the panel can better distinguish drug-resistant from drug-susceptible TB. Overlap represents the diagnostic grey zone where false results are most likely. WT activity is derived from the {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "learned discrimination model" : "heuristic discrimination"} (A_WT = A_MUT / disc ratio).
+                      Density computed from <strong>{plotResults.length}</strong> candidates passing the {activePreset} preset thresholds (eff ≥ {effT}, disc ≥ {discT}×). Greater separation between curves = better discrimination. WT activity derived from discrimination ratios (A<sub>WT</sub> = A<sub>MUT</sub> / disc).
                     </div>
                   </div>
                   <Badge variant={separation >= 0.15 ? "success" : separation >= 0.08 ? "warning" : "danger"}>
@@ -4037,7 +4076,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                     <div style={{ marginTop: "14px", padding: "12px 16px", background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "8px", fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
                       <strong style={{ color: T.primary }}>Interpretation:</strong> Mutant mean activity ({meanMut}) vs wildtype ({meanWt}) gives a separation of <strong style={{ color: separation >= 0.15 ? T.success : T.warning }}>{separation}</strong>.
                       {separation >= 0.15 ? " Good separation — the panel reliably distinguishes resistant from susceptible samples at the aggregate level." : separation >= 0.08 ? " Moderate separation — borderline samples may produce ambiguous calls; consider tightening the panel to high-discrimination targets only." : " Poor separation — the panel cannot reliably distinguish MUT from WT; review target selection and consider dropping low-discrimination candidates."}
-                      {` Overlap zone: ${overlapPct}% (${clinicalRisk} false-positive risk).`}
+                      {` Overlap zone: ${overlapPct}% — this is the aggregate overlap; individual targets with high discrimination (e.g., disc ≥10×) have near-zero overlap. In practice each target is read independently, so per-target separation matters more than panel-level aggregate.`}
                       {` Strongest MUT signal: ${bestMutLabel} (${mutSorted[0].toFixed(3)}). Weakest: ${worstMutLabel} (${mutSorted[mutSorted.length - 1].toFixed(3)}).`}
                     </div>
                   );
@@ -4094,7 +4133,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                 </Badge>
               </div>
               <div style={{ padding: "12px 18px", fontSize: "11px", color: T.textSec, lineHeight: 1.6, borderBottom: `1px solid ${T.borderLight}`, background: T.bg }}>
-                WHO Target Product Profile (TPP) 2024 defines minimum sensitivity and specificity thresholds per drug class for diagnostic deployment. Sensitivity = fraction of resistance-conferring mutations detected (pass/fail per drug class). Specificity = estimated from discrimination ratios (Direct: 1−1/disc, Proximity: AS-RPA 0.95); ≥98% required — marked "Pending" when below threshold as experimental validation is needed. {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Discrimination ratios used here are from the learned model (LightGBM, 15 thermodynamic features)." : "Discrimination ratios used here are from the heuristic model."}
+                WHO Target Product Profile (TPP) 2024 defines minimum sensitivity and specificity thresholds per drug class for diagnostic deployment. Sensitivity = fraction of resistance-conferring mutations detected (pass/fail per drug class). Specificity = approximate in silico estimate: Direct targets use 1−1/disc (assumes perfectly separated signal distributions — actual specificity depends on signal variance and threshold selection). Proximity targets use thermodynamic AS-RPA mismatch penalty. ≥98% required — marked "Pending" when below threshold as experimental validation is needed. {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Discrimination ratios used here are from the learned model (LightGBM, 15 thermodynamic features)." : "Discrimination ratios used here are from the heuristic model."}
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT, fontSize: "12px" }}>
@@ -4170,7 +4209,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                     {worstSens && ` ${worstSens[0]} is the weakest (${(worstSens[1].sensitivity * 100).toFixed(0)}% vs ${((WHO_TPP_SENS[worstSens[0]] || 0.80) * 100).toFixed(0)}% required).`}
                     {sensFailing.length > 1 && ` ${sensFailing.length} classes need additional mutation coverage.`}
                     {sensPassing === whoEntries.length && " All drug classes pass sensitivity."}
-                    {" "}<strong>Specificity:</strong> {specPassing}/{whoEntries.length} classes meet the ≥98% threshold (in silico proxy: 1−1/disc for Direct, thermodynamic AS-RPA estimate for Proximity).
+                    {" "}<strong>Specificity:</strong> {specPassing}/{whoEntries.length} classes meet the ≥98% threshold (approximate in silico proxy — actual specificity requires experimental determination with clinical samples).
                     {specFailing.length > 0 && ` ${specFailing.length} class${specFailing.length > 1 ? "es" : ""} pending — specificity estimates require experimental validation on the electrochemical platform.`}
                     {specPassing === whoEntries.length && " All classes pass specificity."}
                   </div>

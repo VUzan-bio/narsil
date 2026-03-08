@@ -142,6 +142,11 @@ class GUARDNetScorer(Scorer):
         """Compute ensemble: alpha * heuristic + (1 - alpha) * calibrated_gn."""
         return self.alpha * heuristic_score + (1 - self.alpha) * gn_calibrated
 
+    # Alias so the pipeline runner's manual loop can call the same interface
+    # as SequenceMLScorer (which defines ensemble_score without the _val suffix).
+    def ensemble_score(self, heuristic_score: float, gn_calibrated: float) -> float:
+        return self.ensemble_score_val(heuristic_score, gn_calibrated)
+
     def score(
         self,
         candidate: CrRNACandidate,
@@ -447,6 +452,10 @@ class GUARDNetScorer(Scorer):
         rnafm_emb = self._get_rnafm_embedding(candidate)
         predictions = self._predict_batch([context], [rnafm_emb])
         return predictions[0]
+
+    # Alias for pipeline runner compatibility (calls _predict on ml_scorer)
+    def _predict(self, candidate: CrRNACandidate) -> float:
+        return self._predict_single(candidate)
 
     def _predict_batch(
         self,

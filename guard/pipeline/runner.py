@@ -515,7 +515,8 @@ class GUARDPipeline:
                 for sc in scored_list:
                     raw_pred = self.ml_scorer._predict(sc.candidate)
                     sc.cnn_score = round(raw_pred, 4)
-                    sc.ml_scores = [MLScore(model_name="seq_cnn", predicted_efficiency=raw_pred)]
+                    ml_name = "guard_net" if hasattr(self.ml_scorer, '_predict_single') else "seq_cnn"
+                    sc.ml_scores = [MLScore(model_name=ml_name, predicted_efficiency=raw_pred)]
                     all_cnn_raw.append(raw_pred)
 
                     # Temperature-calibrated CNN score
