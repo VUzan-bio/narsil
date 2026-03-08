@@ -1228,20 +1228,23 @@ const HomePage = ({ goTo, connected }) => {
 
         return (
           <div style={{
-            background: "#ffffff", border: `1px solid ${T.border}`, borderRadius: "10px",
+            background: pipeDone ? "#ffffff" : "linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)",
+            border: `1px solid ${pipeDone ? T.border : "#818CF8"}`,
+            borderRadius: "10px",
             marginBottom: "24px", overflow: "hidden",
+            ...(pipeDone ? {} : { boxShadow: "0 2px 12px rgba(99,102,241,0.12)" }),
           }}>
             {/* Running state — single line, icon+name swipe up */}
             {!pipeDone && (
               <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: "14px" }}>
                 <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", animation: "subtlePulse 2s ease-in-out infinite" }}>
-                  <ActiveIcon size={16} color="#111" strokeWidth={1.8} />
+                  <ActiveIcon size={16} color="#4F46E5" strokeWidth={1.8} />
                 </div>
                 <div key={pipeStep} style={{ flex: 1, display: "flex", alignItems: "baseline", gap: "8px", animation: "stepSwipeUp 0.25s ease-out" }}>
-                  <span style={{ fontFamily: MONO, fontSize: "11px", color: "#999" }}>{activeModule.id}</span>
-                  <span style={{ fontSize: "13px", fontWeight: 500, color: "#111" }}>{activeModule.name}</span>
+                  <span style={{ fontFamily: MONO, fontSize: "11px", color: "#6366F1" }}>{activeModule.id}</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#312E81" }}>{activeModule.name}</span>
                 </div>
-                <span style={{ fontFamily: MONO, fontSize: "11px", color: "#999", fontVariantNumeric: "tabular-nums" }}>{pipeElapsed.toFixed(1)}s</span>
+                <span style={{ fontFamily: MONO, fontSize: "11px", color: "#6366F1", fontVariantNumeric: "tabular-nums" }}>{pipeElapsed.toFixed(1)}s</span>
               </div>
             )}
 
