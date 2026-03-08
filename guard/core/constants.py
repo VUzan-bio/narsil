@@ -54,7 +54,7 @@ RPA_PRIMER_LENGTH_MAX = 38
 RPA_TM_MIN = 57.0
 RPA_TM_MAX = 72.0
 RPA_AMPLICON_MIN = 80
-RPA_AMPLICON_MAX = 250
+RPA_AMPLICON_MAX = 150  # Tightened for high-GC M.tb RPA (>65% GC degrades >150bp)
 PRIMER_DIMER_DG_THRESHOLD = -6.0
 
 # Allele-specific RPA (Ye et al. 2019)

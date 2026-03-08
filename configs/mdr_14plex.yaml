@@ -58,7 +58,7 @@ primers:
   tm_min: 57.0
   tm_max: 72.0
   amplicon_min: 80
-  amplicon_max: 250
+  amplicon_max: 150
   enable_allele_specific: true
   as_rpa_deliberate_mm_pos: [-2, -3]
   max_pairs_per_candidate: 10

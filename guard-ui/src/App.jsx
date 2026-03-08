@@ -3142,7 +3142,7 @@ const DiscriminationTab = ({ results }) => {
                 <td style={{ padding: "10px 14px", fontSize: "10px", color: (r.discrimination?.model_name || "").includes("learned") ? T.success : T.textTer }}>
                   {(r.discrimination?.model_name || "").includes("learned") ? "Learned" : "Heuristic"}
                 </td>
-                <td style={{ padding: "10px 14px", fontFamily: MONO }}>{r.score.toFixed(3)}</td>
+                <td style={{ padding: "10px 14px", fontFamily: MONO }}>{(r.ensembleScore || r.score).toFixed(3)}</td>
                 <td style={{ padding: "10px 14px" }}>
                   <Badge variant={r.disc >= 3 ? "success" : r.disc >= 2 ? "warning" : "danger"}>
                     {r.disc >= 10 ? "Excellent" : r.disc >= 3 ? "Good" : r.disc >= 2 ? "Acceptable" : "Insufficient"}
@@ -3155,6 +3155,7 @@ const DiscriminationTab = ({ results }) => {
       </div>
 
       {/* Proximity / AS-RPA section */}
+
       {proximityCands.length > 0 && (
         <div style={{ background: T.bg, border: `1px solid ${T.purple}33`, borderRadius: "12px", overflow: "hidden" }}>
           <div style={{ fontSize: "14px", fontWeight: 700, color: T.purple, fontFamily: HEADING, padding: "16px 20px", borderBottom: `1px solid ${T.purple}33` }}>
@@ -3318,8 +3319,8 @@ const PrimersTab = ({ results }) => {
                     {r.strategy === "Direct" ? "Standard" : "AS-RPA"}
                   </Badge>
                 </td>
-                <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 600, fontSize: "11px", color: r.strategy === "Proximity" ? T.purple : r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger }}>
-                  {r.strategy === "Proximity" ? "AS-RPA" : r.disc > 0 ? `${r.disc.toFixed(1)}×` : "—"}
+                <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 600, fontSize: "11px", color: r.gene === "IS6110" ? T.textTer : r.strategy === "Proximity" ? T.purple : r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger }}>
+                  {r.gene === "IS6110" ? "N/A" : r.strategy === "Proximity" ? "AS-RPA" : r.disc > 0 ? `${r.disc.toFixed(1)}×` : "—"}
                 </td>
                 <td style={{ padding: "10px 14px" }}><Seq s={r.fwd} /></td>
                 <td style={{ padding: "10px 14px" }}><Seq s={r.rev} /></td>
@@ -3406,6 +3407,7 @@ const MultiplexTab = ({ results, panelData }) => {
           <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
             <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.primary }}>{withPrimers}</div>
             <div style={{ fontSize: "11px", color: T.textSec }}>Assay-ready</div>
+            <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>primers + viable discrimination</div>
           </div>
           {(() => {
             const directAll = results.filter(r => r.strategy === "Direct" && r.disc > 0 && r.disc < 900);
