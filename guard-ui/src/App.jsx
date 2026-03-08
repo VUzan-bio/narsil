@@ -28,17 +28,17 @@ const T = {
   bg: "#FFFFFF", bgSub: "#F7F9FC", bgHover: "#EEF2F7",
   border: "#E3E8EF", borderLight: "#F0F3F7",
   text: "#111827", textSec: "#6B7280", textTer: "#9CA3AF",
-  primary: "#36B8F6", primaryLight: "#EBF6FF", primaryDark: "#1E8FCC", primarySub: "#F0F9FF",
+  primary: "#4F46E5", primaryLight: "#EEF2FF", primaryDark: "#312E81", primarySub: "#E0E7FF",
   success: "#16A34A", successLight: "#DCFCE7",
   warning: "#D97706", warningLight: "#FEF3C7",
   danger: "#DC2626", dangerLight: "#FEE2E2",
   purple: "#7C3AED", purpleLight: "#F3E8FF",
-  sidebar: "#FAFBFD", sidebarActive: "#EBF6FF", sidebarHover: "#F3F4F6", sidebarText: "#374151",
+  sidebar: "#FAFBFD", sidebarActive: "#EEF2FF", sidebarHover: "#F3F4F6", sidebarText: "#374151",
 };
-const FONT = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
-const HEADING = "'Urbanist', 'Inter', sans-serif";
+const FONT = "'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
+const HEADING = "'Urbanist', sans-serif";
 const MONO = "'JetBrains Mono', 'Fira Code', monospace";
-const NUC = { A: "#16A34A", T: "#DC2626", G: "#D97706", C: "#36B8F6" };
+const NUC = { A: "#16A34A", T: "#DC2626", G: "#D97706", C: "#6366F1" };
 const BP = 768; // responsive breakpoint
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -231,7 +231,7 @@ const DrugBadge = ({ drug }) => {
 const Seq = ({ s: str }) => (
   <span style={{ fontFamily: MONO, fontSize: "11.5px", letterSpacing: "1.2px" }}>
     {str?.split("").map((c, i) => (
-      <span key={i} style={{ color: c === "A" ? "#16A34A" : c === "T" ? "#DC2626" : c === "G" ? "#D97706" : "#36B8F6", fontWeight: 500 }}>{c}</span>
+      <span key={i} style={{ color: c === "A" ? "#16A34A" : c === "T" ? "#DC2626" : c === "G" ? "#D97706" : "#6366F1", fontWeight: 500 }}>{c}</span>
     ))}
   </span>
 );
@@ -1228,23 +1228,23 @@ const HomePage = ({ goTo, connected }) => {
 
         return (
           <div style={{
-            background: pipeDone ? "#ffffff" : "linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)",
-            border: `1px solid ${pipeDone ? T.border : "#818CF8"}`,
+            background: pipeDone ? "#ffffff" : `linear-gradient(135deg, ${T.primaryLight} 0%, ${T.primarySub} 100%)`,
+            border: `1px solid ${pipeDone ? T.border : T.primary + "88"}`,
             borderRadius: "10px",
             marginBottom: "24px", overflow: "hidden",
-            ...(pipeDone ? {} : { boxShadow: "0 2px 12px rgba(99,102,241,0.12)" }),
+            ...(pipeDone ? {} : { boxShadow: `0 2px 12px ${T.primary}1F` }),
           }}>
             {/* Running state — single line, icon+name swipe up */}
             {!pipeDone && (
               <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: "14px" }}>
                 <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", animation: "subtlePulse 2s ease-in-out infinite" }}>
-                  <ActiveIcon size={16} color="#4F46E5" strokeWidth={1.8} />
+                  <ActiveIcon size={16} color={T.primary} strokeWidth={1.8} />
                 </div>
                 <div key={pipeStep} style={{ flex: 1, display: "flex", alignItems: "baseline", gap: "8px", animation: "stepSwipeUp 0.25s ease-out" }}>
-                  <span style={{ fontFamily: MONO, fontSize: "11px", color: "#6366F1" }}>{activeModule.id}</span>
-                  <span style={{ fontSize: "13px", fontWeight: 600, color: "#312E81" }}>{activeModule.name}</span>
+                  <span style={{ fontFamily: MONO, fontSize: "11px", color: T.primary }}>{activeModule.id}</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark }}>{activeModule.name}</span>
                 </div>
-                <span style={{ fontFamily: MONO, fontSize: "11px", color: "#6366F1", fontVariantNumeric: "tabular-nums" }}>{pipeElapsed.toFixed(1)}s</span>
+                <span style={{ fontFamily: MONO, fontSize: "11px", color: T.primary, fontVariantNumeric: "tabular-nums" }}>{pipeElapsed.toFixed(1)}s</span>
               </div>
             )}
 
@@ -2248,7 +2248,7 @@ const SpacerArchitecture = ({ r }) => {
   const svgH = 80;
 
   const cellBg = (nt) => nt.isSnp ? T.danger : nt.isSynthMM ? T.warning : nt.isSeed ? T.primaryLight : T.bgSub;
-  const cellBorder = (nt) => nt.isSnp ? T.danger : nt.isSynthMM ? T.warning : nt.isSeed ? "rgba(54,184,246,0.3)" : T.borderLight;
+  const cellBorder = (nt) => nt.isSnp ? T.danger : nt.isSynthMM ? T.warning : nt.isSeed ? "rgba(79,70,229,0.25)" : T.borderLight;
   const letterFill = (nt) => (nt.isSnp || nt.isSynthMM) ? "#FFFFFF" : NUC[nt.base] || T.textSec;
   const posFill = (nt) => (nt.isSnp || nt.isSynthMM) ? "rgba(255,255,255,0.7)" : nt.isSeed ? T.primary : T.textTer;
 
@@ -2324,7 +2324,7 @@ const SpacerArchitecture = ({ r }) => {
           {/* Legend items */}
           {[
             { color: T.primary, label: "PAM" },
-            { color: T.primaryLight, label: "Seed (1–8)", border: "rgba(54,184,246,0.3)" },
+            { color: T.primaryLight, label: "Seed (1–8)", border: "rgba(79,70,229,0.25)" },
             { color: T.danger, label: "SNP" },
             ...(r.hasSM ? [{ color: T.warning, label: "Synth. MM" }] : []),
           ].map((item, idx) => (
@@ -2497,15 +2497,15 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
       </div>
 
       {/* Dynamic Interpretation Box */}
-      <div style={{ background: "linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)", border: "1px solid #818CF833", borderRadius: "10px", padding: "16px 20px", marginBottom: "20px" }}>
+      <div style={{ background: `linear-gradient(135deg, ${T.primaryLight} 0%, ${T.primarySub} 100%)`, border: `1px solid ${T.primary}33`, borderRadius: "10px", padding: "16px 20px", marginBottom: "20px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-          <Info size={14} color="#4F46E5" />
-          <span style={{ fontSize: "12px", fontWeight: 700, color: "#312E81", fontFamily: HEADING }}>Interpretation</span>
+          <Info size={14} color={T.primary} />
+          <span style={{ fontSize: "12px", fontWeight: 700, color: T.primaryDark, fontFamily: HEADING }}>Interpretation</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {interpretation.map((line, i) => (
-            <div key={i} style={{ fontSize: "11.5px", color: "#3730A3", lineHeight: 1.65, paddingLeft: "22px", position: "relative" }}>
-              <span style={{ position: "absolute", left: 0, top: "1px", width: "14px", height: "14px", borderRadius: "50%", background: "#C7D2FE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "8px", fontWeight: 700, color: "#4338CA" }}>{i + 1}</span>
+            <div key={i} style={{ fontSize: "11.5px", color: T.primaryDark, lineHeight: 1.65, paddingLeft: "22px", position: "relative" }}>
+              <span style={{ position: "absolute", left: 0, top: "1px", width: "14px", height: "14px", borderRadius: "50%", background: T.primarySub, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "8px", fontWeight: 700, color: T.primary }}>{i + 1}</span>
               {line}
             </div>
           ))}
