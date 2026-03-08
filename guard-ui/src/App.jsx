@@ -6,7 +6,7 @@ import {
   Folder, GitBranch, Grid3x3, Layers, List, Loader2,
   Lock, Menu, Package, PanelLeft, PanelLeftClose, Play, Plus, RefreshCw, Search, Settings, Target,
   TrendingUp, X, Zap, Shield, Crosshair, Brain, Cpu, Wifi, WifiOff,
-  AlertTriangle, CheckCircle,
+  AlertTriangle, CheckCircle, Info, Map,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -2359,12 +2359,92 @@ const SpacerArchitecture = ({ r }) => {
   );
 };
 
-const CandidateAccordion = ({ r }) => {
+const generateInterpretation = (r) => {
+  const lines = [];
+  const eff = r.ensembleScore || r.score;
+  const gc = r.gc * 100;
+  const disc = typeof r.disc === "number" ? r.disc : 0;
+  const spacer = (r.hasSM && r.smSpacer) ? r.smSpacer : r.spacer;
+  const wt = r.wtSpacer && r.wtSpacer.length === spacer.length ? r.wtSpacer : null;
+
+  // Find SNP position
+  let snpPos = null;
+  let snpChange = null;
+  if (wt) {
+    for (let i = 0; i < spacer.length; i++) {
+      if (spacer[i] !== wt[i]) {
+        const isSM = r.hasSM && r.smPosition && (r.smPosition - 1) === i;
+        if (!isSM) { snpPos = i + 1; snpChange = `${wt[i]}\u2192${spacer[i]}`; break; }
+      }
+    }
+  }
+
+  // Overall assessment
+  if (eff >= 0.7) lines.push("Strong candidate. High predicted trans-cleavage activity — expected to generate robust fluorescent signal in the DETECTR assay.");
+  else if (eff >= 0.5) lines.push("Moderate candidate. Predicted activity is sufficient for detection but not optimal — signal intensity may require longer incubation.");
+  else lines.push("Weak candidate. Low predicted cleavage activity — consider alternatives from the top-K list or adjust the scoring weights.");
+
+  // PAM quality
+  const pam = (r.pam || "").toUpperCase();
+  if (pam.match(/^TTT[ACGV]/)) lines.push(`Canonical PAM (${r.pam}) \u2014 optimal Cas12a recognition. LbCas12a binds this PAM with highest affinity.`);
+  else lines.push(`Non-canonical PAM (${r.pam}) \u2014 reduced binding affinity compared to TTTV. This is the best available PAM site in the GC-rich M. tuberculosis genomic context around this mutation.`);
+
+  // Discrimination
+  if (r.strategy === "Proximity") {
+    lines.push(`Proximity detection \u2014 the resistance SNP falls outside the crRNA spacer${r.proximityDistance ? ` (${r.proximityDistance} bp away)` : ""}. Allele discrimination relies on AS-RPA primers (10\u2013100\u00D7 selectivity), not Cas12a mismatch intolerance. The Cas12a disc ratio (~${disc.toFixed(1)}\u00D7) is not relevant for this strategy.`);
+  } else if (snpPos) {
+    if (snpPos <= 8) {
+      if (disc >= 5) lines.push(`SNP at seed position ${snpPos} (${snpChange}) provides strong discrimination (${disc.toFixed(1)}\u00D7). The mismatch in the PAM-proximal seed region (pos 1\u20138) causes near-complete R-loop collapse on the wildtype template, ensuring high specificity.`);
+      else if (disc >= 3) lines.push(`SNP at seed position ${snpPos} (${snpChange}) provides diagnostic-grade discrimination (${disc.toFixed(1)}\u00D7). Seed region mismatches are highly destabilising for Cas12a binding.`);
+      else lines.push(`SNP at seed position ${snpPos} (${snpChange}) gives limited discrimination (${disc.toFixed(1)}\u00D7) despite being in the seed region. The surrounding sequence context may stabilise partial R-loop formation. Synthetic mismatch enhancement may improve this.`);
+    } else {
+      if (disc >= 3) lines.push(`SNP at PAM-distal position ${snpPos} (${snpChange}) provides ${disc.toFixed(1)}\u00D7 discrimination. Although outside the seed, the mismatch is sufficient for diagnostic-grade allele differentiation.`);
+      else lines.push(`SNP at PAM-distal position ${snpPos} (${snpChange}) gives limited discrimination (${disc.toFixed(1)}\u00D7). PAM-distal mismatches are better tolerated by Cas12a \u2014 synthetic mismatch in the seed region could boost specificity.`);
+    }
+  } else if (r.strategy === "Direct" && !wt) {
+    lines.push(`Direct detection strategy. Discrimination ratio: ${disc.toFixed(1)}\u00D7. WT spacer data unavailable for positional analysis.`);
+  }
+
+  // Synthetic mismatch
+  if (r.hasSM) {
+    let smPos = r.smPosition || null;
+    let smChange = null;
+    if (smPos && wt && spacer[smPos - 1] !== wt[smPos - 1]) smChange = `${wt[smPos - 1]}\u2192${spacer[smPos - 1]}`;
+    if (smPos && smChange) lines.push(`Synthetic mismatch at position ${smPos} (${smChange}) creates a double-mismatch penalty on the wildtype template. This engineered substitution boosts discrimination at the cost of ~15\u201320% reduced cleavage activity on the mutant target.`);
+    else lines.push("Synthetic mismatch applied \u2014 an engineered base substitution in the seed region creates a double-mismatch penalty on the wildtype template, boosting specificity.");
+  }
+
+  // GC content
+  if (gc > 65) lines.push(`High GC content (${gc.toFixed(0)}%) increases R-loop thermodynamic stability but also raises the energetic cost of target strand unwinding. This is typical for M. tuberculosis (genome-wide GC ~65.6%).`);
+  else if (gc < 40) lines.push(`Low GC content (${gc.toFixed(0)}%) \u2014 unusual for M. tuberculosis. R-loop stability may be reduced, potentially lowering cleavage efficiency.`);
+
+  // Off-targets
+  if (r.ot > 0) lines.push(`${r.ot} potential off-target site${r.ot > 1 ? "s" : ""} detected in the H37Rv genome. Review cross-reactivity before synthesis \u2014 off-targets within the same amplicon region could generate false positives.`);
+
+  return lines;
+};
+
+const CandidateAccordion = ({ r, onShowAlternatives }) => {
   const mobile = useIsMobile();
   const toast = useToast();
   const ref = r.refs;
   const discColor = r.disc >= 3 ? T.success : r.disc >= 2 ? T.primary : r.disc >= 1.5 ? T.warning : T.danger;
   const displaySpacer = (r.hasSM && r.smSpacer) ? r.smSpacer : r.spacer;
+  const [openTab, setOpenTab] = useState(null);
+  const interpretation = useMemo(() => generateInterpretation(r), [r]);
+
+  const toggleTab = (tab) => { setOpenTab(prev => prev === tab ? null : tab); };
+
+  const tabStyle = (tab) => ({
+    flex: 1, padding: "10px 14px", background: openTab === tab ? T.bg : "transparent",
+    border: `1px solid ${openTab === tab ? T.border : T.borderLight}`,
+    borderBottom: openTab === tab ? "none" : `1px solid ${T.borderLight}`,
+    borderRadius: openTab === tab ? "8px 8px 0 0" : "8px",
+    cursor: "pointer", fontSize: "11px", fontWeight: 600,
+    color: openTab === tab ? T.primary : T.textSec, fontFamily: FONT,
+    display: "flex", alignItems: "center", gap: "6px", justifyContent: "center",
+    transition: "all 0.15s",
+  });
 
   return (
     <div style={{ padding: mobile ? "16px" : "20px 24px", background: T.bgSub, borderTop: `1px solid ${T.borderLight}` }}>
@@ -2397,91 +2477,160 @@ const CandidateAccordion = ({ r }) => {
         </div>
       )}
 
-      {/* crRNA Spacer Architecture — full width */}
-      <SpacerArchitecture r={r} />
+      {/* crRNA Spacer Architecture — full width, with Show Alternatives top-right */}
+      <div style={{ position: "relative" }}>
+        {onShowAlternatives && (
+          <button onClick={(e) => { e.stopPropagation(); onShowAlternatives(); }} style={{
+            position: "absolute", top: 0, right: 0, zIndex: 2,
+            background: T.primaryLight, border: `1px solid ${T.primary}44`,
+            borderRadius: "6px", padding: "6px 14px", cursor: "pointer",
+            fontSize: "11px", fontWeight: 600, color: T.primaryDark, fontFamily: FONT,
+            display: "flex", alignItems: "center", gap: "5px", transition: "all 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = T.primary; e.currentTarget.style.color = "#fff"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = T.primaryLight; e.currentTarget.style.color = T.primaryDark; }}
+          >
+            <Layers size={12} /> Show alternatives
+          </button>
+        )}
+        <SpacerArchitecture r={r} />
+      </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
-        {/* Left: Amplicon + Mismatch */}
-        <div>
-          {/* Amplicon Map */}
-          <div style={{ marginBottom: "16px" }}>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: T.text, marginBottom: "6px" }}>Amplicon Map</div>
-            <div style={{ background: T.bg, borderRadius: "8px", padding: "8px 4px", border: `1px solid ${T.borderLight}` }}>
-              <AmpliconMap r={r} />
-            </div>
-          </div>
-
-          {/* Mismatch Profile */}
-          <div>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: T.text, marginBottom: "6px" }}>MUT vs WT Mismatch</div>
-            <div style={{ background: T.bg, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, overflowX: "auto" }}>
-              <MismatchProfile spacer={displaySpacer} wtSpacer={r.wtSpacer} strategy={r.strategy} />
-            </div>
-          </div>
+      {/* Dynamic Interpretation Box */}
+      <div style={{ background: "linear-gradient(135deg, #EEF2FF 0%, #E0E7FF 100%)", border: "1px solid #818CF833", borderRadius: "10px", padding: "16px 20px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+          <Info size={14} color="#4F46E5" />
+          <span style={{ fontSize: "12px", fontWeight: 700, color: "#312E81", fontFamily: HEADING }}>Interpretation</span>
         </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {interpretation.map((line, i) => (
+            <div key={i} style={{ fontSize: "11.5px", color: "#3730A3", lineHeight: 1.65, paddingLeft: "22px", position: "relative" }}>
+              <span style={{ position: "absolute", left: 0, top: "1px", width: "14px", height: "14px", borderRadius: "50%", background: "#C7D2FE", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "8px", fontWeight: 700, color: "#4338CA" }}>{i + 1}</span>
+              {line}
+            </div>
+          ))}
+        </div>
+      </div>
 
-        {/* Right: Oligos + Evidence */}
-        <div>
-          {/* Oligo Sequences */}
-          <div style={{ marginBottom: "16px" }}>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: T.text, marginBottom: "6px" }}>Oligo Sequences</div>
-            <div style={{ background: T.bg, border: `1px solid ${T.borderLight}`, borderRadius: "8px", overflow: "hidden" }}>
+      {/* Collapsible detail tabs */}
+      <div style={{ display: "flex", gap: "6px", marginBottom: openTab ? "0" : "0" }}>
+        <div style={tabStyle("amplicon")} onClick={(e) => { e.stopPropagation(); toggleTab("amplicon"); }}>
+          <Map size={12} /> Amplicon & Mismatch
+        </div>
+        <div style={tabStyle("oligos")} onClick={(e) => { e.stopPropagation(); toggleTab("oligos"); }}>
+          <Copy size={12} /> Oligo Sequences
+        </div>
+        <div style={tabStyle("evidence")} onClick={(e) => { e.stopPropagation(); toggleTab("evidence"); }}>
+          <FileText size={12} /> Evidence & Metadata
+        </div>
+      </div>
+
+      {/* Tab content */}
+      {openTab && (
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderTop: "none", borderRadius: "0 0 10px 10px", padding: "16px", animation: "fadeIn 0.15s ease-out" }}>
+
+          {/* Amplicon & Mismatch tab */}
+          {openTab === "amplicon" && (
+            <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Amplicon Map</div>
+                <div style={{ background: T.bgSub, borderRadius: "8px", padding: "8px 4px", border: `1px solid ${T.borderLight}` }}>
+                  <AmpliconMap r={r} />
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>MUT vs WT Mismatch</div>
+                <div style={{ background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, overflowX: "auto" }}>
+                  <MismatchProfile spacer={displaySpacer} wtSpacer={r.wtSpacer} strategy={r.strategy} />
+                </div>
+              </div>
+              {r.hasPrimers && (
+                <div style={{ gridColumn: mobile ? "1" : "1 / -1", display: "flex", gap: "8px" }}>
+                  <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "10px", border: `1px solid ${T.borderLight}`, fontSize: "11px" }}>
+                    <div style={{ color: T.textTer, marginBottom: "2px" }}>Amplicon</div>
+                    <div style={{ fontWeight: 700, fontFamily: MONO, color: T.text }}>{r.amplicon} bp</div>
+                  </div>
+                  <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "10px", border: `1px solid ${T.borderLight}`, fontSize: "11px" }}>
+                    <div style={{ color: T.textTer, marginBottom: "2px" }}>PAM</div>
+                    <div style={{ fontWeight: 700, fontFamily: MONO, color: T.text }}>{r.pam}</div>
+                  </div>
+                  <div style={{ flex: 1, background: r.hasSM ? T.primaryLight : T.bgSub, borderRadius: "8px", padding: "10px", border: `1px solid ${T.borderLight}`, fontSize: "11px" }}>
+                    <div style={{ color: T.textTer, marginBottom: "2px" }}>SM</div>
+                    <div style={{ fontWeight: 700, color: r.hasSM ? T.primaryDark : T.textTer }}>{r.hasSM ? "Yes" : "No"}</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Oligo Sequences tab */}
+          {openTab === "oligos" && (
+            <div style={{ background: T.bgSub, border: `1px solid ${T.borderLight}`, borderRadius: "8px", overflow: "hidden" }}>
               {[
                 { name: `${r.label}_crRNA`, seq: `AATTTCTACTCTTGTAGAT${displaySpacer}`, note: "Direct repeat + spacer" },
-                ...(r.fwd ? [{ name: `${r.label}_FWD`, seq: r.fwd, note: r.strategy === "Direct" ? "Standard RPA forward" : "AS-RPA forward" }] : []),
-                ...(r.rev ? [{ name: `${r.label}_REV`, seq: r.rev, note: r.strategy === "Direct" ? "Standard RPA reverse" : "AS-RPA reverse" }] : []),
+                ...(r.fwd ? [{ name: `${r.label}_FWD`, seq: r.fwd, note: r.strategy === "Direct" ? "Standard RPA forward" : "AS-RPA forward (allele-specific)" }] : []),
+                ...(r.rev ? [{ name: `${r.label}_REV`, seq: r.rev, note: r.strategy === "Direct" ? "Standard RPA reverse" : "AS-RPA reverse (allele-specific)" }] : []),
               ].map((o, i, arr) => (
-                <div key={o.name} style={{ padding: "8px 12px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "3px" }}>
+                <div key={o.name} style={{ padding: "10px 14px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                     <span style={{ fontSize: "10px", fontWeight: 700, fontFamily: MONO, color: T.text }}>{o.name}</span>
-                    <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(o.seq); toast(`${o.name} copied`); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "5px", padding: "2px 5px", cursor: "pointer", fontSize: "9px", color: T.textSec, display: "flex", alignItems: "center", gap: "2px" }}><Copy size={9} /> Copy</button>
+                    <button onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(o.seq); toast(`${o.name} copied`); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "5px", padding: "3px 8px", cursor: "pointer", fontSize: "9px", color: T.textSec, display: "flex", alignItems: "center", gap: "3px" }}><Copy size={9} /> Copy</button>
                   </div>
-                  <Seq s={o.seq} />
-                  <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>{o.note}</div>
+                  <div style={{ background: T.bg, borderRadius: "6px", padding: "8px 10px", border: `1px solid ${T.borderLight}`, marginBottom: "4px" }}>
+                    <Seq s={o.seq} />
+                  </div>
+                  <div style={{ fontSize: "9px", color: T.textTer }}>{o.note} — {o.seq.length} nt</div>
                 </div>
               ))}
             </div>
-          </div>
-
-          {/* Evidence */}
-          {ref && (
-            <div>
-              <div style={{ fontSize: "12px", fontWeight: 700, color: T.text, marginBottom: "6px" }}>Evidence</div>
-              <div style={{ background: T.bg, border: `1px solid ${T.borderLight}`, borderRadius: "8px", overflow: "hidden" }}>
-                {[
-                  ["WHO", ref.who],
-                  ["Catalogue", ref.catalogue],
-                  ["Frequency", ref.freq],
-                  ["CRyPTIC", ref.cryptic || "—"],
-                ].map(([k, v], i) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "8px 12px", borderBottom: i < 3 ? `1px solid ${T.borderLight}` : "none", fontSize: "11px" }}>
-                    <span style={{ color: T.textSec }}>{k}</span>
-                    <span style={{ fontWeight: 600, color: T.text }}>{v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           )}
 
-          {/* Amplicon details */}
-          {r.hasPrimers && (
-            <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
-              <div style={{ flex: 1, background: T.bg, borderRadius: "8px", padding: "10px", border: `1px solid ${T.borderLight}`, fontSize: "11px" }}>
-                <div style={{ color: T.textTer, marginBottom: "2px" }}>Amplicon</div>
-                <div style={{ fontWeight: 700, fontFamily: MONO, color: T.text }}>{r.amplicon} bp</div>
-              </div>
-              <div style={{ flex: 1, background: T.bg, borderRadius: "8px", padding: "10px", border: `1px solid ${T.borderLight}`, fontSize: "11px" }}>
-                <div style={{ color: T.textTer, marginBottom: "2px" }}>PAM</div>
-                <div style={{ fontWeight: 700, fontFamily: MONO, color: T.text }}>{r.pam}</div>
-              </div>
-              <div style={{ flex: 1, background: r.hasSM ? T.primaryLight : T.bg, borderRadius: "8px", padding: "10px", border: `1px solid ${T.borderLight}`, fontSize: "11px" }}>
-                <div style={{ color: T.textTer, marginBottom: "2px" }}>SM</div>
-                <div style={{ fontWeight: 700, color: r.hasSM ? T.primaryDark : T.textTer }}>{r.hasSM ? "Yes" : "No"}</div>
+          {/* Evidence & Metadata tab */}
+          {openTab === "evidence" && (
+            <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
+              {ref && (
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Clinical Evidence</div>
+                  <div style={{ background: T.bgSub, border: `1px solid ${T.borderLight}`, borderRadius: "8px", overflow: "hidden" }}>
+                    {[
+                      ["WHO Classification", ref.who],
+                      ["Catalogue", ref.catalogue],
+                      ["Clinical Frequency", ref.freq],
+                      ["CRyPTIC", ref.cryptic || "—"],
+                    ].map(([k, v], i) => (
+                      <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "9px 14px", borderBottom: i < 3 ? `1px solid ${T.borderLight}` : "none", fontSize: "11px" }}>
+                        <span style={{ color: T.textSec }}>{k}</span>
+                        <span style={{ fontWeight: 600, color: T.text, textAlign: "right", maxWidth: "60%" }}>{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Assay Parameters</div>
+                <div style={{ background: T.bgSub, border: `1px solid ${T.borderLight}`, borderRadius: "8px", overflow: "hidden" }}>
+                  {[
+                    ["Drug Class", r.drug],
+                    ["Gene", r.gene],
+                    ["Strategy", r.strategy],
+                    ["PAM Sequence", r.pam],
+                    ["Spacer Length", `${(r.spacer || "").length} nt`],
+                    ["GC Content", `${(r.gc * 100).toFixed(1)}%`],
+                    ...(r.amplicon ? [["Amplicon Size", `${r.amplicon} bp`]] : []),
+                    ["Synthetic Mismatch", r.hasSM ? `Yes (pos ${r.smPosition || "?"})` : "No"],
+                    ["Off-targets", `${r.ot}`],
+                  ].map(([k, v], i, arr) => (
+                    <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 14px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "11px" }}>
+                      <span style={{ color: T.textSec }}>{k}</span>
+                      <span style={{ fontWeight: 600, color: T.text, fontFamily: MONO }}>{v}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -2634,29 +2783,24 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                 </div>
                 {isExpanded && (
                   <>
-                    <CandidateAccordion r={r} />
-                    {/* Top-K Alternatives */}
-                    <div style={{ padding: "0 16px 16px", background: T.bgSub }}>
-                      <button onClick={(e) => { e.stopPropagation(); loadTopK(r.label); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "6px", padding: "6px 12px", cursor: "pointer", fontSize: "11px", fontWeight: 600, color: T.primary, fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px" }}>
-                        <Layers size={12} /> Show alternatives
-                      </button>
-                      {topKLoading[r.label] && <div style={{ fontSize: "11px", color: T.textTer, marginTop: "8px" }}><Loader2 size={12} style={{ animation: "spin 1s linear infinite", display: "inline-block", verticalAlign: "middle", marginRight: "4px" }} />Loading…</div>}
-                      {topKData[r.label]?.alternatives && (
-                        <div style={{ marginTop: "8px", border: `1px solid ${T.border}`, borderRadius: "8px", overflow: "hidden", background: T.bg }}>
-                          <div style={{ padding: "8px 12px", background: T.bgSub, fontSize: "11px", fontWeight: 700, color: T.text, borderBottom: `1px solid ${T.border}` }}>Top-K Alternatives</div>
-                          {topKData[r.label].alternatives.map((alt, ai) => (
-                            <div key={ai} style={{ padding: "8px 12px", borderBottom: ai < topKData[r.label].alternatives.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <div><span style={{ fontFamily: MONO, fontWeight: 600 }}>#{alt.rank}</span> <Seq s={alt.spacer_seq?.slice(0, 16)} /></div>
-                              <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                                <span style={{ fontFamily: MONO }}>{alt.score}</span>
-                                <span style={{ fontFamily: MONO }}>{alt.discrimination}×</span>
-                                {alt.has_primers ? <Badge variant="success">P</Badge> : <Badge variant="danger">—</Badge>}
-                              </div>
+                    <CandidateAccordion r={r} onShowAlternatives={() => loadTopK(r.label)} />
+                    {/* Top-K Alternatives inline */}
+                    {topKLoading[r.label] && <div style={{ padding: "8px 16px", fontSize: "11px", color: T.textTer, background: T.bgSub }}><Loader2 size={12} style={{ animation: "spin 1s linear infinite", display: "inline-block", verticalAlign: "middle", marginRight: "4px" }} />Loading alternatives…</div>}
+                    {topKData[r.label]?.alternatives && (
+                      <div style={{ margin: "0 16px 16px", border: `1px solid ${T.border}`, borderRadius: "8px", overflow: "hidden", background: T.bg }}>
+                        <div style={{ padding: "8px 12px", background: T.primaryLight, fontSize: "11px", fontWeight: 700, color: T.primaryDark, borderBottom: `1px solid ${T.border}` }}>Top-K Alternatives for {r.label}</div>
+                        {topKData[r.label].alternatives.map((alt, ai) => (
+                          <div key={ai} style={{ padding: "8px 12px", borderBottom: ai < topKData[r.label].alternatives.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div><span style={{ fontFamily: MONO, fontWeight: 600 }}>#{alt.rank}</span> <Seq s={alt.spacer_seq?.slice(0, 16)} /></div>
+                            <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                              <span style={{ fontFamily: MONO }}>{alt.score}</span>
+                              <span style={{ fontFamily: MONO }}>{alt.discrimination}×</span>
+                              {alt.has_primers ? <Badge variant="success">P</Badge> : <Badge variant="danger">—</Badge>}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -2702,37 +2846,37 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                   {isExpanded && (
                     <tr>
                       <td colSpan={cols.length + 1} style={{ padding: 0 }}>
-                        <CandidateAccordion r={r} />
-                        {/* Top-K Alternatives */}
-                        <div style={{ padding: "0 24px 16px", background: T.bgSub, borderTop: `1px solid ${T.borderLight}` }}>
-                          <button onClick={(e) => { e.stopPropagation(); loadTopK(r.label); }} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "6px", padding: "6px 12px", cursor: "pointer", fontSize: "11px", fontWeight: 600, color: T.primary, fontFamily: FONT, display: "flex", alignItems: "center", gap: "4px" }}>
-                            <Layers size={12} /> Show alternatives
-                          </button>
-                          {topKLoading[r.label] && <div style={{ fontSize: "11px", color: T.textTer, marginTop: "8px" }}><Loader2 size={12} style={{ animation: "spin 1s linear infinite", display: "inline-block", verticalAlign: "middle", marginRight: "4px" }} />Loading…</div>}
-                          {topKData[r.label]?.alternatives && (
-                            <div style={{ marginTop: "8px", border: `1px solid ${T.border}`, borderRadius: "8px", overflow: "hidden", background: T.bg, maxWidth: 600 }}>
-                              <div style={{ padding: "8px 12px", background: T.bgSub, fontSize: "11px", fontWeight: 700, color: T.text, borderBottom: `1px solid ${T.border}` }}>Top-K Alternatives for {r.label}</div>
-                              {topKData[r.label].alternatives.map((alt, ai) => (
-                                <div key={ai} style={{ padding: "8px 12px", borderBottom: ai < topKData[r.label].alternatives.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-                                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                                    <span style={{ fontFamily: MONO, fontWeight: 700, color: T.textSec }}>#{alt.rank}</span>
-                                    <Seq s={alt.spacer_seq?.slice(0, 20)} />
-                                  </div>
-                                  <div style={{ display: "flex", gap: "12px", alignItems: "center", flexShrink: 0 }}>
-                                    <span style={{ fontFamily: MONO, fontWeight: 600 }}>{alt.score}</span>
-                                    <span style={{ fontFamily: MONO, fontWeight: 600 }}>{alt.discrimination}×</span>
-                                    {alt.has_primers ? <Badge variant="success">Primers</Badge> : <Badge variant="danger">No primers</Badge>}
-                                  </div>
-                                </div>
-                              ))}
-                              {topKData[r.label].alternatives.length > 0 && topKData[r.label].alternatives[0].tradeoff && (
-                                <div style={{ padding: "8px 12px", background: T.bgSub, fontSize: "10px", color: T.textTer, borderTop: `1px solid ${T.border}` }}>
-                                  Tradeoff notes available — hover for details
-                                </div>
-                              )}
+                        <CandidateAccordion r={r} onShowAlternatives={() => loadTopK(r.label)} />
+                        {/* Top-K Alternatives inline */}
+                        {topKLoading[r.label] && <div style={{ padding: "8px 24px", fontSize: "11px", color: T.textTer, background: T.bgSub }}><Loader2 size={12} style={{ animation: "spin 1s linear infinite", display: "inline-block", verticalAlign: "middle", marginRight: "4px" }} />Loading alternatives…</div>}
+                        {topKData[r.label]?.alternatives && (
+                          <div style={{ margin: "0 24px 16px", border: `1px solid ${T.border}`, borderRadius: "8px", overflow: "hidden", background: T.bg }}>
+                            <div style={{ padding: "10px 14px", background: T.primaryLight, fontSize: "11px", fontWeight: 700, color: T.primaryDark, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: "6px" }}>
+                              <Layers size={12} /> Top-K Alternatives for {r.label}
                             </div>
-                          )}
-                        </div>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                              <thead>
+                                <tr style={{ background: T.bgSub }}>
+                                  {["Rank", "Spacer", "Score", "Disc", "Primers", "Tradeoff"].map(h => (
+                                    <th key={h} style={{ padding: "6px 12px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {topKData[r.label].alternatives.map((alt, ai) => (
+                                  <tr key={ai} style={{ borderBottom: ai < topKData[r.label].alternatives.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
+                                    <td style={{ padding: "7px 12px", fontFamily: MONO, fontWeight: 700, color: T.textSec }}>#{alt.rank}</td>
+                                    <td style={{ padding: "7px 12px" }}><Seq s={alt.spacer_seq?.slice(0, 20)} /></td>
+                                    <td style={{ padding: "7px 12px", fontFamily: MONO, fontWeight: 600 }}>{alt.score}</td>
+                                    <td style={{ padding: "7px 12px", fontFamily: MONO, fontWeight: 600 }}>{alt.discrimination}×</td>
+                                    <td style={{ padding: "7px 12px" }}>{alt.has_primers ? <Badge variant="success">Yes</Badge> : <Badge variant="danger">No</Badge>}</td>
+                                    <td style={{ padding: "7px 12px", fontSize: "10px", color: T.textSec }}>{alt.tradeoff || "—"}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )}
