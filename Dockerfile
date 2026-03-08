@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY pyproject.toml README.md ./
 COPY guard/ ./guard/
-RUN pip install --no-cache-dir -e ".[primers,api,viz]"
+RUN pip install --no-cache-dir -e ".[primers,api,viz,disc]"
 
 # Stage 3: Lean runtime (no compilers)
 FROM python:3.11-slim
@@ -40,6 +40,14 @@ COPY guard/ ./guard/
 COPY api/ ./api/
 COPY configs/ ./configs/
 COPY data/ ./data/
+
+# Discrimination model checkpoint + supporting modules
+COPY guard-net/checkpoints/disc_xgb.pkl ./guard-net/checkpoints/disc_xgb.pkl
+COPY guard-net/checkpoints/disc_cv_results.json ./guard-net/checkpoints/disc_cv_results.json
+COPY guard-net/models/ ./guard-net/models/
+COPY guard-net/features/ ./guard-net/features/
+COPY guard-net/data/thermo_discrimination_features.py ./guard-net/data/thermo_discrimination_features.py
+COPY guard-net/data/__init__.py ./guard-net/data/__init__.py
 
 # Editable install (egg-link only, no downloads)
 RUN pip install --no-cache-dir --no-deps -e .
