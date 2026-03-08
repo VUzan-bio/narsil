@@ -694,7 +694,7 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
       <div style={{ padding: isCollapsed ? "16px 0" : "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between", gap: "8px" }}>
         {!isCollapsed && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <img src="/logo.png" alt="GUARD" style={{ height: "22px", objectFit: "contain" }} />
+            <img src="/guard-wordmark.png" alt="GUARD" style={{ height: "24px", objectFit: "contain" }} />
             {!connected && (
               <span style={{ fontSize: "10px", color: T.danger, fontWeight: 600, display: "flex", alignItems: "center", gap: "3px" }}>
                 <WifiOff size={10} /> API disconnected
@@ -702,7 +702,7 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
             )}
           </div>
         )}
-        {isCollapsed && <img src="/logo.png" alt="GUARD" style={{ height: "20px", objectFit: "contain" }} />}
+        {isCollapsed && <img src="/favicon-g.png" alt="GUARD" style={{ height: "22px", width: "22px", objectFit: "contain" }} />}
         {mobile ? (
           <button onClick={() => setMobileOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", marginLeft: "auto" }}><X size={20} color={T.textSec} /></button>
         ) : (
@@ -5413,7 +5413,7 @@ const GUARDPlatform = () => {
           <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex" }}>
             <Menu size={22} color={T.text} />
           </button>
-          <img src="/logo.png" alt="GUARD" style={{ height: "20px", objectFit: "contain" }} />
+          <img src="/guard-wordmark.png" alt="GUARD" style={{ height: "22px", objectFit: "contain" }} />
           {!connected && (
             <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: T.danger, fontWeight: 600 }}>
               <WifiOff size={10} /> API disconnected
