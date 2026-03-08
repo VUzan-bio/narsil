@@ -113,6 +113,7 @@ class GUARDNetScorer(Scorer):
             if cache_path.exists():
                 self._load_rnafm_cache(cache_path)
             else:
+                self._use_rnafm = False
                 logger.info(
                     "RNA-FM cache dir %s not found — using CNN-only mode",
                     cache_path,
