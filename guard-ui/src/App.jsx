@@ -3273,7 +3273,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
         const drugSens = drugTargets.length ? covered / drugTargets.length : 0;
         const drugSpec = drugSpecs.length ? drugSpecs.reduce((a, v) => a + v, 0) / drugSpecs.length : 0;
         const tppSens = drug === "RIF" ? 0.95 : ["INH", "FQ"].includes(drug) ? 0.90 : 0.80;
-        whoComp[drug] = { sensitivity: +drugSens.toFixed(3), specificity: +drugSpec.toFixed(3), meets_tpp: drugSens >= tppSens && drugSpec >= 0.98, targets_covered: covered, targets_total: drugTargets.length };
+        whoComp[drug] = { sensitivity: +drugSens.toFixed(3), specificity: +drugSpec.toFixed(3), meets_tpp: drugSens >= tppSens && drugSpec >= 0.98, meets_sensitivity: drugSens >= tppSens, meets_specificity: drugSpec >= 0.98, targets_covered: covered, targets_total: drugTargets.length };
       }
       setWhoCompliance({ preset, panel_sensitivity: +sensitivity.toFixed(3), panel_specificity: +specificity.toFixed(3), who_compliance: whoComp });
     } catch (err) {
@@ -3343,10 +3343,15 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               // Skip species control and unknown
               if (drug === "species_control" || drug === "unknown") continue;
               const drugKey = DRUG_MAP[drug] || drug.toUpperCase();
+              const tppSens = drugKey === "RIF" ? 0.95 : ["INH", "FQ"].includes(drugKey) ? 0.90 : 0.80;
+              const sens = entry.sensitivity ?? 0;
+              const spec = entry.specificity ?? 0;
               normalizedWho[drugKey] = {
-                sensitivity: entry.sensitivity ?? 0,
-                specificity: entry.specificity ?? 0,
+                sensitivity: sens,
+                specificity: spec,
                 meets_tpp: entry.meets_tpp ?? entry.meets_minimal ?? false,
+                meets_sensitivity: sens >= tppSens,
+                meets_specificity: spec >= 0.98,
                 targets_covered: entry.n_covered ?? 0,
                 targets_total: entry.n_targets ?? 0,
               };
@@ -3677,24 +3682,28 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             // Filter out species_control/UNKNOWN from WHO table — it's not a resistance drug class
             const whoEntries = Object.entries(whoCompliance.who_compliance).filter(([drug]) => !["UNKNOWN", "OTHER", "SPECIES_CONTROL", "species_control"].includes(drug));
             const WHO_TPP_SENS = { RIF: 0.95, INH: 0.90, FQ: 0.90, EMB: 0.80, PZA: 0.80, AG: 0.80 };
-            const passing = whoEntries.filter(([, d]) => d.meets_tpp).length;
+            const sensPassing = whoEntries.filter(([, d]) => d.meets_sensitivity).length;
+            const specPassing = whoEntries.filter(([, d]) => d.meets_specificity).length;
             return (
             <div style={{ marginBottom: "24px", border: `1px solid ${T.border}`, borderRadius: "10px", overflow: "hidden" }}>
               <div style={{ background: T.bgSub, padding: "14px 18px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                 <Shield size={14} color={T.primary} />
                 <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>WHO TPP Compliance by Drug Class</span>
-                <Badge variant={passing === whoEntries.length ? "success" : "warning"}>
-                  {passing}/{whoEntries.length} passing
+                <Badge variant={sensPassing === whoEntries.length ? "success" : "warning"}>
+                  Sens: {sensPassing}/{whoEntries.length}
+                </Badge>
+                <Badge variant={specPassing === whoEntries.length ? "success" : specPassing > 0 ? "warning" : "neutral"}>
+                  Spec: {specPassing}/{whoEntries.length}
                 </Badge>
               </div>
               <div style={{ padding: "12px 18px", fontSize: "11px", color: T.textSec, lineHeight: 1.6, borderBottom: `1px solid ${T.borderLight}`, background: T.bg }}>
-                WHO Target Product Profile (TPP) 2024 defines minimum sensitivity and specificity thresholds per drug class for diagnostic deployment. Sensitivity = fraction of resistance-conferring mutations detected. Specificity is estimated from mean discrimination ratios (proxy: 1 - 1/disc).
+                WHO Target Product Profile (TPP) 2024 defines minimum sensitivity and specificity thresholds per drug class for diagnostic deployment. Sensitivity = fraction of resistance-conferring mutations detected (pass/fail per drug class). Specificity = estimated from discrimination ratios (Direct: 1−1/disc, Proximity: AS-RPA 0.95); ≥98% required — marked "Pending" when below threshold as experimental validation is needed.
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT, fontSize: "12px" }}>
                   <thead>
                     <tr style={{ background: T.bgSub }}>
-                      {["Drug Class", "Sensitivity", "WHO Target", "Coverage", "Avg Disc", "Status"].map(h => (
+                      {["Drug Class", "Sensitivity", "WHO Target", "Coverage", "Avg Disc", "Specificity", "Sens. Status", "Spec. Status"].map(h => (
                         <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, color: T.textSec, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
                       ))}
                     </tr>
@@ -3725,10 +3734,22 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                         <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 600 }}>{data.targets_covered}/{data.targets_total}</td>
                         <td style={{ padding: "10px 14px", fontFamily: MONO, fontSize: "11px", color: avgDisc >= 3 ? T.success : avgDisc >= 2 ? T.warning : T.textTer }}>{avgDisc > 0 ? `${avgDisc.toFixed(1)}×` : "—"}</td>
                         <td style={{ padding: "10px 14px" }}>
-                          {data.meets_tpp ? (
+                          {data.specificity != null ? (
+                            <span style={{ fontFamily: MONO, fontWeight: 600, fontSize: "12px", color: data.specificity >= 0.98 ? T.success : data.specificity >= 0.90 ? T.warning : T.textTer }}>{(data.specificity * 100).toFixed(1)}%</span>
+                          ) : <span style={{ color: T.textTer }}>—</span>}
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          {data.meets_sensitivity ? (
                             <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "20px", background: "rgba(16,185,129,0.1)", color: T.success, fontWeight: 600, fontSize: "11px" }}><CheckCircle size={12} /> Pass</span>
                           ) : (
                             <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "20px", background: "rgba(239,68,68,0.08)", color: T.danger, fontWeight: 600, fontSize: "11px" }}><AlertTriangle size={12} /> Fail</span>
+                          )}
+                        </td>
+                        <td style={{ padding: "10px 14px" }}>
+                          {data.meets_specificity ? (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "20px", background: "rgba(16,185,129,0.1)", color: T.success, fontWeight: 600, fontSize: "11px" }}><CheckCircle size={12} /> Pass</span>
+                          ) : (
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "3px 10px", borderRadius: "20px", background: "rgba(245,158,11,0.08)", color: T.warning, fontWeight: 600, fontSize: "11px" }}><AlertTriangle size={12} /> Pending</span>
                           )}
                         </td>
                       </tr>
@@ -3739,15 +3760,19 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               </div>
               {/* Interpretation */}
               {(() => {
-                const failing = whoEntries.filter(([, d]) => !d.meets_tpp);
-                const worstDrug = failing.length ? failing.sort((a, b) => a[1].sensitivity - b[1].sensitivity)[0] : null;
+                const sensFailing = whoEntries.filter(([, d]) => !d.meets_sensitivity);
+                const specFailing = whoEntries.filter(([, d]) => !d.meets_specificity);
+                const worstSens = sensFailing.length ? sensFailing.sort((a, b) => a[1].sensitivity - b[1].sensitivity)[0] : null;
                 return (
                   <div style={{ padding: "12px 18px", background: T.primaryLight, borderTop: `1px solid ${T.borderLight}`, fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
-                    <strong style={{ color: T.primary }}>Interpretation:</strong> {passing}/{whoEntries.length} drug classes meet WHO TPP minimal sensitivity requirements.
-                    {worstDrug && ` ${worstDrug[0]} is the weakest (${(worstDrug[1].sensitivity * 100).toFixed(0)}% vs ${((WHO_TPP_SENS[worstDrug[0]] || 0.80) * 100).toFixed(0)}% required)`}
-                    {failing.length > 1 && ` — ${failing.length} classes need additional mutation coverage or candidate optimisation.`}
-                    {passing === whoEntries.length && " All drug classes pass. The panel meets WHO TPP for clinical deployment."}
-                    {" "}Note: these are in silico estimates. Experimental validation will refine per-assay sensitivity and specificity.
+                    <strong style={{ color: T.primary }}>Interpretation:</strong>{" "}
+                    <strong>Sensitivity:</strong> {sensPassing}/{whoEntries.length} drug classes meet WHO TPP minimal sensitivity thresholds.
+                    {worstSens && ` ${worstSens[0]} is the weakest (${(worstSens[1].sensitivity * 100).toFixed(0)}% vs ${((WHO_TPP_SENS[worstSens[0]] || 0.80) * 100).toFixed(0)}% required).`}
+                    {sensFailing.length > 1 && ` ${sensFailing.length} classes need additional mutation coverage.`}
+                    {sensPassing === whoEntries.length && " All drug classes pass sensitivity."}
+                    {" "}<strong>Specificity:</strong> {specPassing}/{whoEntries.length} classes meet the ≥98% threshold (in silico proxy: 1−1/disc for Direct, 0.95 for AS-RPA Proximity).
+                    {specFailing.length > 0 && ` ${specFailing.length} class${specFailing.length > 1 ? "es" : ""} pending — specificity estimates require experimental validation on the electrochemical platform.`}
+                    {specPassing === whoEntries.length && " All classes pass specificity."}
                   </div>
                 );
               })()}
