@@ -186,7 +186,7 @@ class AppState:
                 if scoring_kwargs.get("scorer") == "guard_net":
                     scoring_kwargs.setdefault(
                         "guard_net_weights",
-                        Path("guard/weights/guard_net_best.pt"),
+                        Path("guard/weights/guard_net_diagnostic.pt"),
                     )
                     scoring_kwargs.setdefault(
                         "rnafm_cache_dir",
