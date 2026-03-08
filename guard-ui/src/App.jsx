@@ -103,20 +103,23 @@ const RESULTS = MUTATIONS.map((m, i) => {
   const cnnRaw = +(0.5 + Math.random() * 0.4).toFixed(4);
   const cnnCal = +(cnnRaw * 0.8 + 0.18).toFixed(4);
   const ensemble = +(heuristic * 0.35 + cnnCal * 0.65).toFixed(4);
+  const discRatio = +(1.5 + Math.random() * 8).toFixed(1);
+  const mutAct = +(0.5 + Math.random() * 0.45).toFixed(2);
+  const wtAct = +(1.0 / Math.max(discRatio, 0.01)).toFixed(4);
   return {
     ...m, label: refKey,
     strategy: i % 3 === 0 ? "Direct" : i % 3 === 1 ? "Proximity" : "Direct",
     spacer, wtSpacer, pam: ["TTTV", "TTTG", "TTTA", "TTTC"][i % 4],
     score: heuristic, cnnScore: cnnRaw, cnnCalibrated: cnnCal, ensembleScore: ensemble,
     mlScores: [{ model_name: "guard_net", predicted_efficiency: cnnRaw }],
-    disc: +(1.5 + Math.random() * 8).toFixed(1),
-    discrimination: { model_name: "learned_lightgbm", ratio: +(1.5 + Math.random() * 8).toFixed(1), mut_activity: +(0.5 + Math.random() * 0.45).toFixed(2), wt_activity: +(0.05 + Math.random() * 0.15).toFixed(2) },
+    disc: discRatio,
+    discrimination: { model_name: "learned_lightgbm", ratio: discRatio, mut_activity: mutAct, wt_activity: wtAct },
     gc: +(0.35 + Math.random() * 0.3).toFixed(2),
     ot: Math.floor(Math.random() * 3), hasPrimers: i < 12, hasSM: i % 4 === 1, proximityDistance: i % 3 === 1 ? 15 + Math.floor(Math.random() * 30) : null,
     fwd: i < 12 ? seq(30) : null, rev: i < 12 ? seq(30) : null,
     amplicon: i < 12 ? 120 + Math.floor(Math.random() * 60) : null,
-    mutActivity: +(0.5 + Math.random() * 0.45).toFixed(2),
-    wtActivity: +(0.05 + Math.random() * 0.15).toFixed(2),
+    mutActivity: mutAct,
+    wtActivity: wtAct,
     refs: WHO_REFS[refKey] || null,
   };
 });
@@ -125,7 +128,8 @@ RESULTS.push({
   label: "IS6110_NON", strategy: "Direct", spacer: "AATGTCGCCGCGATCGAGCG", wtSpacer: "AATGTCGCCGCGATCGAGCG",
   pam: "TTTG", score: 0.95, cnnScore: 0.88, cnnCalibrated: 0.91, ensembleScore: 0.924,
   mlScores: [{ model_name: "guard_net", predicted_efficiency: 0.88 }],
-  disc: 999, gc: 0.65, ot: 0, hasPrimers: true, hasSM: false,
+  disc: 999, discrimination: { model_name: "learned_lightgbm", ratio: 999, mut_activity: 0.95, wt_activity: 0.001 },
+  gc: 0.65, ot: 0, hasPrimers: true, hasSM: false,
   fwd: seq(30), rev: seq(30), amplicon: 142, mutActivity: 0.95, wtActivity: 0.001,
   refs: { who: "N/A", catalogue: "Species control", pmid: "30593580", cryptic: null, freq: "6–16 copies/genome" },
 });
