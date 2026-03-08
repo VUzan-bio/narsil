@@ -3692,7 +3692,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                                         const s = alt.efficiency || alt.score || alt.composite_score || 0;
                                         const disc = alt.discrimination_ratio || alt.discrimination || 0;
                                         const strategy = alt.strategy || alt.detection_strategy || "";
-                                        const notes = alt.tradeoff_note || alt.notes || "";
+                                        const notes = alt.tradeoff_summary || alt.tradeoff_note || alt.notes || "";
                                         return (
                                           <div key={i} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "4px 0", fontSize: "11px", fontFamily: MONO, color: i === 0 ? T.text : T.textSec }}>
                                             <span style={{ width: "20px", fontWeight: 700 }}>#{i + 1}</span>

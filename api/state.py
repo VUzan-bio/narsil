@@ -246,6 +246,15 @@ class AppState:
                     s.get("duration_ms", 0) for s in pipeline.last_stats
                 )
 
+                # Cache scored candidates for Block 3 endpoints (top-K, sweep, pareto)
+                from api.routes.optimisation import cache_pipeline_result
+                if hasattr(pipeline, "_scored_by_target"):
+                    cache_pipeline_result(
+                        job_id=job_id,
+                        members=panel.members,
+                        candidates_by_target=pipeline._scored_by_target,
+                    )
+
             # Save result to disk
             result_path = self.results_dir / f"{job_id}.json"
             with open(result_path, "w") as f:
