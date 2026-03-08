@@ -19,7 +19,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY pyproject.toml README.md ./
 COPY guard/ ./guard/
-RUN pip install --no-cache-dir -e ".[primers,api,viz,disc]"
+# Install CPU-only PyTorch first (small ~200MB vs ~2GB for CUDA)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir -e ".[primers,api,viz,disc,ml]"
 
 # Stage 3: Lean runtime (no compilers)
 FROM python:3.11-slim
@@ -41,13 +43,8 @@ COPY api/ ./api/
 COPY configs/ ./configs/
 COPY data/ ./data/
 
-# Discrimination model checkpoint + supporting modules
-COPY guard-net/checkpoints/disc_xgb.pkl ./guard-net/checkpoints/disc_xgb.pkl
-COPY guard-net/checkpoints/disc_cv_results.json ./guard-net/checkpoints/disc_cv_results.json
-COPY guard-net/models/ ./guard-net/models/
-COPY guard-net/features/ ./guard-net/features/
-COPY guard-net/data/thermo_discrimination_features.py ./guard-net/data/thermo_discrimination_features.py
-COPY guard-net/data/__init__.py ./guard-net/data/__init__.py
+# GUARD-Net model package (architecture + checkpoints + features)
+COPY guard-net/ ./guard-net/
 
 # Editable install (egg-link only, no downloads)
 RUN pip install --no-cache-dir --no-deps -e .
