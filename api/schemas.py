@@ -111,6 +111,8 @@ class TargetResult(BaseModel):
     sm_position: Optional[int] = None
     sm_discrimination_score: Optional[float] = None
     sm_improvement_factor: Optional[float] = None
+    sm_original_base: Optional[str] = None
+    sm_replacement_base: Optional[str] = None
     asrpa_discrimination: Optional[dict] = None
 
 

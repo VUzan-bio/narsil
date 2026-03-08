@@ -365,10 +365,13 @@ function transformApiCandidate(c) {
     ensembleScore: c.ensemble_score ?? null,
     mlScores: c.ml_scores || [],
     ot: c.offtarget_count, hasPrimers: c.has_primers, hasSM: c.has_sm,
+    smSpacer: c.sm_enhanced_spacer || null, smPosition: c.sm_position || null,
+    smOriginalBase: c.sm_original_base || null, smReplacementBase: c.sm_replacement_base || null,
     fwd: c.fwd_primer, rev: c.rev_primer, amplicon: c.amplicon_length,
     proximityDistance: c.proximity_distance || null,
     mutActivity: c.discrimination?.mut_activity || 0,
     wtActivity: c.discrimination?.wt_activity || 0,
+    asrpaDiscrimination: c.asrpa_discrimination || null,
     refs: WHO_REFS[c.target_label] || null,
     scoringBreakdown: c.scoring_breakdown || null,
     isControl: c.is_control || false,
@@ -2807,7 +2810,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
         <div style={{ fontSize: "13px", fontWeight: 700, color: T.primaryDark, fontFamily: HEADING, marginBottom: "6px" }}>Reading the table</div>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : hasML ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr", gap: "6px 20px", fontSize: "12px", color: T.primaryDark, lineHeight: 1.5, opacity: 0.85 }}>
           <div><strong>Score</strong> — predicted trans-cleavage activity (0–1). Higher = stronger fluorescent signal. {hasML ? `Ensemble of heuristic + ${hasGuardNet ? "GUARD-Net" : "CNN"}.` : "Heuristic composite."}</div>
-          <div><strong>Disc</strong> — fold-difference in cleavage between MUT and WT templates. ≥ 3× = diagnostic-grade specificity.</div>
+          <div><strong>Disc</strong> — fold-difference in cleavage between MUT and WT templates. ≥ 3× = diagnostic-grade discrimination (specificity proxy: ~1-1/disc).</div>
           {hasML && <div><strong>{mlColLabel}</strong> — {hasGuardNet ? "GUARD-Net neural network" : "ML calibrated"} activity prediction (before ensemble).</div>}
           <div><strong>Expand</strong> — click any row for full interpretation, crRNA architecture, primers, and alternatives.</div>
         </div>

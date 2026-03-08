@@ -150,6 +150,8 @@ def _build_target_result(member: dict[str, Any]) -> TargetResult:
         sm_position=member.get("sm_position"),
         sm_discrimination_score=member.get("sm_discrimination_score"),
         sm_improvement_factor=member.get("sm_improvement_factor"),
+        sm_original_base=member.get("sm_original_base"),
+        sm_replacement_base=member.get("sm_replacement_base"),
         asrpa_discrimination=member.get("asrpa_discrimination"),
     )
 
