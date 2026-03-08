@@ -690,15 +690,19 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
       transition: "width 0.2s ease",
       ...(mobile ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 9998, boxShadow: "4px 0 24px rgba(0,0,0,0.15)" } : {}),
     }}>
-      {/* Status + Toggle */}
+      {/* Logo + Toggle */}
       <div style={{ padding: isCollapsed ? "16px 0" : "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between", gap: "8px" }}>
         {!isCollapsed && (
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
-            {connected ? <Wifi size={12} color={T.success} /> : <WifiOff size={12} color={T.danger} />}
-            <span style={{ color: connected ? T.success : T.danger, fontWeight: 600 }}>{connected ? "Connected" : "Offline"}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <img src="/logo.png" alt="GUARD" style={{ height: "22px", objectFit: "contain" }} />
+            {!connected && (
+              <span style={{ fontSize: "10px", color: T.danger, fontWeight: 600, display: "flex", alignItems: "center", gap: "3px" }}>
+                <WifiOff size={10} /> API disconnected
+              </span>
+            )}
           </div>
         )}
-        {isCollapsed && (connected ? <Wifi size={14} color={T.success} /> : <WifiOff size={14} color={T.danger} />)}
+        {isCollapsed && <img src="/logo.png" alt="GUARD" style={{ height: "20px", objectFit: "contain" }} />}
         {mobile ? (
           <button onClick={() => setMobileOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", marginLeft: "auto" }}><X size={20} color={T.textSec} /></button>
         ) : (
@@ -947,20 +951,8 @@ const HomePage = ({ goTo, connected }) => {
 
   return (
     <div style={{ padding: mobile ? "24px 16px" : "48px 40px" }}>
-      {/* Hero */}
-      <div style={{ marginBottom: mobile ? "28px" : "48px" }}>
-        <div style={{ maxWidth: "100%" }}>
-          <div style={{ marginBottom: "4px" }}>
-            <img src="/guard-logo.png" alt="GUARD" style={{ height: mobile ? "42px" : "72px", objectFit: "contain", display: "block" }} />
-          </div>
-          <p style={{ fontSize: mobile ? "12px" : "14px", fontWeight: 600, color: T.textSec, margin: "0 0 2px", letterSpacing: "0.02em" }}>
-            Guide RNA Automated Resistance Diagnostics
-          </p>
-          <p style={{ fontSize: mobile ? "12px" : "13px", color: T.textTer, lineHeight: 1.5, margin: 0, maxWidth: 680 }}>
-            Computational pipeline for designing multiplexed CRISPR-Cas12a diagnostic panels targeting drug-resistant <em>Mycobacterium tuberculosis</em>.
-          </p>
-        </div>
-      </div>
+      {/* Spacer — hero removed, logo in sidebar */}
+      <div style={{ marginBottom: mobile ? "12px" : "24px" }} />
 
       {/* ── Run Workflow ── */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: mobile ? "20px" : "32px", marginBottom: "24px" }}>
@@ -5421,10 +5413,12 @@ const GUARDPlatform = () => {
           <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex" }}>
             <Menu size={22} color={T.text} />
           </button>
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px", fontSize: "11px" }}>
-            {connected ? <Wifi size={12} color={T.success} /> : <WifiOff size={12} color={T.danger} />}
-            <span style={{ color: connected ? T.success : T.danger, fontWeight: 600 }}>{connected ? "Connected" : "Offline"}</span>
-          </div>
+          <img src="/logo.png" alt="GUARD" style={{ height: "20px", objectFit: "contain" }} />
+          {!connected && (
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: T.danger, fontWeight: 600 }}>
+              <WifiOff size={10} /> API disconnected
+            </div>
+          )}
         </header>
       )}
 
