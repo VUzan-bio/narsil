@@ -1658,6 +1658,42 @@ const HomePage = ({ goTo, connected }) => {
         ))}
       </CollapsibleSection>
 
+      {/* ═══ LIMITATIONS ═══ */}
+      <CollapsibleSection title="Limitations & Scope">
+        <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.75, marginBottom: "8px" }}>
+          All predictions are in silico estimates. Experimental validation on the target electrochemical platform is required before diagnostic deployment. Key limitations of the current version:
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {[
+            {
+              title: "Discrimination prediction",
+              text: "Uses position-dependent heuristics (Strohkendl et al. 2018), not learned mismatch-specific models. Two SNPs at the same spacer position but with different mismatch chemistry (e.g. G\u2192A vs G\u2192T) receive identical discrimination scores. Paired MUT/WT experimental measurements will enable mismatch-specific discrimination modelling.",
+            },
+            {
+              title: "Domain shift",
+              text: "The scoring model was trained on AsCas12a/LbCas12a data (Kim et al. 2018; Huang et al. 2024). Deployment uses enAsCas12a on RPA-amplified M. tuberculosis DNA \u2014 a domain shift in enzyme variant, target organism, and GC context. Active learning from initial experimental validation will calibrate predictions to the deployment domain.",
+            },
+            {
+              title: "AS-RPA specificity",
+              text: "Discrimination for Proximity candidates uses a fixed 0.95 specificity estimate. Real AS-RPA performance varies with 3\u2032 mismatch identity, primer design, and template concentration.",
+            },
+            {
+              title: "Multiplex compatibility",
+              text: "Assessed by sequence homology only. Thermodynamic primer-dimer stability, enzyme competition, and amplification bias in multiplexed RPA reactions are not currently modelled.",
+            },
+            {
+              title: "Specificity estimates",
+              text: "The proxy formula (1\u22121/disc) converts discrimination ratios to specificity-like values but is not a clinical measurement. WHO TPP compliance requires experimental validation on clinical isolate panels. All specificity statuses are marked \u201CPending\u201D accordingly.",
+            },
+          ].map((item, i) => (
+            <div key={i} style={{ background: T.bgSub, borderRadius: "8px", padding: "12px 16px", border: `1px solid ${T.borderLight}` }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: T.text, marginBottom: "4px" }}>{item.title}</div>
+              <div style={{ fontSize: "11.5px", color: T.textSec, lineHeight: 1.65 }}>{item.text}</div>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
+
       {/* ═══ REFERENCES ═══ */}
       <CollapsibleSection title={`References (${BIBLIOGRAPHY.length})`}>
         {(() => {
