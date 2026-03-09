@@ -35,9 +35,9 @@ const T = {
   danger: "#DC2626", dangerLight: "#FEE2E2",
   purple: "#7C3AED", purpleLight: "#F3E8FF",
   sidebar: "#FAFBFD", sidebarActive: "#EEF2FF", sidebarHover: "#F3F4F6", sidebarText: "#374151",
-  riskGreen: "#16A34A", riskGreenBg: "#DCFCE7",
-  riskAmber: "#D97706", riskAmberBg: "#FEF3C7",
-  riskRed: "#DC2626", riskRedBg: "#FEE2E2",
+  riskGreen: "#6BBF8A", riskGreenBg: "#E8F5EC",
+  riskAmber: "#E8A855", riskAmberBg: "#FDF2E0",
+  riskRed: "#E07070", riskRedBg: "#FBEAEA",
 };
 const FONT = "'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
 const HEADING = "'Urbanist', sans-serif";
@@ -4017,6 +4017,12 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
     getPresets().then(({ data }) => { setPresets(data && data.length ? data : fallbackPresets); });
   }, [connected]);
 
+  // Clear sweep/pareto when preset changes so stale charts don't persist
+  useEffect(() => {
+    setSweepData(null);
+    setParetoData(null);
+  }, [activePreset]);
+
   // Load diagnostics + WHO compliance — try API, fall back to client-side computation
   useEffect(() => {
     if (!results || !results.length) return;
@@ -4262,7 +4268,15 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               if (r.strategy === "Proximity") return !(r.asrpaDiscrimination?.block_class === "none");
               return (r.disc > 0 && r.disc < 900) ? r.disc >= discT : false;
             });
-            const plotResults = filtered.length >= 2 ? filtered : results.filter(r => r.gene !== "IS6110"); // fallback to all if <2 pass
+            if (filtered.length < 2) return (
+              <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px 28px", marginBottom: "24px" }}>
+                <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>MUT vs WT Predicted Activity</div>
+                <div style={{ fontSize: "12px", color: T.textSec, padding: "20px 0", textAlign: "center" }}>
+                  Only {filtered.length} candidate{filtered.length === 1 ? "" : "s"} pass the <strong>{PRESET_LABELS[activePreset] || activePreset}</strong> thresholds (eff ≥ {effT}, disc ≥ {discT}×). Need ≥ 2 to plot distribution. Try a less stringent preset.
+                </div>
+              </div>
+            );
+            const plotResults = filtered;
             const mutScores = plotResults.map(r => r.ensembleScore || r.score);
             const wtScores = plotResults.map(r => {
               const eff = r.ensembleScore || r.score;
@@ -4289,7 +4303,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <div>
                     <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>MUT vs WT Predicted Activity</div>
                     <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5, maxWidth: "540px" }}>
-                      Density computed from <strong>{plotResults.length}</strong> candidates passing the {activePreset} preset thresholds (eff ≥ {effT}, disc ≥ {discT}×). Greater separation between curves = better discrimination. WT activity derived from discrimination ratios (A<sub>WT</sub> = A<sub>MUT</sub> / disc).
+                      Density from <strong>{plotResults.length}</strong>/{results.filter(r => r.gene !== "IS6110").length} candidates passing <strong>{PRESET_LABELS[activePreset] || activePreset}</strong> thresholds (eff ≥ {effT}, disc ≥ {discT}×). Greater separation = better discrimination. WT activity derived from discrimination ratios (A<sub>WT</sub> = A<sub>MUT</sub> / disc).
                     </div>
                   </div>
                   <Badge variant={separation >= 0.15 ? "success" : separation >= 0.08 ? "warning" : "danger"}>
@@ -4370,9 +4384,9 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   const mutSorted = [...mutScores].sort((a, b) => b - a);
                   const wtSorted = [...wtScores].sort((a, b) => b - a);
                   const bestMutIdx = mutScores.indexOf(mutSorted[0]);
-                  const bestMutLabel = results[bestMutIdx]?.label || "top target";
+                  const bestMutLabel = plotResults[bestMutIdx]?.label || "top target";
                   const worstMutIdx = mutScores.indexOf(mutSorted[mutSorted.length - 1]);
-                  const worstMutLabel = results[worstMutIdx]?.label || "weakest target";
+                  const worstMutLabel = plotResults[worstMutIdx]?.label || "weakest target";
                   const clinicalRisk = overlapPct > 30 ? "high" : overlapPct > 15 ? "moderate" : "low";
                   return (
                     <div style={{ marginTop: "14px", padding: "12px 16px", background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "8px", fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
