@@ -1803,25 +1803,30 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
    ═══════════════════════════════════════════════════════════════════ */
 const RISK_COLORS = { green: T.riskGreen, amber: T.riskAmber, red: T.riskRed };
 const RISK_BG = { green: T.riskGreenBg, amber: T.riskAmberBg, red: T.riskRedBg };
-/* Blue → Red continuous gradient helper (coolwarm-inspired) */
-function blueRedColor(t) {
-  // t in [0,1]: 0 = deep blue, 0.5 = light/neutral, 1 = deep red
+/* Blue → White → Orange continuous gradient (CD69/CD103 immunology UMAP style) */
+const gradientColor = (t) => {
   t = Math.max(0, Math.min(1, t));
-  if (t <= 0.5) {
-    const s = t / 0.5; // 0→1
-    const r = Math.round(30 + s * 195);
-    const g = Math.round(80 + s * 140);
-    const b = Math.round(220 - s * 50);
-    return `rgb(${r},${g},${b})`;
-  } else {
-    const s = (t - 0.5) / 0.5; // 0→1
-    const r = Math.round(225 + s * 30);
-    const g = Math.round(220 - s * 170);
-    const b = Math.round(170 - s * 140);
-    return `rgb(${r},${g},${b})`;
+  const stops = [
+    { t: 0.0,  r: 8,   g: 81,  b: 156 },  // #08519c deep blue
+    { t: 0.25, r: 107, g: 174, b: 214 },  // #6baed6 mid blue
+    { t: 0.5,  r: 247, g: 247, b: 247 },  // #f7f7f7 near white
+    { t: 0.75, r: 253, g: 174, b: 107 },  // #fdae6b light orange
+    { t: 1.0,  r: 230, g: 85,  b: 13  },  // #e6550d deep orange
+  ];
+  let lower = stops[0], upper = stops[stops.length - 1];
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (t >= stops[i].t && t <= stops[i + 1].t) { lower = stops[i]; upper = stops[i + 1]; break; }
   }
-}
-const AXIS_COLORS = { efficiency: blueRedColor(0.15), discrimination: blueRedColor(0.7), primers: blueRedColor(0.0), safety: blueRedColor(0.85), gc: blueRedColor(0.45) };
+  const range = upper.t - lower.t || 1;
+  const f = (t - lower.t) / range;
+  const r = Math.round(lower.r + f * (upper.r - lower.r));
+  const g = Math.round(lower.g + f * (upper.g - lower.g));
+  const b = Math.round(lower.b + f * (upper.b - lower.b));
+  return `rgb(${r},${g},${b})`;
+};
+const gradientCSS = "linear-gradient(90deg, #08519c, #6baed6, #f7f7f7, #fdae6b, #e6550d)";
+const PASS_GREEN = "#22c55e";
+const AXIS_COLORS = { efficiency: "#6baed6", discrimination: "#e6550d", primers: "#3182bd", safety: "#fd8d3c", gc: "#bdd7e7" };
 const AXIS_LABELS = { efficiency: "Activity", discrimination: "Discrimination", primers: "Primers", safety: "Off-target", gc: "GC" };
 
 const RiskDot = ({ level, size = 12 }) => (
@@ -1830,6 +1835,29 @@ const RiskDot = ({ level, size = 12 }) => (
     backgroundColor: RISK_COLORS[level] || "#6b7280", flexShrink: 0,
   }} />
 );
+
+/* Heatmap cell for Risk Assessment Matrix */
+const riskLevelToT = { green: 0.9, amber: 0.5, red: 0.1 };
+const RiskHeatCell = ({ level, type = "quantitative" }) => {
+  if (type === "binary") {
+    const passed = level === "green";
+    return (
+      <div style={{
+        width: 44, height: 28, borderRadius: 4, border: "2px solid #fff",
+        backgroundColor: passed ? PASS_GREEN : "#08519c",
+        margin: "0 auto",
+      }} />
+    );
+  }
+  const t = riskLevelToT[level] ?? 0.5;
+  const color = gradientColor(t);
+  return (
+    <div style={{
+      width: 44, height: 28, borderRadius: 4, border: "2px solid #fff",
+      backgroundColor: color, margin: "0 auto",
+    }} />
+  );
+};
 
 const PriorityBadge = ({ rank }) => (
   <span style={{
@@ -1887,6 +1915,7 @@ const ExperimentalPriorityCard = ({ results }) => {
   );
 };
 
+const RISK_AXIS_TYPE = { activity: "quantitative", discrimination: "quantitative", primers: "binary", gc_risk: "quantitative", off_target: "quantitative" };
 const RiskMatrix = ({ results }) => {
   const mobile = useIsMobile();
   const sorted = [...results].filter(r => r.experimentalPriority != null)
@@ -1901,33 +1930,41 @@ const RiskMatrix = ({ results }) => {
         <div style={{ fontSize: "12px", color: T.textTer }}>{sorted.length} targets</div>
       </div>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "2px 2px", fontSize: "12px" }}>
           <thead>
             <tr>
-              <th style={{ padding: "8px 16px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}`, width: mobile ? 100 : 140 }}>Target</th>
+              <th style={{ padding: "8px 16px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", width: mobile ? 100 : 140 }}>Target</th>
               {axes.map(a => (
-                <th key={a} style={{ padding: "8px 10px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}`, width: 60 }}>{axisNames[a]}</th>
+                <th key={a} style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", width: 52 }}>{axisNames[a]}</th>
               ))}
-              <th style={{ padding: "8px 10px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}`, width: 60 }}>Overall</th>
-              <th style={{ padding: "8px 14px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}`, width: 50 }}>#</th>
+              <th style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", width: 52 }}>Overall</th>
+              <th style={{ padding: "8px 14px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", width: 50 }}>#</th>
             </tr>
           </thead>
           <tbody>
             {sorted.map(r => {
               const risk = r.riskProfile || {};
               return (
-                <tr key={r.label} style={{ borderBottom: `1px solid ${T.borderLight}`, height: 38 }}>
-                  <td style={{ padding: "6px 16px", fontWeight: 600, fontSize: "11px", color: T.text, whiteSpace: "nowrap" }}>{r.label}</td>
+                <tr key={r.label}>
+                  <td style={{ padding: "4px 16px", fontWeight: 600, fontSize: "11px", color: T.text, whiteSpace: "nowrap" }}>{r.label}</td>
                   {axes.map(a => (
-                    <td key={a} style={{ padding: "6px 10px", textAlign: "center" }}><RiskDot level={risk[a]} /></td>
+                    <td key={a} style={{ padding: "3px 2px", textAlign: "center" }}><RiskHeatCell level={risk[a]} type={RISK_AXIS_TYPE[a]} /></td>
                   ))}
-                  <td style={{ padding: "6px 10px", textAlign: "center" }}><RiskDot level={risk.overall} /></td>
-                  <td style={{ padding: "6px 14px", textAlign: "center" }}><PriorityBadge rank={r.experimentalPriority} /></td>
+                  <td style={{ padding: "3px 2px", textAlign: "center" }}><RiskHeatCell level={risk.overall} /></td>
+                  <td style={{ padding: "4px 14px", textAlign: "center" }}><PriorityBadge rank={r.experimentalPriority} /></td>
                 </tr>
               );
             })}
           </tbody>
         </table>
+      </div>
+      {/* Gradient legend */}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 24px 14px", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "10px", color: T.textTer }}>Risk / Low</span>
+        <div style={{ width: 160, height: 10, borderRadius: 5, background: gradientCSS }} />
+        <span style={{ fontSize: "10px", color: T.textTer }}>Safe / High</span>
+        <div style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: PASS_GREEN, marginLeft: 12 }} />
+        <span style={{ fontSize: "10px", color: T.textTer }}>Pass (binary)</span>
       </div>
     </div>
   );
@@ -2038,18 +2075,13 @@ const UMAPPanel = ({ jobId }) => {
 
     const getColor = (p) => {
       if (colorBy === "drug") return DRUG_CANVAS[p.drug] || DRUG_CANVAS.OTHER;
-      if (colorBy === "score") {
-        const t = Math.max(0, Math.min(1, ((p.score || 0.5) - 0.2) / 0.6));
-        return blueRedColor(t);
-      }
+      if (colorBy === "score") return gradientColor(p.score || 0);
       if (colorBy === "gc") {
-        const t = Math.max(0, Math.min(1, ((p.gc_content || 0.5) - 0.3) / 0.4));
-        return blueRedColor(t);
+        const gcNorm = 1 - Math.min(Math.abs((p.gc_content || 0.5) - 0.5) / 0.25, 1);
+        return gradientColor(gcNorm);
       }
-      if (colorBy === "strategy") {
-        return p.detection_strategy === "direct" ? blueRedColor(0.1) : blueRedColor(0.85);
-      }
-      return blueRedColor(0.5);
+      if (colorBy === "strategy") return p.detection_strategy === "direct" ? "#3b82f6" : "#a855f7";
+      return gradientColor(0.5);
     };
 
     // All unselected: draw all points (small, semi-transparent for density)
@@ -2179,7 +2211,7 @@ const UMAPPanel = ({ jobId }) => {
         ) : (
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span style={{ fontSize: "10px", color: T.textTer }}>Low</span>
-            <div style={{ width: 80, height: 8, borderRadius: 4, background: `linear-gradient(to right, ${blueRedColor(0)}, ${blueRedColor(0.25)}, ${blueRedColor(0.5)}, ${blueRedColor(0.75)}, ${blueRedColor(1)})` }} />
+            <div style={{ width: 120, height: 8, borderRadius: 4, background: gradientCSS }} />
             <span style={{ fontSize: "10px", color: T.textTer }}>High</span>
           </div>
         )}
@@ -2347,7 +2379,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                     const ready = d.score >= 0.4 && d.disc >= 3;
                     return (
                       <div style={{ ...tooltipStyle, padding: "12px 16px" }}>
-                        <div style={{ fontWeight: 700, fontSize: "12px", color: blueRedColor(d.score), marginBottom: "4px" }}>{d.label}</div>
+                        <div style={{ fontWeight: 700, fontSize: "12px", color: gradientColor(d.readiness), marginBottom: "4px" }}>{d.label}</div>
                         <div style={{ fontSize: "11px", color: T.textSec }}>Score: <strong style={{ color: T.text }}>{d.score.toFixed(3)}</strong></div>
                         <div style={{ fontSize: "11px", color: T.textSec }}>Discrimination: <strong style={{ color: T.text }}>{d.disc.toFixed(1)}×</strong></div>
                         <div style={{ fontSize: "11px", color: T.textSec }}>{d.drug} · {d.strategy}{hasReadiness ? ` · Readiness ${(d.readiness * 100).toFixed(0)}%` : (d.hasPrimers ? " · Primers OK" : " · No primers")}</div>
@@ -2360,7 +2392,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                   <Scatter data={scatterData} isAnimationActive={false}>
                     {scatterData.map((entry, i) => {
                       const dotR = hasReadiness ? Math.max(4, entry.readiness * 14) : (entry.hasPrimers ? 8 : 5);
-                      return <Cell key={i} fill={blueRedColor(entry.score)} r={dotR} stroke="#fff" strokeWidth={2} opacity={0.85} />;
+                      return <Cell key={i} fill={gradientColor(entry.readiness)} r={dotR} stroke="#fff" strokeWidth={2} opacity={0.85} />;
                     })}
                   </Scatter>
                 </ScatterChart>
@@ -2373,9 +2405,9 @@ const OverviewTab = ({ results, scorer, jobId }) => {
             {/* Legend */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px", flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "10px", color: T.textTer }}>Low</span>
-                <div style={{ width: 80, height: 8, borderRadius: 4, background: `linear-gradient(to right, ${blueRedColor(0)}, ${blueRedColor(0.25)}, ${blueRedColor(0.5)}, ${blueRedColor(0.75)}, ${blueRedColor(1)})` }} />
-                <span style={{ fontSize: "10px", color: T.textTer }}>High score</span>
+                <span style={{ fontSize: "10px", color: T.textTer }}>Low readiness</span>
+                <div style={{ width: 120, height: 8, borderRadius: 4, background: gradientCSS }} />
+                <span style={{ fontSize: "10px", color: T.textTer }}>High readiness</span>
               </div>
               {hasReadiness ? (<>
                 <span style={{ fontSize: "10px", color: T.textTer }}>|</span>
@@ -2466,7 +2498,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                   const diff = d.guardNet - d.heuristic;
                   return (
                     <div style={{ ...tooltipStyle, padding: "12px 16px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "12px", color: blueRedColor(d.ensemble), marginBottom: "4px" }}>{d.label}</div>
+                      <div style={{ fontWeight: 700, fontSize: "12px", color: gradientColor(d.ensemble), marginBottom: "4px" }}>{d.label}</div>
                       <div style={{ fontSize: "11px", color: T.textSec }}>Heuristic: <strong style={{ color: T.text }}>{d.heuristic.toFixed(3)}</strong></div>
                       <div style={{ fontSize: "11px", color: T.textSec }}>GUARD-Net: <strong style={{ color: T.primary }}>{d.guardNet.toFixed(3)}</strong></div>
                       <div style={{ fontSize: "11px", color: T.textSec }}>Ensemble: <strong style={{ color: T.text }}>{d.ensemble.toFixed(3)}</strong></div>
@@ -2479,7 +2511,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                 <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke={T.textTer} strokeDasharray="6 4" strokeWidth={1} opacity={0.4} />
                 <Scatter data={scatterData} isAnimationActive={false}>
                   {scatterData.map((entry, i) => (
-                    <Cell key={i} fill={blueRedColor(entry.ensemble)} r={7} stroke="#fff" strokeWidth={2} opacity={0.85} />
+                    <Cell key={i} fill={gradientColor(entry.ensemble)} r={7} stroke="#fff" strokeWidth={2} opacity={0.85} />
                   ))}
                 </Scatter>
               </ScatterChart>
@@ -2488,7 +2520,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px", flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ fontSize: "10px", color: T.textTer }}>Low</span>
-                <div style={{ width: 80, height: 8, borderRadius: 4, background: `linear-gradient(to right, ${blueRedColor(0)}, ${blueRedColor(0.25)}, ${blueRedColor(0.5)}, ${blueRedColor(0.75)}, ${blueRedColor(1)})` }} />
+                <div style={{ width: 120, height: 8, borderRadius: 4, background: gradientCSS }} />
                 <span style={{ fontSize: "10px", color: T.textTer }}>High ensemble</span>
               </div>
               <span style={{ fontSize: "10px", color: T.textTer }}>|</span>
@@ -3221,8 +3253,8 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                     <td style={{ padding: "10px 12px", fontWeight: 600, fontFamily: MONO, fontSize: "11px" }}>{r.label}</td>
                     <td style={{ padding: "10px 12px" }}><DrugBadge drug={r.drug} /></td>
                     <td style={{ padding: "10px 12px" }}><Badge variant={r.strategy === "Direct" ? "success" : "purple"}>{r.strategy}</Badge></td>
-                    {hasReadiness && <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 700, fontSize: "12px" }}>{r.readinessScore != null ? <span style={{ padding: "2px 8px", borderRadius: 6, background: RISK_BG[r.riskProfile?.overall] || T.bgSub, color: RISK_COLORS[r.riskProfile?.overall] || T.textSec }}>{r.readinessScore.toFixed(2)}</span> : "—"}</td>}
-                    {hasReadiness && <td style={{ padding: "10px 12px", textAlign: "center" }}>{r.riskProfile && <RiskDot level={r.riskProfile.overall} />}</td>}
+                    {hasReadiness && <td style={{ padding: "10px 6px", textAlign: "center" }}>{r.readinessScore != null ? <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 6, fontFamily: MONO, fontWeight: 700, fontSize: "12px", backgroundColor: gradientColor(r.readinessScore), color: r.readinessScore > 0.35 && r.readinessScore < 0.65 ? "#333" : "#fff" }}>{r.readinessScore.toFixed(2)}</span> : "—"}</td>}
+                    {hasReadiness && <td style={{ padding: "10px 6px", textAlign: "center" }}>{r.riskProfile && <RiskHeatCell level={r.riskProfile.overall} />}</td>}
                     <td style={{ padding: "10px 12px" }}><Seq s={r.spacer?.slice(0, 24)} /></td>
                     <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 700, color: (r.ensembleScore || r.score) > 0.8 ? T.primary : (r.ensembleScore || r.score) > 0.65 ? T.warning : T.danger }}>{(r.ensembleScore || r.score).toFixed(3)}</td>
                     {hasML && <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 600, color: r.score > 0.8 ? T.primary : r.score > 0.65 ? T.warning : T.danger }}>{r.score.toFixed(3)}</td>}
@@ -4314,16 +4346,16 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <AreaChart data={combined} margin={{ top: 10, right: 15, bottom: 25, left: 15 }}>
                     <defs>
                       <linearGradient id="mutAreaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2563EB" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#2563EB" stopOpacity={0.03} />
+                        <stop offset="0%" stopColor="#e6550d" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#e6550d" stopOpacity={0.03} />
                       </linearGradient>
                       <linearGradient id="wtAreaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#F59E0B" stopOpacity={0.25} />
-                        <stop offset="100%" stopColor="#F59E0B" stopOpacity={0.03} />
+                        <stop offset="0%" stopColor="#08519c" stopOpacity={0.25} />
+                        <stop offset="100%" stopColor="#08519c" stopOpacity={0.03} />
                       </linearGradient>
                       <linearGradient id="overlapAreaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={T.danger} stopOpacity={0.25} />
-                        <stop offset="100%" stopColor={T.danger} stopOpacity={0.05} />
+                        <stop offset="0%" stopColor="#c8b4a0" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#c8b4a0" stopOpacity={0.05} />
                       </linearGradient>
                     </defs>
                     <XAxis dataKey="x" type="number" domain={[0, 1]} tick={{ fontSize: 10, fill: T.textTer, fontFamily: MONO }} tickCount={11} axisLine={{ stroke: T.border }} tickLine={false} label={{ value: "Predicted cleavage activity", position: "insideBottom", offset: -12, fontSize: 10, fill: T.textSec }} />
@@ -4334,29 +4366,29 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                         <div style={{ ...tooltipStyle, padding: "10px 14px" }}>
                           <div style={{ fontWeight: 600, fontSize: "11px", color: T.text, marginBottom: "4px" }}>Activity: {label}</div>
                           {payload.map(p => p.dataKey !== "overlap" && (
-                            <div key={p.dataKey} style={{ fontSize: "11px", color: p.dataKey === "mut" ? "#2563EB" : "#D97706" }}>
+                            <div key={p.dataKey} style={{ fontSize: "11px", color: p.dataKey === "mut" ? "#e6550d" : "#08519c" }}>
                               {p.dataKey === "mut" ? "Mutant" : "Wildtype"}: {p.value?.toFixed(4)}
                             </div>
                           ))}
                         </div>
                       );
                     }} />
-                    <ReferenceLine x={meanMut} stroke="#2563EB" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ MUT", position: "insideTopRight", fontSize: 9, fill: "#2563EB", fontWeight: 700 }} />
-                    <ReferenceLine x={meanWt} stroke="#D97706" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ WT", position: "insideTopRight", fontSize: 9, fill: "#D97706", fontWeight: 700 }} />
+                    <ReferenceLine x={meanMut} stroke="#e6550d" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ MUT", position: "insideTopRight", fontSize: 9, fill: "#e6550d", fontWeight: 700 }} />
+                    <ReferenceLine x={meanWt} stroke="#08519c" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ WT", position: "insideTopRight", fontSize: 9, fill: "#08519c", fontWeight: 700 }} />
                     <Area type="monotone" dataKey="overlap" stroke="none" fill="url(#overlapAreaFill)" isAnimationActive={false} />
-                    <Area type="monotone" dataKey="mut" stroke="#2563EB" strokeWidth={2.5} fill="url(#mutAreaFill)" isAnimationActive={false} />
-                    <Area type="monotone" dataKey="wt" stroke="#D97706" strokeWidth={2} fill="url(#wtAreaFill)" isAnimationActive={false} strokeDasharray="6 3" />
+                    <Area type="monotone" dataKey="mut" stroke="#e6550d" strokeWidth={2.5} fill="url(#mutAreaFill)" isAnimationActive={false} />
+                    <Area type="monotone" dataKey="wt" stroke="#08519c" strokeWidth={2} fill="url(#wtAreaFill)" isAnimationActive={false} strokeDasharray="6 3" />
                   </AreaChart>
                 </ResponsiveContainer>
                 {/* Custom legend + stats */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", flexWrap: "wrap", gap: "12px" }}>
                   <div style={{ display: "flex", gap: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                      <div style={{ width: "16px", height: "3px", background: "#2563EB", borderRadius: "2px" }} />
+                      <div style={{ width: "16px", height: "3px", background: "#e6550d", borderRadius: "2px" }} />
                       <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>Mutant (A<sub>MUT</sub>)</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                      <div style={{ width: "16px", height: "3px", background: "#D97706", borderRadius: "2px", borderBottom: "1px dashed #D97706" }} />
+                      <div style={{ width: "16px", height: "3px", background: "#08519c", borderRadius: "2px", borderBottom: "1px dashed #08519c" }} />
                       <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>Wildtype (A<sub>WT</sub>)</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -4367,11 +4399,11 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <div style={{ display: "flex", gap: "20px" }}>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ MUT</div>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#2563EB", fontFamily: MONO }}>{meanMut}</div>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#e6550d", fontFamily: MONO }}>{meanMut}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ WT</div>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#D97706", fontFamily: MONO }}>{meanWt}</div>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#08519c", fontFamily: MONO }}>{meanWt}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>SEPARATION</div>
