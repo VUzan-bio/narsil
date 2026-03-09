@@ -35,9 +35,9 @@ const T = {
   danger: "#DC2626", dangerLight: "#FEE2E2",
   purple: "#7C3AED", purpleLight: "#F3E8FF",
   sidebar: "#FAFBFD", sidebarActive: "#EEF2FF", sidebarHover: "#F3F4F6", sidebarText: "#374151",
-  riskGreen: "#22c55e", riskGreenBg: "#f0fdf4",
-  riskAmber: "#f59e0b", riskAmberBg: "#fefce8",
-  riskRed: "#ef4444", riskRedBg: "#fef2f2",
+  riskGreen: "#16A34A", riskGreenBg: "#DCFCE7",
+  riskAmber: "#D97706", riskAmberBg: "#FEF3C7",
+  riskRed: "#DC2626", riskRedBg: "#FEE2E2",
 };
 const FONT = "'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
 const HEADING = "'Urbanist', sans-serif";
@@ -1803,7 +1803,7 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
    ═══════════════════════════════════════════════════════════════════ */
 const RISK_COLORS = { green: T.riskGreen, amber: T.riskAmber, red: T.riskRed };
 const RISK_BG = { green: T.riskGreenBg, amber: T.riskAmberBg, red: T.riskRedBg };
-const AXIS_COLORS = { efficiency: "#3b82f6", discrimination: "#f97316", primers: "#22c55e", safety: "#8b5cf6", gc: "#6b7280" };
+const AXIS_COLORS = { efficiency: T.primary, discrimination: T.warning, primers: T.success, safety: T.purple, gc: T.textTer };
 const AXIS_LABELS = { efficiency: "Activity", discrimination: "Discrimination", primers: "Primers", safety: "Off-target", gc: "GC" };
 
 const RiskDot = ({ level, size = 12 }) => (
