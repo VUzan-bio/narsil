@@ -1803,7 +1803,25 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
    ═══════════════════════════════════════════════════════════════════ */
 const RISK_COLORS = { green: T.riskGreen, amber: T.riskAmber, red: T.riskRed };
 const RISK_BG = { green: T.riskGreenBg, amber: T.riskAmberBg, red: T.riskRedBg };
-const AXIS_COLORS = { efficiency: T.primary, discrimination: T.warning, primers: T.success, safety: T.purple, gc: T.textTer };
+/* Blue → Red continuous gradient helper (coolwarm-inspired) */
+function blueRedColor(t) {
+  // t in [0,1]: 0 = deep blue, 0.5 = light/neutral, 1 = deep red
+  t = Math.max(0, Math.min(1, t));
+  if (t <= 0.5) {
+    const s = t / 0.5; // 0→1
+    const r = Math.round(30 + s * 195);
+    const g = Math.round(80 + s * 140);
+    const b = Math.round(220 - s * 50);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    const s = (t - 0.5) / 0.5; // 0→1
+    const r = Math.round(225 + s * 30);
+    const g = Math.round(220 - s * 170);
+    const b = Math.round(170 - s * 140);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+const AXIS_COLORS = { efficiency: blueRedColor(0.15), discrimination: blueRedColor(0.7), primers: blueRedColor(0.0), safety: blueRedColor(0.85), gc: blueRedColor(0.45) };
 const AXIS_LABELS = { efficiency: "Activity", discrimination: "Discrimination", primers: "Primers", safety: "Off-target", gc: "GC" };
 
 const RiskDot = ({ level, size = 12 }) => (
@@ -1975,7 +1993,7 @@ const DRUG_CANVAS = { RIF: "#2563EB", INH: "#D97706", EMB: "#7C3AED", FQ: "#E11D
 const UMAPPanel = ({ jobId }) => {
   const [umapData, setUmapData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [colorBy, setColorBy] = useState("drug");
+  const [colorBy, setColorBy] = useState("score");
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const canvasRef = useRef(null);
@@ -2022,59 +2040,50 @@ const UMAPPanel = ({ jobId }) => {
       if (colorBy === "drug") return DRUG_CANVAS[p.drug] || DRUG_CANVAS.OTHER;
       if (colorBy === "score") {
         const t = Math.max(0, Math.min(1, ((p.score || 0.5) - 0.2) / 0.6));
-        return `hsl(${(1 - t) * 240}, 75%, ${45 + t * 15}%)`;
+        return blueRedColor(t);
       }
       if (colorBy === "gc") {
         const t = Math.max(0, Math.min(1, ((p.gc_content || 0.5) - 0.3) / 0.4));
-        return `hsl(${(1 - t) * 120 + 200}, 70%, 50%)`;
+        return blueRedColor(t);
       }
-      if (colorBy === "strategy") return p.detection_strategy === "direct" ? "#3b82f6" : "#a855f7";
-      return "#555";
+      if (colorBy === "strategy") {
+        return p.detection_strategy === "direct" ? blueRedColor(0.1) : blueRedColor(0.85);
+      }
+      return blueRedColor(0.5);
     };
 
-    // Unselected: downsample for perf
+    // All unselected: draw all points (small, semi-transparent for density)
     const unselected = points.filter(p => !p.selected);
-    const maxBg = 5000;
+    const maxBg = 12000;
     const step = unselected.length > maxBg ? Math.ceil(unselected.length / maxBg) : 1;
-    ctx.globalAlpha = 0.12;
+    ctx.globalAlpha = 0.35;
     for (let i = 0; i < unselected.length; i += step) {
       const p = unselected[i];
       ctx.beginPath();
-      ctx.arc(scX(p.x), scY(p.y), 1.5, 0, Math.PI * 2);
+      ctx.arc(scX(p.x), scY(p.y), 1.2, 0, Math.PI * 2);
       ctx.fillStyle = getColor(p);
       ctx.fill();
     }
 
-    // Selected: large, opaque, bordered
+    // Selected: large, opaque, bordered (no text labels)
     const selected = points.filter(p => p.selected);
     ctx.globalAlpha = 1.0;
     for (const p of selected) {
       const cx = scX(p.x), cy = scY(p.y);
       // Halo
       ctx.beginPath();
-      ctx.arc(cx, cy, 9, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(255,255,255,0.18)";
+      ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
       ctx.fill();
       // Dot
       ctx.beginPath();
-      ctx.arc(cx, cy, 5.5, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 5, 0, Math.PI * 2);
       ctx.fillStyle = getColor(p);
       ctx.fill();
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 1.5;
       ctx.stroke();
     }
-
-    // Labels for selected
-    ctx.font = `500 10px ${FONT}`;
-    ctx.textAlign = "left";
-    for (const p of selected) {
-      const cx = scX(p.x), cy = scY(p.y);
-      ctx.fillStyle = T.text;
-      ctx.globalAlpha = 0.85;
-      ctx.fillText(p.target_label.replace(/_/g, " "), cx + 10, cy + 3);
-    }
-    ctx.globalAlpha = 1.0;
   }, [umapData, colorBy, mobile]);
 
   // Hover detection (selected points only for speed)
@@ -2158,26 +2167,32 @@ const UMAPPanel = ({ jobId }) => {
         <span style={{ fontSize: "10px", color: T.textTer }}>{umapData.stats?.method || "UMAP"} · cosine · 128-dim</span>
       </div>
 
-      {/* Legend for drug colors when in drug mode */}
-      {colorBy === "drug" && (
-        <div style={{ display: "flex", gap: "12px", marginTop: "8px", flexWrap: "wrap" }}>
-          {Object.entries(DRUG_CANVAS).filter(([d]) => d !== "OTHER" && umapData.points.some(p => p.drug === d)).map(([drug, color]) => (
+      {/* Legend */}
+      <div style={{ display: "flex", gap: "12px", marginTop: "8px", flexWrap: "wrap", alignItems: "center" }}>
+        {colorBy === "drug" ? (
+          Object.entries(DRUG_CANVAS).filter(([d]) => d !== "OTHER" && umapData.points.some(p => p.drug === d)).map(([drug, color]) => (
             <div key={drug} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
               <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>{drug}</span>
             </div>
-          ))}
-          <span style={{ fontSize: "10px", color: T.textTer }}>|</span>
-          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: T.textTer, border: "1.5px solid #fff" }} />
-            <span style={{ fontSize: "10px", color: T.textTer }}>Selected (panel)</span>
+          ))
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ fontSize: "10px", color: T.textTer }}>Low</span>
+            <div style={{ width: 80, height: 8, borderRadius: 4, background: `linear-gradient(to right, ${blueRedColor(0)}, ${blueRedColor(0.25)}, ${blueRedColor(0.5)}, ${blueRedColor(0.75)}, ${blueRedColor(1)})` }} />
+            <span style={{ fontSize: "10px", color: T.textTer }}>High</span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-            <div style={{ width: 4, height: 4, borderRadius: "50%", background: T.textTer, opacity: 0.3 }} />
-            <span style={{ fontSize: "10px", color: T.textTer }}>Screened</span>
-          </div>
+        )}
+        <span style={{ fontSize: "10px", color: T.textTer }}>|</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: T.textTer, border: "1.5px solid #fff" }} />
+          <span style={{ fontSize: "10px", color: T.textTer }}>Selected (panel)</span>
         </div>
-      )}
+        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+          <div style={{ width: 4, height: 4, borderRadius: "50%", background: T.textTer, opacity: 0.3 }} />
+          <span style={{ fontSize: "10px", color: T.textTer }}>Screened</span>
+        </div>
+      </div>
     </div>
   );
 };
@@ -2304,7 +2319,6 @@ const OverviewTab = ({ results, scorer, jobId }) => {
 
       {/* Score vs Discrimination Scatter — readiness-sized dots */}
       {!mobile && (() => {
-        const DRUG_SC = { RIF: "#2563EB", INH: "#D97706", EMB: "#7C3AED", FQ: "#E11D48", AG: "#4F46E5", PZA: "#16A34A", OTHER: "#9CA3AF" };
         const getScore = (r) => usesGuardNet ? (r.ensembleScore || r.score) : r.score;
         const hasReadiness = results.some(r => r.readinessScore != null);
         const scatterData = results.filter(r => r.disc > 0 && r.disc < 900).map(r => ({
@@ -2333,7 +2347,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                     const ready = d.score >= 0.4 && d.disc >= 3;
                     return (
                       <div style={{ ...tooltipStyle, padding: "12px 16px" }}>
-                        <div style={{ fontWeight: 700, fontSize: "12px", color: DRUG_SC[d.drug] || T.text, marginBottom: "4px" }}>{d.label}</div>
+                        <div style={{ fontWeight: 700, fontSize: "12px", color: blueRedColor(d.score), marginBottom: "4px" }}>{d.label}</div>
                         <div style={{ fontSize: "11px", color: T.textSec }}>Score: <strong style={{ color: T.text }}>{d.score.toFixed(3)}</strong></div>
                         <div style={{ fontSize: "11px", color: T.textSec }}>Discrimination: <strong style={{ color: T.text }}>{d.disc.toFixed(1)}×</strong></div>
                         <div style={{ fontSize: "11px", color: T.textSec }}>{d.drug} · {d.strategy}{hasReadiness ? ` · Readiness ${(d.readiness * 100).toFixed(0)}%` : (d.hasPrimers ? " · Primers OK" : " · No primers")}</div>
@@ -2346,7 +2360,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                   <Scatter data={scatterData} isAnimationActive={false}>
                     {scatterData.map((entry, i) => {
                       const dotR = hasReadiness ? Math.max(4, entry.readiness * 14) : (entry.hasPrimers ? 8 : 5);
-                      return <Cell key={i} fill={DRUG_SC[entry.drug] || DRUG_SC.OTHER} r={dotR} stroke="#fff" strokeWidth={2} opacity={0.85} />;
+                      return <Cell key={i} fill={blueRedColor(entry.score)} r={dotR} stroke="#fff" strokeWidth={2} opacity={0.85} />;
                     })}
                   </Scatter>
                 </ScatterChart>
@@ -2358,12 +2372,11 @@ const OverviewTab = ({ results, scorer, jobId }) => {
             </div>
             {/* Legend */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px", flexWrap: "wrap" }}>
-              {[...new Set(results.map(r => r.drug))].map(d => (
-                <div key={d} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: DRUG_SC[d] || DRUG_SC.OTHER }} />
-                  <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>{d}</span>
-                </div>
-              ))}
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "10px", color: T.textTer }}>Low</span>
+                <div style={{ width: 80, height: 8, borderRadius: 4, background: `linear-gradient(to right, ${blueRedColor(0)}, ${blueRedColor(0.25)}, ${blueRedColor(0.5)}, ${blueRedColor(0.75)}, ${blueRedColor(1)})` }} />
+                <span style={{ fontSize: "10px", color: T.textTer }}>High score</span>
+              </div>
               {hasReadiness ? (<>
                 <span style={{ fontSize: "10px", color: T.textTer }}>|</span>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -2413,7 +2426,6 @@ const OverviewTab = ({ results, scorer, jobId }) => {
 
       {/* Heuristic vs GUARD-Net Scatter */}
       {!mobile && usesGuardNet && avgCNN != null && (() => {
-        const DRUG_SC = { RIF: "#2563EB", INH: "#D97706", EMB: "#7C3AED", FQ: "#E11D48", AG: "#4F46E5", PZA: "#16A34A", OTHER: "#9CA3AF" };
         const scatterData = results.filter(r => r.cnnCalibrated != null).map(r => ({
           heuristic: r.score, guardNet: r.cnnCalibrated, ensemble: r.ensembleScore || r.score,
           label: r.label, drug: r.drug,
@@ -2454,7 +2466,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                   const diff = d.guardNet - d.heuristic;
                   return (
                     <div style={{ ...tooltipStyle, padding: "12px 16px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "12px", color: DRUG_SC[d.drug] || T.text, marginBottom: "4px" }}>{d.label}</div>
+                      <div style={{ fontWeight: 700, fontSize: "12px", color: blueRedColor(d.ensemble), marginBottom: "4px" }}>{d.label}</div>
                       <div style={{ fontSize: "11px", color: T.textSec }}>Heuristic: <strong style={{ color: T.text }}>{d.heuristic.toFixed(3)}</strong></div>
                       <div style={{ fontSize: "11px", color: T.textSec }}>GUARD-Net: <strong style={{ color: T.primary }}>{d.guardNet.toFixed(3)}</strong></div>
                       <div style={{ fontSize: "11px", color: T.textSec }}>Ensemble: <strong style={{ color: T.text }}>{d.ensemble.toFixed(3)}</strong></div>
@@ -2467,19 +2479,18 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                 <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke={T.textTer} strokeDasharray="6 4" strokeWidth={1} opacity={0.4} />
                 <Scatter data={scatterData} isAnimationActive={false}>
                   {scatterData.map((entry, i) => (
-                    <Cell key={i} fill={DRUG_SC[entry.drug] || DRUG_SC.OTHER} r={7} stroke="#fff" strokeWidth={2} opacity={0.85} />
+                    <Cell key={i} fill={blueRedColor(entry.ensemble)} r={7} stroke="#fff" strokeWidth={2} opacity={0.85} />
                   ))}
                 </Scatter>
               </ScatterChart>
             </ResponsiveContainer>
             {/* Legend */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px", flexWrap: "wrap" }}>
-              {[...new Set(results.map(r => r.drug))].map(d => (
-                <div key={d} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: DRUG_SC[d] || DRUG_SC.OTHER }} />
-                  <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>{d}</span>
-                </div>
-              ))}
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "10px", color: T.textTer }}>Low</span>
+                <div style={{ width: 80, height: 8, borderRadius: 4, background: `linear-gradient(to right, ${blueRedColor(0)}, ${blueRedColor(0.25)}, ${blueRedColor(0.5)}, ${blueRedColor(0.75)}, ${blueRedColor(1)})` }} />
+                <span style={{ fontSize: "10px", color: T.textTer }}>High ensemble</span>
+              </div>
               <span style={{ fontSize: "10px", color: T.textTer }}>|</span>
               <span style={{ fontSize: "10px", color: T.textTer }}>Dashed line = perfect agreement (y = x)</span>
             </div>
