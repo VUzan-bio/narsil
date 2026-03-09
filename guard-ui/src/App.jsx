@@ -190,7 +190,7 @@ const BIBLIOGRAPHY = [
   { id: "kim2018", authors: "Kim HK, Min S, Song M, et al.", year: 2018, title: "Deep learning improves prediction of CRISPR-Cpf1 guide RNA activity", journal: "Nature Biotechnology", doi: "10.1038/nbt.4061", pmid: "29431741", category: "Guide Activity Prediction" },
   { id: "huang2024", authors: "Huang B, Mu K, Li G, et al.", year: 2024, title: "Deep learning enhancing guide RNA design for CRISPR/Cas12a-based diagnostics", journal: "iMeta", doi: "10.1002/imt2.214", category: "Guide Activity Prediction" },
   { id: "chen2022rnafm", authors: "Chen J, Hu Z, Sun S, et al.", year: 2022, title: "Interpretable RNA Foundation Model from Unannotated Data for Highly Accurate RNA Structure and Function Predictions", journal: "arXiv:2204.00300", doi: null, url: "https://arxiv.org/abs/2204.00300", category: "Guide Activity Prediction" },
-  { id: "blondel2020", authors: "Blondel M, Teboul O, Berthet Q, Djolonga J", year: 2020, title: "Fast Differentiable Sorting and Ranking", journal: "ICML 2020", doi: null, url: "https://arxiv.org/abs/2002.08871", category: "Guide Activity Prediction" },
+  { id: "blondel2020", authors: "Blondel M, Teboul O, Berthet Q, Djolonga J", year: 2020, title: "Fast Differentiable Sorting and Ranking [Soft Spearman correlation loss used in GUARD-Net training]", journal: "ICML 2020", doi: null, url: "https://arxiv.org/abs/2002.08871", category: "Guide Activity Prediction" },
   { id: "yao2025", authors: "Yao Z, Li W, He K, et al.", year: 2025, title: "Facilitating crRNA design by integrating DNA interaction features of CRISPR-Cas12a system", journal: "Advanced Science", doi: "10.1002/advs.202501269", category: "Guide Activity Prediction" },
   // Clinical Standards
   { id: "who2024tpp", authors: "World Health Organization", year: 2024, title: "Target product profiles for tuberculosis diagnosis and detection of drug resistance", journal: "WHO", doi: null, url: "https://www.who.int/publications/i/item/9789240097698", isbn: "978-92-4-009769-8", category: "Clinical Standards" },
@@ -1366,7 +1366,7 @@ const HomePage = ({ goTo, connected }) => {
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "12px", marginBottom: "32px" }}>
         {[
           { step: "1", icon: Target, title: "Define Targets", desc: "Input WHO resistance mutations. The pipeline resolves each mutation to its exact genomic position on the M. tuberculosis H37Rv reference genome, identifies the codon context, and determines which drug class it confers resistance to." },
-          { step: "2", icon: Search, title: "Generate & Score Candidates", desc: "For each target, GUARD scans for Cas12a-compatible PAM sites, generates crRNA candidates, filters by biophysical criteria (GC content, secondary structure, off-targets), and scores them with GUARD-Net — trained on 25,000+ cis- and trans-cleavage measurements from Kim et al. (2018) and Huang et al. (2024)." },
+          { step: "2", icon: Search, title: "Generate & Score Candidates", desc: "For each target, GUARD scans for Cas12a-compatible PAM sites, generates crRNA candidates, filters by biophysical criteria (GC content, secondary structure, off-targets), and scores them using two models: GUARD-Net for cleavage efficiency (trained on 25,000+ cis- and trans-cleavage measurements from Kim et al. 2018 and Huang et al. 2024) and a thermodynamic discrimination model for MUT/WT selectivity (trained on 6,136 paired measurements, 15 features, r = 0.46)." },
           { step: "3", icon: Grid3x3, title: "Optimise the Panel", desc: "Panel composition is optimised via simulated annealing (10,000 iterations) over the combinatorial space of candidate assignments, maximising a weighted objective of efficiency, discrimination, and cross-reactivity avoidance. RPA primers are co-designed for each guide, with allele-specific primers for proximity targets." },
           { step: "4", icon: Shield, title: "Assess Clinical Performance", desc: "Block 3 evaluates the panel against WHO Target Product Profiles: per-drug-class sensitivity, specificity estimates, and ranked backup alternatives for each target. Three operating modes (field screening, clinical deployment, reference lab) adjust thresholds automatically." },
         ].map(c => (
@@ -1442,7 +1442,7 @@ const HomePage = ({ goTo, connected }) => {
           {[
             { icon: Cpu, title: "Target DNA analysis", desc: "A multi-scale CNN scans the 34-nucleotide target context (PAM + protospacer + flanks) for sequence patterns governing Cas12a binding: dinucleotide preferences, seed-region composition, and PAM quality." },
             { icon: Layers, title: "Guide RNA structure", desc: "A pre-trained RNA foundation model (RNA-FM, 23M sequences) analyses the guide's folding and thermodynamic stability — properties governing Cas12a loading efficiency and spacer accessibility." },
-            { icon: TrendingUp, title: "R-loop propagation", desc: "Cas12a reads DNA sequentially from PAM-proximal to PAM-distal. A causal attention mechanism encodes this directional constraint, improving cross-dataset generalisation by 6.7% over standard bidirectional attention." },
+            { icon: TrendingUp, title: "R-loop propagation", desc: "Cas12a reads DNA sequentially from PAM-proximal to PAM-distal. A causal attention mechanism encodes this directional constraint, improving cross-dataset generalisation by 6.7% on the Kim 2018 cross-library evaluation over standard bidirectional attention." },
           ].map(c => (
             <div key={c.title}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
@@ -1467,7 +1467,7 @@ const HomePage = ({ goTo, connected }) => {
             ["Trans-cleavage \u03C1", "0.55 (EasyDesign benchmark)"],
             ["Cis-cleavage \u03C1", "0.49 (Kim 2018 benchmark)"],
             ["Attention", "R-Loop Propagation Attention (RLPA)"],
-            ["RLPA improvement", "+6.7% cross-dataset generalisation"],
+            ["RLPA improvement", "+6.7% on Kim 2018 cross-library evaluation"],
             ["Training protocol", "3-phase: pretrain, RLPA, multi-task"],
             ["Multi-task heads", "Efficiency (sigmoid) + Discrimination (Softplus)"],
             ["Inference", "CPU-compatible (~50ms per candidate)"],
@@ -1495,7 +1495,7 @@ const HomePage = ({ goTo, connected }) => {
             <li style={{ marginBottom: "4px" }}><strong style={{ color: T.text }}>CNN branch:</strong> multi-scale parallel convolutions (kernel sizes 3, 5, 7; 32 channels each) scan the 34-nt target DNA context for sequence patterns affecting Cas12a binding — GC content, seed composition, PAM quality. Output: 64-dim features per position.</li>
             <li style={{ marginBottom: "4px" }}><strong style={{ color: T.text }}>RNA-FM branch:</strong> pre-trained RNA foundation model (23M sequences) generates 640-dim per-nucleotide embeddings of the guide RNA, projected to 64 dimensions. Captures folding stability and accessibility properties governing enzyme loading.</li>
           </ul>
-          <p style={{ margin: "0 0 10px" }}>These are concatenated (64 + 64 = 128-dim per position) and processed by R-Loop Propagation Attention — a single-head causal attention mechanism with 32-dim Q/K/V projections and a learnable 34x34 positional bias matrix. The causal mask encodes the directional way Cas12a reads DNA (PAM-proximal to PAM-distal), improving cross-dataset generalisation by 6.7%.</p>
+          <p style={{ margin: "0 0 10px" }}>These are concatenated (64 + 64 = 128-dim per position) and processed by R-Loop Propagation Attention — a single-head causal attention mechanism with 32-dim Q/K/V projections and a learnable 34x34 positional bias matrix. The causal mask encodes the directional way Cas12a reads DNA (PAM-proximal to PAM-distal), improving cross-dataset generalisation by 6.7% on the Kim 2018 cross-library evaluation.</p>
           <p style={{ margin: "0 0 10px" }}>Two output heads per candidate:</p>
           <ul style={{ margin: "0 0 10px", paddingLeft: "20px" }}>
             <li style={{ marginBottom: "4px" }}><strong style={{ color: T.text }}>Efficiency</strong> (0-1): predicted trans-cleavage signal strength. Head: 128 {"\u2192"} 64 {"\u2192"} 32 {"\u2192"} 1, sigmoid.</li>
@@ -1529,7 +1529,7 @@ const HomePage = ({ goTo, connected }) => {
                     {
                       label: "Fusion", title: "R-Loop Propagation Attention (RLPA)", accent: "#0d9488",
                       input: "Concatenated per-position features: 64-dim CNN + 64-dim RNA-FM = 128-dim at each of 34 positions.",
-                      process: "Single-head attention with 32-dim Q/K/V projections. A lower-triangular causal mask enforces PAM-proximal to PAM-distal directionality. A learnable 34x34 positional bias matrix encodes position-dependent interaction strengths. This improves cross-dataset generalisation by 6.7% over standard bidirectional attention.",
+                      process: "Single-head attention with 32-dim Q/K/V projections. A lower-triangular causal mask enforces PAM-proximal to PAM-distal directionality. A learnable 34x34 positional bias matrix encodes position-dependent interaction strengths. This improves cross-dataset generalisation by 6.7% on the Kim 2018 cross-library evaluation over standard bidirectional attention.",
                       output: "Attention-weighted 128-dim representation where features are re-weighted by positional importance in R-loop propagation.",
                     },
                     {
@@ -1596,8 +1596,7 @@ const HomePage = ({ goTo, connected }) => {
       {/* ═══ DISCRIMINATION ═══ */}
       {sectionTitle("Discrimination Analysis")}
       <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 16px 0" }}>
-        Discrimination quantifies a crRNA's ability to distinguish the resistance allele from wildtype.
-        Reported as the ratio of mutant vs wildtype cleavage activity. Higher is better.
+        Discrimination quantifies the panel's ability to distinguish the resistance allele from wildtype at each target. For Direct candidates, this is the Cas12a cleavage activity ratio (MUT/WT) — predicted by a gradient-boosted model trained on 6,136 paired measurements using 15 thermodynamic features. For Proximity candidates, discrimination is provided by allele-specific RPA primers — the crRNA cleaves equally on both alleles, but only the mutant template is amplified. Higher ratios indicate more reliable resistance calls.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "8px", marginBottom: "16px" }}>
@@ -1638,7 +1637,7 @@ const HomePage = ({ goTo, connected }) => {
         </p>
         <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: "0 0 12px 0" }}>
           GUARD uses the engineered <strong>enAsCas12a</strong> variant (Kleinstiver et al. 2019), which expands PAM recognition
-          from canonical TTTV to include TTTT, VTTV, and TRTV motifs, increasing targetable sites by approximately 4-fold.
+          from canonical TTTV to include TTTT, VTTV, and TRTV motifs, increasing targetable sites by approximately 7-fold.
           This variant maintains high fidelity while operating at 37 °C — compatible with recombinase polymerase amplification (RPA)
           for single-tube, equipment-free diagnostics at point of care.
         </p>
@@ -1652,7 +1651,7 @@ const HomePage = ({ goTo, connected }) => {
             ["Trans-cleavage", "Non-specific ssDNase (reporter activation)"],
             ["Temperature", "37 °C (RPA-compatible)"],
             ["Readouts", "Fluorescence · lateral flow · electrochemical"],
-            ["Sensitivity", "Attomolar with RPA pre-amplification"],
+            ["Sensitivity", "Attomolar with RPA pre-amplification (solution-phase fluorescence; electrode sensitivity platform-dependent)"],
             ["Multiplexing", "Orthogonal reporters per crRNA in single tube"],
           ].map(([k, v]) => (
             <div key={k} style={{ display: "flex", gap: "8px", padding: "8px 12px", background: T.bgSub, borderRadius: "6px" }}>
@@ -1662,7 +1661,7 @@ const HomePage = ({ goTo, connected }) => {
           ))}
         </div>
         <div style={{ background: T.primaryLight, borderRadius: "8px", padding: "10px 14px", fontSize: "11px", color: T.primaryDark, lineHeight: 1.5 }}>
-          <strong>Why Cas12a over Cas9 for diagnostics?</strong> (1) T-rich PAM avoids GC-rich regions that cause secondary structures. (2) Self-processing crRNA simplifies guide design. (3) Trans-cleavage enables signal amplification without PCR. (4) Staggered cuts improve allele discrimination at single-nucleotide resolution.
+          <strong>Why Cas12a over Cas9 for diagnostics?</strong> (1) T-rich PAM provides orthogonal target space to Cas9's NGG. The engineered enAsCas12a variant (E174R/S542R/K548R) expands recognition to VTTV and TRTV motifs, mitigating PAM scarcity in GC-rich genomes like M. tuberculosis. (2) Self-processing crRNA simplifies guide design. (3) Trans-cleavage enables signal amplification without PCR. (4) Staggered cuts improve allele discrimination at single-nucleotide resolution.
         </div>
       </CollapsibleSection>
 
@@ -1698,7 +1697,7 @@ const HomePage = ({ goTo, connected }) => {
             },
             {
               title: "Training data & domain shift",
-              text: "GUARD-Net is trained on two datasets: Kim et al. 2018 (indel frequencies \u2014 cis-cleavage, AsCas12a/LbCas12a) and EasyDesign (Huang et al. 2024, FAM-quencher reporter fluorescence \u2014 trans-cleavage, LbCas12a). The production checkpoint is validated against EasyDesign\u2019s trans-cleavage test set (\u03c1 = 0.55), so predictions are performance-validated against the diagnostic-relevant readout. The primary domain shift is enzyme variant (trained on LbCas12a, deployed on enAsCas12a), target organism (human \u2192 M. tuberculosis), and amplification context (purified DNA \u2192 RPA amplicons). Active learning from initial experimental validation will calibrate predictions to the deployment domain.",
+              text: "GUARD-Net is trained on two datasets: Kim et al. 2018 (indel frequencies \u2014 cis-cleavage, AsCas12a/LbCas12a) and EasyDesign (Huang et al. 2024, FAM-quencher reporter fluorescence \u2014 trans-cleavage, LbCas12a). The production checkpoint is validated against EasyDesign\u2019s trans-cleavage test set (\u03c1 = 0.55), so predictions are performance-validated against the diagnostic-relevant readout. The primary domain shifts are: (1) enzyme variant \u2014 trained on wild-type AsCas12a (Kim 2018) and LbCas12a (EasyDesign), deployed on enAsCas12a (engineered AsCas12a with E174R/S542R/K548R mutations that alter PAM recognition and may affect cleavage kinetics); (2) target organism \u2014 training data from human cell lines and diverse pathogens, deployed on M. tuberculosis (65.6% GC, above the training data median of ~50%); (3) amplification context \u2014 training data from purified DNA or direct fluorescence, deployed on RPA-amplified genomic DNA. Active learning from initial experimental validation will calibrate predictions to the deployment domain.",
             },
             {
               title: "AS-RPA specificity",
