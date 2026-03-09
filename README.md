@@ -12,7 +12,7 @@ GUARD takes WHO-catalogued drug-resistance mutations as input and produces a com
 
 ## Pipeline
 
-<img width="3398" height="1147" alt="GUARD pipeline architecture" src="https://github.com/user-attachments/assets/89c58154-ba94-4e98-94ec-c2c8580c4c99" />
+<img width="936" height="470" alt="guard-archit" src="https://github.com/user-attachments/assets/800af375-aea3-4ae2-80d2-4e0f7912fcfe" />
 
 <br />
 
