@@ -19,6 +19,7 @@ import {
   listScoringModels, getPresets, getDiagnostics, getWHOCompliance,
   getTopK, runSweep, runPareto,
   compareScorers, getThermoProfile, getThermoStandalone, getAblation,
+  getNucleaseProfiles, getNucleaseComparison,
 } from "./api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -5043,6 +5044,10 @@ const ResearchPage = ({ connected }) => {
   const [thermoShowWT, setThermoShowWT] = useState(true);
   const [ablation, setAblation] = useState([]);
   const [sciBgOpen, setSciBgOpen] = useState(false);
+  const [nucleaseProfiles, setNucleaseProfiles] = useState(null);
+  const [nucleaseCoverage, setNucleaseCoverage] = useState(null);
+  const [nucleaseLoading, setNucleaseLoading] = useState(false);
+  const [expandedVariant, setExpandedVariant] = useState(null);
 
   useEffect(() => {
     if (connected) {
@@ -5054,6 +5059,7 @@ const ResearchPage = ({ connected }) => {
         }
       });
       getAblation().then(({ data }) => { if (data) setAblation(data); });
+      getNucleaseProfiles().then(({ data }) => { if (data?.profiles) setNucleaseProfiles(data.profiles); });
     }
   }, [connected]);
 
@@ -5733,6 +5739,358 @@ const ResearchPage = ({ connected }) => {
               </div>
             );
           })()}
+        </div>
+      </CollapsibleSection>
+
+      {/* ═══ Section 5: Platform Roadmap ═══ */}
+      <CollapsibleSection title="Platform Roadmap" defaultOpen={false}>
+        <p style={{ fontSize: "12px", color: RS.muted, marginBottom: "16px", lineHeight: 1.7 }}>
+          Planned capabilities for the GUARD platform. Each module requires specific experimental input before activation.
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "14px" }}>
+          {[
+            {
+              icon: <RefreshCw size={18} />,
+              title: "Active Learning Loop",
+              desc: "Feed experimental measurements back into GUARD-Net. Fluorescence or electrochemical data recalibrates the ensemble, closing the gap between in silico and platform-specific signal.",
+              input: "Validation data (fluorescence or electrochemical)",
+              ready: true,
+            },
+            {
+              icon: <Zap size={18} />,
+              title: "Electrochemical Transfer Function",
+              desc: "Model the relationship between solution-phase trans-cleavage and surface-tethered MB reporter degradation on LIG electrodes.",
+              input: "Electrode current drop measurements",
+              ready: false,
+            },
+            {
+              icon: <Grid3x3 size={18} />,
+              title: "Spatial Multiplexing Optimiser",
+              desc: "Assign targets to electrode pads on the spatially addressed array, minimising electrochemical crosstalk. Replaces solution-phase M8 when using in-situ complexation.",
+              input: "Chip geometry definition",
+              ready: false,
+            },
+            {
+              icon: <FlaskConical size={18} />,
+              title: "Nuclease Adaptation Engine",
+              desc: "Swap Cas12a variants via transfer learning. Freeze sequence encoders, fine-tune RLPA attention and output heads on variant-specific data.",
+              input: "50\u2013100 measurements on new variant",
+              ready: false,
+            },
+          ].map((card, i) => (
+            <div key={i} style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "8px", padding: "20px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
+                <div style={{ color: card.ready ? RS.positive : RS.muted }}>{card.icon}</div>
+                <div style={{ fontSize: "14px", fontWeight: 700, color: RS.text, fontFamily: HEADING }}>{card.title}</div>
+              </div>
+              <p style={{ fontSize: "12px", color: RS.muted, lineHeight: 1.7, margin: "0 0 12px" }}>{card.desc}</p>
+              <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "8px" }}>
+                <strong>Input needed:</strong> {card.input}
+              </div>
+              <span style={{
+                display: "inline-block", fontSize: "10px", fontWeight: 700, padding: "3px 10px", borderRadius: "12px",
+                background: card.ready ? `${RS.positive}18` : `${RS.muted}18`,
+                color: card.ready ? RS.positive : RS.muted,
+              }}>
+                {card.ready ? "Ready to start" : `Requires ${card.input.split(" ")[0].toLowerCase()} data`}
+              </span>
+            </div>
+          ))}
+        </div>
+      </CollapsibleSection>
+
+      {/* ═══ Section 6: Nuclease Comparison ═══ */}
+      <CollapsibleSection title="Nuclease Variant Comparison" defaultOpen={false}>
+        <p style={{ fontSize: "12px", color: RS.muted, marginBottom: "16px", lineHeight: 1.7, maxWidth: "800px" }}>
+          Compare Cas12a variants on the current 15-target MDR-TB panel. PAM coverage is computed by running GUARD's M2 PAM scanner against the
+          H37Rv genome with each variant's published PAM set. Scoring and discrimination columns show whether GUARD-Net has been trained on data
+          for that variant — "Retraining required" indicates the scoring model needs variant-specific experimental data before predictions are valid.
+        </p>
+
+        {/* Load coverage button */}
+        {!nucleaseCoverage && (
+          <button
+            onClick={() => {
+              setNucleaseLoading(true);
+              getNucleaseComparison().then(({ data }) => {
+                if (data) {
+                  setNucleaseProfiles(Object.values(data.profiles));
+                  setNucleaseCoverage(data.coverage);
+                }
+                setNucleaseLoading(false);
+              });
+            }}
+            disabled={nucleaseLoading}
+            style={{ ...btnStyle, marginBottom: "16px", opacity: nucleaseLoading ? 0.6 : 1 }}
+          >
+            {nucleaseLoading ? "Scanning PAMs..." : "Run PAM Coverage Comparison"}
+          </button>
+        )}
+
+        {/* Profile summary table (always shown if profiles loaded) */}
+        {nucleaseProfiles && (
+          <div style={{ overflowX: "auto", marginBottom: "20px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", minWidth: 900 }}>
+              <thead>
+                <tr>
+                  {["Variant", "Mutations", "PAM Set", "Targets", "PAM Deserts", "Scoring", "Disc."].map(h => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {nucleaseProfiles.map(p => {
+                  const cov = nucleaseCoverage?.[p.id];
+                  const isExpanded = expandedVariant === p.id;
+                  return (
+                    <React.Fragment key={p.id}>
+                      <tr
+                        onClick={() => setExpandedVariant(isExpanded ? null : p.id)}
+                        style={{ cursor: "pointer", borderBottom: `1px solid ${RS.border}`, background: isExpanded ? RS.seedBg : "transparent" }}
+                      >
+                        <td style={{ ...tdStyle, fontWeight: 700 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                            {p.display_name}
+                          </div>
+                        </td>
+                        <td style={{ ...tdStyle, fontSize: "11px" }}>
+                          {p.mutations ? p.mutations.join("/") : "\u2014"}
+                        </td>
+                        <td style={{ ...tdStyle, fontSize: "11px" }}>
+                          {p.pam_canonical.join(", ")}
+                          {p.pam_total_count > p.pam_canonical.length && (
+                            <span style={{ color: RS.accent, marginLeft: "4px" }}>+{p.pam_total_count - p.pam_canonical.length}</span>
+                          )}
+                        </td>
+                        <td style={tdStyle}>
+                          {cov && !cov.error ? (
+                            <span style={{ fontWeight: 700, color: cov.targets_with_pam === cov.targets_total ? RS.positive : RS.barrier }}>
+                              {cov.targets_with_pam}/{cov.targets_total}
+                            </span>
+                          ) : cov?.error ? (
+                            <span style={{ color: RS.muted, fontSize: "10px" }}>{cov.error.split(" — ")[0]}</span>
+                          ) : (
+                            <span style={{ color: RS.muted }}>—</span>
+                          )}
+                        </td>
+                        <td style={{ ...tdStyle, fontSize: "10px" }}>
+                          {cov && !cov.error ? (
+                            cov.pam_desert_targets?.length > 0 ? (
+                              <span style={{ color: RS.negative }}>{cov.pam_desert_targets.join(", ")}</span>
+                            ) : (
+                              <span style={{ color: RS.positive }}>None</span>
+                            )
+                          ) : "—"}
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{
+                            display: "inline-block", fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "10px",
+                            background: p.scoring_trained ? `${RS.positive}18` : `${RS.barrier}18`,
+                            color: p.scoring_trained ? RS.positive : RS.barrier,
+                          }}>
+                            {p.scoring_trained ? "Trained" : "Retraining required"}
+                          </span>
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{
+                            display: "inline-block", fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "10px",
+                            background: p.scoring_trained ? `${RS.positive}18` : `${RS.barrier}18`,
+                            color: p.scoring_trained ? RS.positive : RS.barrier,
+                          }}>
+                            {p.scoring_trained ? "Trained" : "Retraining required"}
+                          </span>
+                        </td>
+                      </tr>
+
+                      {/* Expanded variant detail card */}
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={7} style={{ padding: 0 }}>
+                            <div style={{ padding: "16px 20px", background: RS.seedBg, borderBottom: `1px solid ${RS.border}` }}>
+                              <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
+                                {/* Left: Profile details */}
+                                <div>
+                                  <div style={{ fontSize: "13px", fontWeight: 700, color: RS.text, marginBottom: "8px", fontFamily: HEADING }}>
+                                    {p.display_name}
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
+                                    <strong>Organism:</strong> <em>{p.organism}</em>
+                                  </div>
+                                  {p.mutations && (
+                                    <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
+                                      <strong>Mutations:</strong> {p.mutations.join(", ")}
+                                    </div>
+                                  )}
+                                  <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
+                                    <strong>PAM:</strong> {p.pam_note}
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
+                                    <strong>Seed:</strong> {p.seed_note}
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
+                                    <strong>SNV discrimination:</strong> {p.snv_discrimination}
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
+                                    <strong>Divalent cation:</strong> {p.divalent_cation}
+                                  </div>
+                                  <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
+                                    <strong>Temperature:</strong> {p.optimal_temp}\u00b0C optimal
+                                    {p.temperature?.active_range_C && ` (active ${p.temperature.active_range_C[0]}\u2013${p.temperature.active_range_C[1]}\u00b0C)`}
+                                  </div>
+                                  {p.kinetics?.note && (
+                                    <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
+                                      <strong>Kinetics:</strong> {p.kinetics.note}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Right: Seed region heatmap */}
+                                <div>
+                                  <div style={{ fontSize: "11px", fontWeight: 600, color: RS.muted, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                                    Seed Region Profile (positions 1\u201320)
+                                  </div>
+                                  <div style={{ display: "flex", gap: "2px", flexWrap: "wrap" }}>
+                                    {Array.from({ length: 20 }, (_, i) => {
+                                      const pos = i + 1;
+                                      const isCritical = p.seed_positions.includes(pos);
+                                      const isTolerant = p.tolerant_positions.includes(pos);
+                                      const intensity = isCritical ? 1.0 : isTolerant ? 0.15 : 0.45;
+                                      return (
+                                        <div key={pos} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                                          <div style={{
+                                            width: "24px", height: "24px", borderRadius: "3px",
+                                            background: `rgba(37, 99, 235, ${intensity})`,
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            fontSize: "9px", fontFamily: MONO, fontWeight: 700,
+                                            color: intensity > 0.5 ? "#fff" : RS.text,
+                                          }}>
+                                            {pos}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "10px", color: RS.muted }}>
+                                    <span><span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "2px", background: "rgba(37,99,235,1.0)", verticalAlign: "middle", marginRight: "4px" }} />Critical</span>
+                                    <span><span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "2px", background: "rgba(37,99,235,0.45)", verticalAlign: "middle", marginRight: "4px" }} />Intermediate</span>
+                                    <span><span style={{ display: "inline-block", width: "10px", height: "10px", borderRadius: "2px", background: "rgba(37,99,235,0.15)", verticalAlign: "middle", marginRight: "4px" }} />Tolerant</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* References */}
+                              <div style={{ marginTop: "12px", borderTop: `1px solid ${RS.border}`, paddingTop: "10px" }}>
+                                <div style={{ fontSize: "10px", fontWeight: 600, color: RS.muted, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "6px" }}>References</div>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                                  {p.references.map((ref, ri) => (
+                                    <a
+                                      key={ri}
+                                      href={ref.doi ? `https://doi.org/${ref.doi}` : "#"}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      style={{
+                                        fontSize: "10px", padding: "3px 8px", borderRadius: "6px",
+                                        background: `${RS.accent}10`, color: RS.accent, textDecoration: "none",
+                                        border: `1px solid ${RS.accent}30`,
+                                      }}
+                                      title={ref.data}
+                                    >
+                                      {ref.short} <ExternalLink size={8} style={{ verticalAlign: "middle" }} />
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Per-target coverage detail (shown after comparison run) */}
+        {nucleaseCoverage && (() => {
+          const variants = Object.values(nucleaseCoverage).filter(v => !v.error && v.per_target);
+          if (variants.length === 0) return null;
+          const allTargets = variants[0].per_target.map(t => t.target);
+          return (
+            <div style={{ overflowX: "auto", marginBottom: "20px" }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: RS.text, marginBottom: "8px", fontFamily: HEADING }}>Per-Target PAM Availability</div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px", minWidth: 700 }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Target</th>
+                    <th style={thStyle}>Drug</th>
+                    {variants.map(v => <th key={v.variant_id} style={thStyle}>{v.display_name}</th>)}
+                  </tr>
+                </thead>
+                <tbody>
+                  {allTargets.map((targetName, ti) => (
+                    <tr key={targetName} style={{ borderBottom: `1px solid ${RS.border}` }}>
+                      <td style={{ ...tdStyle, fontWeight: 600, fontSize: "11px" }}>{targetName}</td>
+                      <td style={{ ...tdStyle, fontSize: "10px" }}>{variants[0].per_target[ti]?.drug || ""}</td>
+                      {variants.map(v => {
+                        const t = v.per_target[ti];
+                        return (
+                          <td key={v.variant_id} style={tdStyle}>
+                            {t ? (
+                              <span style={{
+                                fontWeight: 600,
+                                color: t.n_direct > 0 ? RS.positive : t.n_total > 0 ? RS.barrier : RS.negative,
+                              }}>
+                                {t.n_direct > 0 ? `${t.n_direct} direct` : t.n_total > 0 ? "proximity" : "none"}
+                              </span>
+                            ) : "\u2014"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+
+        {/* Scientific insight box */}
+        <div style={{ background: `${RS.barrier}10`, border: `1px solid ${RS.barrier}30`, borderRadius: "8px", padding: "14px 18px", marginTop: "8px" }}>
+          <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+            <AlertTriangle size={16} color={RS.barrier} style={{ flexShrink: 0, marginTop: 2 }} />
+            <div>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: RS.text, marginBottom: "4px" }}>Mg\u00b2\u207a Concentration Inverts Seed Specificity</div>
+              <p style={{ fontSize: "11px", color: RS.muted, lineHeight: 1.7, margin: 0 }}>
+                Nguyen et al. (2024, <em>NAR</em> 52:9343) showed that at low Mg\u00b2\u207a (\u22641 mM), seed mismatches become <em>more</em> tolerated
+                while PAM-distal mismatches become <em>less</em> tolerated — partially inverting the canonical specificity pattern.
+                The standard 10 mM MgCl\u2082 used in most published assays may not reflect diagnostic buffer conditions.
+                Buffer Mg\u00b2\u207a optimisation is a critical experimental variable for achieving reliable SNV discrimination.
+              </p>
+              <a
+                href="https://doi.org/10.1093/nar/gkae613"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: "10px", color: RS.accent, textDecoration: "none", marginTop: "6px", display: "inline-flex", alignItems: "center", gap: "4px" }}
+              >
+                DOI: 10.1093/nar/gkae613 <ExternalLink size={9} />
+              </a>
+            </div>
+          </div>
+        </div>
+
+        {/* CasDx1 note */}
+        <div style={{ background: `${RS.muted}08`, border: `1px solid ${RS.border}`, borderRadius: "8px", padding: "12px 16px", marginTop: "10px" }}>
+          <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+            <Lock size={14} color={RS.muted} style={{ flexShrink: 0, marginTop: 2 }} />
+            <p style={{ fontSize: "11px", color: RS.muted, lineHeight: 1.7, margin: 0 }}>
+              <strong>CasDx1</strong> (Mammoth Biosciences) showed superior SNV discrimination in SARS-CoV-2 detection
+              (Fasching et al. 2022, <em>J Clin Microbiol</em>) but its PAM specificity and biochemical parameters are proprietary
+              and cannot be configured. 97.3% SNP concordance on 261 clinical samples.
+            </p>
+          </div>
         </div>
       </CollapsibleSection>
     </div>

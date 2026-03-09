@@ -151,6 +151,15 @@ export async function addAblationRow(row) {
   });
 }
 
+// Nuclease profiles
+export async function getNucleaseProfiles() {
+  return request("/api/research/nuclease/profiles");
+}
+
+export async function getNucleaseComparison() {
+  return request("/api/research/nuclease/comparison");
+}
+
 // WebSocket for live progress
 export function connectJobWS(jobId, onMessage, onClose) {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";

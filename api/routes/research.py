@@ -161,3 +161,34 @@ async def add_ablation(row: AblationRow) -> dict[str, Any]:
     from guard.research.ablation_store import add_ablation_row
     added = add_ablation_row(row.model_dump())
     return {"ok": True, "row": added}
+
+
+# ── GET /api/research/nuclease/profiles ──
+
+@router.get("/nuclease/profiles")
+async def list_nuclease_profiles() -> dict[str, Any]:
+    """List all available nuclease profiles with summaries."""
+    from guard.nuclease.profile_loader import NucleaseProfile
+    return {
+        "profiles": [
+            NucleaseProfile.load(vid).to_summary()
+            for vid in NucleaseProfile.available()
+        ]
+    }
+
+
+# ── GET /api/research/nuclease/comparison ──
+
+@router.get("/nuclease/comparison")
+async def nuclease_comparison() -> dict[str, Any]:
+    """Compare PAM coverage across all loaded nuclease profiles."""
+    from guard.nuclease.profile_loader import NucleaseProfile
+    from guard.nuclease.pam_coverage import compare_pam_coverage
+
+    profiles = {
+        vid: NucleaseProfile.load(vid).to_summary()
+        for vid in NucleaseProfile.available()
+    }
+    coverage = compare_pam_coverage()
+
+    return {"profiles": profiles, "coverage": coverage}
