@@ -274,7 +274,8 @@ class GUARDNetScorer(Scorer):
 
         result = {"efficiency": output["efficiency"].item()}
         if "discrimination" in output:
-            result["discrimination"] = output["discrimination"].item()
+            result["neural_disc"] = output["discrimination"].item()
+            result["disc_method"] = "neural"
         return result
 
     # ------------------------------------------------------------------
@@ -288,7 +289,11 @@ class GUARDNetScorer(Scorer):
         use_rlpa: bool,
         multitask: bool,
     ) -> None:
-        """Load GUARD-Net from checkpoint."""
+        """Load GUARD-Net from checkpoint.
+
+        Auto-detects multitask capability: if checkpoint contains disc_head
+        keys, enables multitask even if not explicitly requested.
+        """
         try:
             import torch
             import importlib
@@ -312,12 +317,6 @@ class GUARDNetScorer(Scorer):
 
             self._device = torch.device(self._device_name)
 
-            self.model = GUARDNet(
-                use_rnafm=use_rnafm,
-                use_rloop_attention=use_rlpa,
-                multitask=multitask,
-            )
-
             checkpoint = torch.load(
                 str(path), map_location=self._device, weights_only=False,
             )
@@ -326,6 +325,21 @@ class GUARDNetScorer(Scorer):
                 state_dict = checkpoint["model_state_dict"]
             else:
                 state_dict = checkpoint
+
+            # Auto-detect multitask: if disc_head keys present, enable it
+            has_disc_head = any("disc_head" in k for k in state_dict.keys())
+            if has_disc_head and not multitask:
+                logger.info(
+                    "Checkpoint contains disc_head — auto-enabling multitask mode"
+                )
+                multitask = True
+                self._multitask = True
+
+            self.model = GUARDNet(
+                use_rnafm=use_rnafm,
+                use_rloop_attention=use_rlpa,
+                multitask=multitask,
+            )
 
             # Handle partial loading: filter out unexpected keys (e.g.
             # domain_head from training) and allow missing keys (e.g.
@@ -352,14 +366,30 @@ class GUARDNetScorer(Scorer):
             self.model.to(self._device)
             self.model.eval()
 
-            self._val_rho = checkpoint.get("val_rho") or checkpoint.get("best_val_rho")
+            self._val_rho = (
+                checkpoint.get("val_rho")
+                or checkpoint.get("val_eff_rho")
+                or checkpoint.get("best_val_rho")
+            )
             n_params = sum(p.numel() for p in self.model.parameters())
+
+            # Store disc head metadata
+            self._disc_val_r = checkpoint.get("val_disc_r")
+            self._checkpoint_meta = {
+                k: v for k, v in checkpoint.items()
+                if k != "model_state_dict"
+            }
 
             logger.info(
                 "Loaded GUARD-Net from %s (%d params, val_rho=%.4f, rnafm=%s, rlpa=%s, mt=%s)",
                 path, n_params, self._val_rho or 0.0,
                 use_rnafm, use_rlpa, multitask,
             )
+            if has_disc_head:
+                logger.info(
+                    "  Discrimination head active (val_disc_r=%.4f)",
+                    self._disc_val_r or 0.0,
+                )
         except Exception as e:
             logger.warning("Failed to load GUARD-Net from %s: %s", path, e)
             self.model = None

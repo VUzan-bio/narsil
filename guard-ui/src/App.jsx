@@ -336,7 +336,8 @@ function transformApiCandidate(c) {
       label: c.label, strategy: c.detection_strategy === "direct" ? "Direct" : "Proximity",
       spacer: sc.spacer_seq, wtSpacer: sc.wt_spacer_seq || "", pam: sc.pam_seq,
       score: sc.composite_score, disc: +(sc.discrimination_ratio || 0).toFixed(1), gc: sc.gc_content,
-      discrimination: sc.discrimination || null,
+      discrimination: sc.discrimination || null, discMethod: sc.disc_method || null,
+      neuralDisc: sc.neural_disc ?? null, featureDisc: sc.feature_disc ?? null,
       cnnScore: sc.cnn_score ?? null,
       cnnCalibrated: sc.cnn_calibrated ?? null,
       ensembleScore: sc.ensemble_score ?? null,
@@ -1868,7 +1869,7 @@ const OverviewTab = ({ results, scorer }) => {
         <StatGroup title="Discrimination" items={[
           { l: "Avg. ratio", v: `${avgDisc}×` },
           { l: "Diagnostic-grade", v: highDisc, sub: "≥ 3× threshold" },
-          { l: "Model", v: directResults.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Learned" : "Heuristic", sub: directResults.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "XGBoost · 15 features" : "position × destab" },
+          { l: "Model", v: directResults.some(r => r.discMethod === "neural") ? "Neural" : directResults.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "Learned" : "Heuristic", sub: directResults.some(r => r.discMethod === "neural") ? "GUARD-Net disc head · 235K" : directResults.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "XGBoost · 15 features" : "position × destab" },
         ]} />
         <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "auto", background: T.border, flexShrink: 0 }} />
         <StatGroup title="Predicted Activity" items={[
@@ -2470,8 +2471,9 @@ const generateInterpretation = (r) => {
 
   // Discrimination
   const discModelName = r.discrimination?.model_name || "";
-  const isLearnedDisc = discModelName.includes("learned");
-  const discSource = isLearnedDisc ? "learned model (XGBoost, 15 thermodynamic features)" : "heuristic model (position \u00D7 destabilisation)";
+  const isNeuralDisc = r.discMethod === "neural";
+  const isLearnedDisc = discModelName.includes("learned") || r.discMethod === "feature";
+  const discSource = isNeuralDisc ? "neural discrimination head (GUARD-Net multi-task, trained on 6,136 EasyDesign pairs)" : isLearnedDisc ? "learned model (XGBoost, 15 thermodynamic features)" : "heuristic model (position \u00D7 destabilisation)";
   if (r.strategy === "Proximity") {
     lines.push(`Proximity detection \u2014 the resistance SNP falls outside the crRNA spacer${r.proximityDistance ? ` (${r.proximityDistance} bp away)` : ""}. Allele discrimination relies on AS-RPA primers (10\u2013100\u00D7 selectivity), not Cas12a mismatch intolerance. The Cas12a disc ratio (~${disc.toFixed(1)}\u00D7) is not relevant for this strategy.`);
   } else if (snpPos) {
@@ -3055,8 +3057,10 @@ const DiscriminationTab = ({ results }) => {
                 The ratio indicates how many times stronger the signal is on resistant vs susceptible DNA.
               </div>
               <div style={{ fontSize: "10px", color: T.textTer, marginTop: "2px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: directCands.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "#22c55e" : T.warning }} />
-                {directCands.some(r => (r.discrimination?.model_name || "").includes("learned"))
+                <span style={{ display: "inline-block", width: 6, height: 6, borderRadius: "50%", background: directCands.some(r => r.discMethod === "neural") ? "#3b82f6" : directCands.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "#22c55e" : T.warning }} />
+                {directCands.some(r => r.discMethod === "neural")
+                  ? "Predicted by GUARD-Net neural discrimination head (multi-task, 235K params, trained on 6,136 EasyDesign pairs)"
+                  : directCands.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature")
                   ? "Predicted by learned model (XGBoost on 15 thermodynamic features, trained on 6,136 EasyDesign pairs)"
                   : "Predicted by heuristic model (position sensitivity \u00D7 mismatch destabilisation)"
                 }
@@ -3112,7 +3116,7 @@ const DiscriminationTab = ({ results }) => {
               const avgDisc = +(discChart.reduce((a, d) => a + d.disc, 0) / discChart.length).toFixed(1);
               return (
                 <div style={{ marginTop: "14px", padding: "12px 16px", background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "8px", fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
-                  <strong style={{ color: T.primary }}>Interpretation:</strong> {diagGrade}/{directCands.length} candidates reach diagnostic-grade (≥ 3×), panel avg {avgDisc}×{directCands.some(r => (r.discrimination?.model_name || "").includes("learned")) ? " (learned model)" : " (heuristic)"}.
+                  <strong style={{ color: T.primary }}>Interpretation:</strong> {diagGrade}/{directCands.length} candidates reach diagnostic-grade (≥ 3×), panel avg {avgDisc}×{directCands.some(r => r.discMethod === "neural") ? " (neural disc head)" : directCands.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? " (learned model)" : " (heuristic)"}.
                   {bestDisc ? ` Highest: ${bestDisc.name} at ${bestDisc.disc.toFixed(1)}× — likely a seed-region mismatch (positions 1–4).` : ""}
                   {worstDisc ? ` Lowest: ${worstDisc.name} at ${worstDisc.disc.toFixed(1)}×${worstDisc.disc < 2 ? " — insufficient for any detection method, SM enhancement required." : worstDisc.disc < 3 ? " — acceptable but not diagnostic-grade." : "."}` : ""}
                   {below2.length > 0 ? ` ${below2.length} candidate${below2.length > 1 ? "s" : ""} (${below2.map(d => d.name).slice(0, 3).join(", ")}${below2.length > 3 ? "…" : ""}) fall below the 2× minimum — these have PAM-distal mismatches and require synthetic mismatch engineering.` : " All candidates meet the 2× minimum detection threshold."}
@@ -3142,8 +3146,8 @@ const DiscriminationTab = ({ results }) => {
                 <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 600, fontSize: "11px" }}>{r.label}</td>
                 <td style={{ padding: "10px 14px" }}><DrugBadge drug={r.drug} /></td>
                 <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 700, color: r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger }}>{typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×</td>
-                <td style={{ padding: "10px 14px", fontSize: "10px", color: (r.discrimination?.model_name || "").includes("learned") ? T.success : T.textTer }}>
-                  {(r.discrimination?.model_name || "").includes("learned") ? "Learned" : "Heuristic"}
+                <td style={{ padding: "10px 14px", fontSize: "10px", color: r.discMethod === "neural" ? "#3b82f6" : (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature" ? T.success : T.textTer }}>
+                  {r.discMethod === "neural" ? "Neural" : (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature" ? "Learned" : "Heuristic"}
                 </td>
                 <td style={{ padding: "10px 14px", fontFamily: MONO }}>{(r.ensembleScore || r.score).toFixed(3)}</td>
                 <td style={{ padding: "10px 14px" }}>
@@ -3260,7 +3264,7 @@ const PrimersTab = ({ results }) => {
           <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: 0 }}>
             Symmetric flanking primers for <strong>DIRECT detection</strong> candidates. The crRNA spacer overlaps the mutation site,
             so allele discrimination comes from Cas12a mismatch intolerance — not from primers. Primers simply amplify the region
-            containing the crRNA binding site. Discrimination ratios are {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "predicted by a learned model (LightGBM, 15 thermodynamic features)" : "estimated by position × destabilisation heuristic"}.
+            containing the crRNA binding site. Discrimination ratios are {results.some(r => r.discMethod === "neural") ? "predicted by GUARD-Net neural discrimination head (multi-task, trained on 6,136 EasyDesign pairs)" : results.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "predicted by a learned model (LightGBM, 15 thermodynamic features)" : "estimated by position × destabilisation heuristic"}.
           </p>
         </div>
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: "20px" }}>
@@ -3364,7 +3368,7 @@ const MultiplexTab = ({ results, panelData }) => {
           <p style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6, margin: 0, opacity: 0.85 }}>
             <strong>Cross-reactivity</strong> is the risk that one crRNA accidentally binds to another target's amplicon or primer,
             producing a false signal. The optimizer uses simulated annealing to pick the combination of guides that
-            minimizes cross-talk while maximizing discrimination across the full panel. {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Discrimination ratios are predicted by the learned model (LightGBM, 15 thermodynamic features) and used during optimization — the panel is selected with these predictions, not relabeled post-hoc." : ""}
+            minimizes cross-talk while maximizing discrimination across the full panel. {results.some(r => r.discMethod === "neural") ? "Discrimination ratios are predicted by GUARD-Net's neural discrimination head (multi-task learning on 6,136 EasyDesign trans-cleavage pairs) and used during optimization — the panel is selected with these predictions, not relabeled post-hoc." : results.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "Discrimination ratios are predicted by the learned model (LightGBM, 15 thermodynamic features) and used during optimization — the panel is selected with these predictions, not relabeled post-hoc." : ""}
           </p>
         </div>
       </div>
@@ -4107,9 +4111,11 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               </div>
               <div style={{ marginBottom: "14px" }}>
                 <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, marginBottom: "4px" }}>Prediction model</div>
-                {results.some(r => (r.discrimination?.model_name || "").includes("learned"))
-                  ? "Discrimination ratios are predicted by a gradient-boosted model (LightGBM) trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a). The model uses 15 thermodynamic features including R-loop cumulative ΔG, mismatch ΔΔG penalties, and position sensitivity. 3-fold CV: RMSE = 0.540, r = 0.459 (vs heuristic RMSE = 0.641, r = 0.298)."
-                  : "Discrimination ratios are predicted by a heuristic model using position sensitivity × mismatch destabilisation scores. A trained model (XGBoost on 15 thermodynamic features) is available but was not loaded for this run."
+                {results.some(r => r.discMethod === "neural")
+                  ? "Discrimination ratios are predicted by GUARD-Net's neural discrimination head — a multi-task extension (235K params) trained end-to-end on efficiency and discrimination simultaneously. The disc head takes paired encoder representations [mut, wt, mut\u2212wt, mut\u00D7wt] from the shared CNN+RNA-FM+RLPA backbone and outputs a predicted MUT/WT ratio via Softplus. Trained on 6,136 paired trans-cleavage measurements from EasyDesign (Huang et al. 2024, LbCas12a)."
+                  : results.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature")
+                  ? "Discrimination ratios are predicted by a gradient-boosted model (LightGBM) trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a). The model uses 15 thermodynamic features including R-loop cumulative \u0394G, mismatch \u0394\u0394G penalties, and position sensitivity. 3-fold CV: RMSE = 0.540, r = 0.459 (vs heuristic RMSE = 0.641, r = 0.298)."
+                  : "Discrimination ratios are predicted by a heuristic model using position sensitivity \u00D7 mismatch destabilisation scores. A trained model (XGBoost on 15 thermodynamic features) is available but was not loaded for this run."
                 }
               </div>
               <div style={{ fontSize: "11px", color: T.textTer, fontStyle: "italic", borderTop: `1px solid ${T.borderLight}`, paddingTop: "10px" }}>

@@ -228,6 +228,45 @@ class GUARDNet(nn.Module):
 
         return output
 
+    def get_embedding(
+        self,
+        target_onehot: torch.Tensor,
+        crrna_rnafm_emb: torch.Tensor | None = None,
+        crrna_sequences: list[str] | None = None,
+        scalar_features: torch.Tensor | None = None,
+    ) -> torch.Tensor:
+        """Convenience: encode + pool -> fixed-size embedding vector.
+
+        Returns:
+            (batch, dense_input_dim) pooled embedding suitable for
+            discrimination head or downstream tasks.
+        """
+        fused = self.encode(target_onehot, crrna_rnafm_emb, crrna_sequences)
+        return self._pool_and_append_scalars(fused, scalar_features)
+
+    def predict_discrimination(
+        self,
+        mut_target_onehot: torch.Tensor,
+        wt_target_onehot: torch.Tensor,
+        crrna_rnafm_emb: torch.Tensor | None = None,
+        crrna_sequences: list[str] | None = None,
+        scalar_features: torch.Tensor | None = None,
+    ) -> torch.Tensor | None:
+        """Predict discrimination ratio from paired targets.
+
+        Returns:
+            (batch, 1) predicted ratio, or None if not multitask.
+        """
+        if not self.multitask:
+            return None
+        mut_emb = self.get_embedding(
+            mut_target_onehot, crrna_rnafm_emb, crrna_sequences, scalar_features,
+        )
+        wt_emb = self.get_embedding(
+            wt_target_onehot, crrna_rnafm_emb, crrna_sequences, scalar_features,
+        )
+        return self.disc_head(mut_emb, wt_emb)
+
     def count_trainable_params(self) -> int:
         """Count trainable parameters (RNA-FM is frozen, only projection trains)."""
         return sum(p.numel() for p in self.parameters() if p.requires_grad)

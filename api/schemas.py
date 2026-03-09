@@ -89,6 +89,9 @@ class CandidateSummary(BaseModel):
     ensemble_score: Optional[float] = None
     discrimination_ratio: Optional[float] = None
     discrimination: Optional[dict] = None
+    disc_method: Optional[str] = None  # "neural" (GUARD-Net disc head) or "feature" (XGBoost/LightGBM)
+    neural_disc: Optional[float] = None  # Neural disc head prediction (if available)
+    feature_disc: Optional[float] = None  # Feature-based disc prediction (if available)
     ml_scores: list[dict] = Field(default_factory=list)
     rank: Optional[int] = None
 

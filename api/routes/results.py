@@ -101,6 +101,23 @@ def _build_target_result(member: dict[str, Any]) -> TargetResult:
             disc.get("mut_activity", 0),
         )
 
+    # Discrimination method and neural/feature scores
+    disc_method = None
+    neural_disc = None
+    feature_disc = None
+    if disc:
+        neural_disc = disc.get("neural_disc")
+        feature_disc = disc.get("feature_disc")
+        disc_method = disc.get("disc_method")
+        # Infer method from available data
+        if disc_method is None:
+            if neural_disc is not None:
+                disc_method = "neural"
+            elif feature_disc is not None:
+                disc_method = "feature"
+            elif disc_ratio is not None:
+                disc_method = "heuristic"
+
     candidate_summary = CandidateSummary(
         candidate_id=candidate.get("candidate_id", ""),
         spacer_seq=candidate.get("spacer_seq", ""),
@@ -117,6 +134,9 @@ def _build_target_result(member: dict[str, Any]) -> TargetResult:
         ensemble_score=selected.get("ensemble_score"),
         discrimination_ratio=disc_ratio,
         discrimination=disc,
+        disc_method=disc_method,
+        neural_disc=neural_disc,
+        feature_disc=feature_disc,
         ml_scores=selected.get("ml_scores", []),
         rank=selected.get("rank"),
     ) if candidate.get("candidate_id") else None
