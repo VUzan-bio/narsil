@@ -1144,10 +1144,14 @@ class GUARDPipeline:
                 embeddings = self.ml_scorer.get_collected_embeddings()
                 panel_labels = [m.target.label for m in panel.members]
 
-                # Mark selected candidates
-                panel_set = set(panel_labels)
+                # Mark selected candidates by spacer_seq (not target_label,
+                # which would match ALL candidates for that target)
+                panel_spacers = set()
+                for m in panel.members:
+                    c = m.selected_candidate.candidate
+                    panel_spacers.add(c.spacer_seq)
                 for e in embeddings:
-                    e["selected"] = e["target_label"] in panel_set
+                    e["selected"] = e["spacer_seq"] in panel_spacers
 
                 umap_path = self._output / "umap_embeddings.json"
                 umap_result = compute_panel_umap(embeddings, panel_labels, umap_path)

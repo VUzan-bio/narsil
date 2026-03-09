@@ -1164,7 +1164,7 @@ const HomePage = ({ goTo, connected }) => {
                 <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px" }}>Pipeline Mode</div>
                 <div style={{ display: "flex", gap: "6px" }}>
                   {[
-                    { id: "standard", label: "Standard", tip: "All 8 modules" },
+                    { id: "standard", label: "Standard", tip: "All 11 modules" },
                     { id: "custom", label: "Custom", tip: "Select modules" },
                   ].map(m => (
                     <button key={m.id} onClick={() => { setMode(m.id); if (m.id === "standard") setSelectedModules(new Set(MODULES.map(x => x.id))); }}
@@ -1803,15 +1803,15 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
    ═══════════════════════════════════════════════════════════════════ */
 const RISK_COLORS = { green: T.riskGreen, amber: T.riskAmber, red: T.riskRed };
 const RISK_BG = { green: T.riskGreenBg, amber: T.riskAmberBg, red: T.riskRedBg };
-/* Green → Yellow continuous gradient (CITEseq UMAP style) */
+/* Modified coolwarm: blue → white → orange-red (diverging/sequential) */
 const gradientColor = (t) => {
   t = Math.max(0, Math.min(1, t));
   const stops = [
-    { t: 0.0,  r: 26,  g: 106, b: 72  },  // #1a6a48 deep green
-    { t: 0.25, r: 56,  g: 152, b: 86  },  // #389856 medium green
-    { t: 0.5,  r: 120, g: 190, b: 80  },  // #78be50 bright green
-    { t: 0.75, r: 180, g: 210, b: 60  },  // #b4d23c yellow-green
-    { t: 1.0,  r: 228, g: 228, b: 40  },  // #e4e428 yellow
+    { t: 0.0,  r: 8,   g: 81,  b: 156 },  // #08519c deep blue
+    { t: 0.25, r: 107, g: 174, b: 214 },  // #6baed6 light blue
+    { t: 0.5,  r: 247, g: 247, b: 247 },  // #f7f7f7 white midpoint
+    { t: 0.75, r: 253, g: 174, b: 107 },  // #fdae6b light orange
+    { t: 1.0,  r: 230, g: 85,  b: 13  },  // #e6550d orange-red
   ];
   let lower = stops[0], upper = stops[stops.length - 1];
   for (let i = 0; i < stops.length - 1; i++) {
@@ -1824,9 +1824,9 @@ const gradientColor = (t) => {
   const b = Math.round(lower.b + f * (upper.b - lower.b));
   return `rgb(${r},${g},${b})`;
 };
-const gradientCSS = "linear-gradient(90deg, #1a6a48, #389856, #78be50, #b4d23c, #e4e428)";
+const gradientCSS = "linear-gradient(90deg, #08519c, #6baed6, #f7f7f7, #fdae6b, #e6550d)";
 const PASS_GREEN = "#22c55e";
-const AXIS_COLORS = { efficiency: "#78be50", discrimination: "#e4e428", primers: "#1a6a48", safety: "#b4d23c", gc: "#389856" };
+const AXIS_COLORS = { efficiency: "#fdae6b", discrimination: "#e6550d", primers: "#08519c", safety: "#6baed6", gc: "#9ecae1" };
 const AXIS_LABELS = { efficiency: "Activity", discrimination: "Discrimination", primers: "Primers", safety: "Off-target", gc: "GC" };
 
 const RiskDot = ({ level, size = 12 }) => (
@@ -1837,14 +1837,14 @@ const RiskDot = ({ level, size = 12 }) => (
 );
 
 /* Heatmap cell for Risk Assessment Matrix */
-const riskLevelToT = { green: 0.9, amber: 0.5, red: 0.1 };
+const riskLevelToT = { green: 0.0, amber: 0.5, red: 1.0 };
 const RiskHeatCell = ({ level, type = "quantitative" }) => {
   if (type === "binary") {
     const passed = level === "green";
     return (
       <div style={{
         width: 44, height: 28, borderRadius: 4, border: "2px solid #fff",
-        backgroundColor: passed ? PASS_GREEN : "#1a6a48",
+        backgroundColor: passed ? "#08519c" : "#e6550d",
         margin: "0 auto",
       }} />
     );
@@ -2151,8 +2151,8 @@ const UMAPPanel = ({ jobId }) => {
         <div>
           <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Candidate Embedding Space</div>
           <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5 }}>
-            UMAP of {umapData.n_total.toLocaleString()} screened candidates (GUARD-Net 128-dim RLPA embeddings).
-            {" "}{umapData.n_selected} selected panel members highlighted. Proximity in this space reflects learned sequence similarity.
+            UMAP of {umapData.n_total.toLocaleString()} scored candidates (GUARD-Net 128-dim RLPA embeddings).
+            {" "}{umapData.n_selected} panel members highlighted. Proximity in this space reflects learned sequence similarity.
           </div>
         </div>
         <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
@@ -2192,7 +2192,7 @@ const UMAPPanel = ({ jobId }) => {
 
       {/* Stats bar */}
       <div style={{ display: "flex", gap: "20px", marginTop: "10px", fontSize: "11px", color: T.textTer, flexWrap: "wrap" }}>
-        <span><strong style={{ color: T.text, fontFamily: MONO }}>{umapData.n_total.toLocaleString()}</strong> candidates screened</span>
+        <span><strong style={{ color: T.text, fontFamily: MONO }}>{umapData.n_total.toLocaleString()}</strong> candidates scored</span>
         <span><strong style={{ color: T.primary, fontFamily: MONO }}>{umapData.n_selected}</strong> selected ({((umapData.n_selected / umapData.n_total) * 100).toFixed(2)}%)</span>
         {umapData.stats?.panel_spread > 0 && <span>Panel spread: <strong style={{ fontFamily: MONO }}>{umapData.stats.panel_spread.toFixed(2)}</strong></span>}
         {umapData.stats?.coverage != null && <span>Space coverage: <strong style={{ fontFamily: MONO }}>{(umapData.stats.coverage * 100).toFixed(1)}%</strong></span>}
@@ -2533,7 +2533,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
               const onLine = scatterData.length - aboveLine.length - belowLine.length;
               return (
                 <div style={{ marginTop: "14px", padding: "12px 16px", background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "8px", fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
-                  <strong style={{ color: T.primary }}>Interpretation:</strong> {onLine}/{scatterData.length} candidates scored within ±0.05 by both models.
+                  <strong style={{ color: T.primary }}>Interpretation:</strong> {agreePct}% of candidates are classified the same way by both models (above/below 0.5 threshold). {onLine}/{scatterData.length} score within ±0.05 of each other.
                   {aboveLine.length > 0 ? ` GUARD-Net scores ${aboveLine.length} candidate${aboveLine.length > 1 ? "s" : ""} higher (${aboveLine.slice(0, 2).map(d => d.label).join(", ")}${aboveLine.length > 2 ? "\u2026" : ""}).` : ""}
                   {belowLine.length > 0 ? ` Heuristic scores ${belowLine.length} candidate${belowLine.length > 1 ? "s" : ""} higher (${belowLine.slice(0, 2).map(d => d.label).join(", ")}${belowLine.length > 2 ? "\u2026" : ""}).` : ""}
                   {modelAgreement != null ? ` Rank correlation \u03c1 = ${modelAgreement} \u2014 ${modelAgreement >= 0.7 ? "strong agreement, ensemble adds stability" : modelAgreement >= 0.4 ? "moderate agreement, ensemble captures complementary signal" : "weak agreement, models capture different features \u2014 ensemble is critical"}.` : ""}
@@ -3253,7 +3253,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                     <td style={{ padding: "10px 12px", fontWeight: 600, fontFamily: MONO, fontSize: "11px" }}>{r.label}</td>
                     <td style={{ padding: "10px 12px" }}><DrugBadge drug={r.drug} /></td>
                     <td style={{ padding: "10px 12px" }}><Badge variant={r.strategy === "Direct" ? "success" : "purple"}>{r.strategy}</Badge></td>
-                    {hasReadiness && <td style={{ padding: "10px 6px", textAlign: "center" }}>{r.readinessScore != null ? <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 6, fontFamily: MONO, fontWeight: 700, fontSize: "12px", backgroundColor: gradientColor(r.readinessScore), color: r.readinessScore > 0.35 && r.readinessScore < 0.65 ? "#333" : "#fff" }}>{r.readinessScore.toFixed(2)}</span> : "—"}</td>}
+                    {hasReadiness && <td style={{ padding: "10px 6px", textAlign: "center" }}>{r.readinessScore != null ? <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 6, fontFamily: MONO, fontWeight: 700, fontSize: "12px", backgroundColor: gradientColor(r.readinessScore), color: r.readinessScore > 0.3 && r.readinessScore < 0.7 ? "#333" : "#fff" }}>{r.readinessScore.toFixed(2)}</span> : "—"}</td>}
                     {hasReadiness && <td style={{ padding: "10px 6px", textAlign: "center" }}>{r.riskProfile && <RiskHeatCell level={r.riskProfile.overall} />}</td>}
                     <td style={{ padding: "10px 12px" }}><Seq s={r.spacer?.slice(0, 24)} /></td>
                     <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 700, color: (r.ensembleScore || r.score) > 0.8 ? T.primary : (r.ensembleScore || r.score) > 0.65 ? T.warning : T.danger }}>{(r.ensembleScore || r.score).toFixed(3)}</td>
@@ -4346,16 +4346,16 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <AreaChart data={combined} margin={{ top: 10, right: 15, bottom: 25, left: 15 }}>
                     <defs>
                       <linearGradient id="mutAreaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#e4e428" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#e4e428" stopOpacity={0.03} />
+                        <stop offset="0%" stopColor="#e6550d" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#e6550d" stopOpacity={0.03} />
                       </linearGradient>
                       <linearGradient id="wtAreaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#1a6a48" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#1a6a48" stopOpacity={0.03} />
+                        <stop offset="0%" stopColor="#08519c" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#08519c" stopOpacity={0.03} />
                       </linearGradient>
                       <linearGradient id="overlapAreaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#78be50" stopOpacity={0.2} />
-                        <stop offset="100%" stopColor="#78be50" stopOpacity={0.05} />
+                        <stop offset="0%" stopColor="#9467bd" stopOpacity={0.2} />
+                        <stop offset="100%" stopColor="#9467bd" stopOpacity={0.05} />
                       </linearGradient>
                     </defs>
                     <XAxis dataKey="x" type="number" domain={[0, 1]} tick={{ fontSize: 10, fill: T.textTer, fontFamily: MONO }} tickCount={11} axisLine={{ stroke: T.border }} tickLine={false} label={{ value: "Predicted cleavage activity", position: "insideBottom", offset: -12, fontSize: 10, fill: T.textSec }} />
@@ -4366,44 +4366,44 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                         <div style={{ ...tooltipStyle, padding: "10px 14px" }}>
                           <div style={{ fontWeight: 600, fontSize: "11px", color: T.text, marginBottom: "4px" }}>Activity: {label}</div>
                           {payload.map(p => p.dataKey !== "overlap" && (
-                            <div key={p.dataKey} style={{ fontSize: "11px", color: p.dataKey === "mut" ? "#8aaa20" : "#1a6a48" }}>
+                            <div key={p.dataKey} style={{ fontSize: "11px", color: p.dataKey === "mut" ? "#e6550d" : "#08519c" }}>
                               {p.dataKey === "mut" ? "Mutant" : "Wildtype"}: {p.value?.toFixed(4)}
                             </div>
                           ))}
                         </div>
                       );
                     }} />
-                    <ReferenceLine x={meanMut} stroke="#b4d23c" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ MUT", position: "insideTopRight", fontSize: 9, fill: "#8aaa20", fontWeight: 700 }} />
-                    <ReferenceLine x={meanWt} stroke="#1a6a48" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ WT", position: "insideTopRight", fontSize: 9, fill: "#1a6a48", fontWeight: 700 }} />
+                    <ReferenceLine x={meanMut} stroke="#e6550d" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ MUT", position: "insideTopRight", fontSize: 9, fill: "#e6550d", fontWeight: 700 }} />
+                    <ReferenceLine x={meanWt} stroke="#08519c" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ WT", position: "insideTopRight", fontSize: 9, fill: "#08519c", fontWeight: 700 }} />
                     <Area type="monotone" dataKey="overlap" stroke="none" fill="url(#overlapAreaFill)" isAnimationActive={false} />
-                    <Area type="monotone" dataKey="mut" stroke="#b4d23c" strokeWidth={2.5} fill="url(#mutAreaFill)" isAnimationActive={false} />
-                    <Area type="monotone" dataKey="wt" stroke="#1a6a48" strokeWidth={2} fill="url(#wtAreaFill)" isAnimationActive={false} strokeDasharray="6 3" />
+                    <Area type="monotone" dataKey="mut" stroke="#e6550d" strokeWidth={2.5} fill="url(#mutAreaFill)" isAnimationActive={false} />
+                    <Area type="monotone" dataKey="wt" stroke="#08519c" strokeWidth={2} fill="url(#wtAreaFill)" isAnimationActive={false} strokeDasharray="6 3" />
                   </AreaChart>
                 </ResponsiveContainer>
                 {/* Custom legend + stats */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", flexWrap: "wrap", gap: "12px" }}>
                   <div style={{ display: "flex", gap: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                      <div style={{ width: "16px", height: "3px", background: "#b4d23c", borderRadius: "2px" }} />
+                      <div style={{ width: "16px", height: "3px", background: "#e6550d", borderRadius: "2px" }} />
                       <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>Mutant (A<sub>MUT</sub>)</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                      <div style={{ width: "16px", height: "3px", background: "#1a6a48", borderRadius: "2px", borderBottom: "1px dashed #1a6a48" }} />
+                      <div style={{ width: "16px", height: "3px", background: "#08519c", borderRadius: "2px", borderBottom: "1px dashed #08519c" }} />
                       <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>Wildtype (A<sub>WT</sub>)</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                      <div style={{ width: "10px", height: "10px", background: "rgba(220,38,38,0.15)", borderRadius: "2px" }} />
+                      <div style={{ width: "10px", height: "10px", background: "rgba(148,103,189,0.2)", borderRadius: "2px" }} />
                       <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>Overlap zone ({overlapPct}%)</span>
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: "20px" }}>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ MUT</div>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#8aaa20", fontFamily: MONO }}>{meanMut}</div>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#e6550d", fontFamily: MONO }}>{meanMut}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ WT</div>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#1a6a48", fontFamily: MONO }}>{meanWt}</div>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#08519c", fontFamily: MONO }}>{meanWt}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>SEPARATION</div>
@@ -4451,7 +4451,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               <div style={{ marginBottom: "14px" }}>
                 <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, marginBottom: "4px" }}>Prediction model</div>
                 {results.some(r => r.discMethod === "neural")
-                  ? "Discrimination ratios are predicted by GUARD-Net's neural discrimination head — a multi-task extension (235K params) trained end-to-end on efficiency and discrimination simultaneously. The disc head takes paired encoder representations [mut, wt, mut\u2212wt, mut\u00D7wt] from the shared CNN+RNA-FM+RLPA backbone and outputs a predicted MUT/WT ratio via Softplus. Trained on 6,136 paired trans-cleavage measurements from EasyDesign (Huang et al. 2024, LbCas12a)."
+                  ? "Discrimination ratios are predicted by GUARD-Net's neural discrimination head — a multi-task extension (235K params) trained end-to-end on efficiency and discrimination simultaneously. The disc head takes paired encoder representations [mut, wt, mut\u2212wt, mut\u00D7wt] from the shared CNN+RNA-FM+RLPA backbone and outputs a predicted MUT/WT ratio via Softplus. Trained on 6,136 paired trans-cleavage measurements from EasyDesign (Huang et al. 2024, LbCas12a). 3-fold CV: r = 0.440."
                   : results.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature")
                   ? "Discrimination ratios are predicted by a gradient-boosted model (LightGBM) trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a). The model uses 15 thermodynamic features including R-loop cumulative \u0394G, mismatch \u0394\u0394G penalties, and position sensitivity. 3-fold CV: RMSE = 0.540, r = 0.459 (vs heuristic RMSE = 0.641, r = 0.298)."
                   : "Discrimination ratios are predicted by a heuristic model using position sensitivity \u00D7 mismatch destabilisation scores. A trained model (XGBoost on 15 thermodynamic features) is available but was not loaded for this run."
@@ -5185,6 +5185,7 @@ const MutationsPage = () => {
 const ScoringPage = ({ connected }) => {
   const mobile = useIsMobile();
   const [models, setModels] = useState([]);
+  const [showApiRef, setShowApiRef] = useState(false);
 
   useEffect(() => {
     if (connected) {
@@ -5290,14 +5291,14 @@ const ScoringPage = ({ connected }) => {
           <span style={{ background: "#EAEBFA", color: T.primary, padding: "3px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 600 }}>In development</span>
         </div>
         <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 16px" }}>
-          Self-supervised foundation model (JEPA architecture) pretrained on ~1,000 bacterial genomes (301K fragments × 512bp).
+          Self-supervised foundation model (JEPA architecture) pretrained on 6,326 bacterial genomes (301K fragments × 512bp).
           Fine-tuned for Cas12a activity prediction with the goal of improving cross-library generalisation beyond the supervised CNN.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "10px" }}>
           {[
-            { label: "Pretraining", value: "~1K genomes" },
-            { label: "Parameters", value: "8.5M → 48M" },
-            { label: "Current ρ", value: "0.484" },
+            { label: "Pretraining", value: "6.3K genomes" },
+            { label: "Parameters", value: "50.2M" },
+            { label: "Current ρ", value: "training v4.2" },
             { label: "Target ρ", value: "> 0.60" },
           ].map(s => (
             <div key={s.label} style={{ background: T.bgSub, borderRadius: "8px", padding: "12px", textAlign: "center" }}>
@@ -5323,7 +5324,8 @@ const ScoringPage = ({ connected }) => {
         <div style={{ background: T.bgSub, borderRadius: "10px", overflow: "hidden", marginBottom: "16px" }}>
           {[
             { name: "Heuristic baseline", rmse: "0.641", corr: "0.298", delta: null },
-            { name: "Learned model (XGBoost)", rmse: "0.540", corr: "0.459", delta: "\u221215% RMSE" },
+            { name: "XGBoost (feature-based)", rmse: "0.540", corr: "0.459", delta: "\u221215% RMSE" },
+            { name: "GUARD-Net neural head", rmse: "—", corr: "0.440", delta: "integrated" },
           ].map((f, i, arr) => (
             <div key={f.name} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
               <div style={{ flex: 1, fontSize: "13px", fontWeight: 600, color: T.text }}>{f.name}</div>
@@ -5357,16 +5359,24 @@ const ScoringPage = ({ connected }) => {
         </div>
       </div>
 
-      {/* API models */}
+      {/* API models — hidden by default, developer-only */}
       {models.length > 0 && (
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "12px" }}>Available Models from API</div>
-          {models.map((m) => (
-            <div key={m.id || m.name} style={{ padding: "12px", borderRadius: "8px", border: `1px solid ${T.borderLight}`, marginBottom: "8px" }}>
-              <div style={{ fontWeight: 600, color: T.text }}>{m.name}</div>
-              {m.description && <div style={{ fontSize: "12px", color: T.textSec, marginTop: "4px" }}>{m.description}</div>}
+        <div style={{ marginTop: "8px" }}>
+          <button onClick={() => setShowApiRef(!showApiRef)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: T.textTer, padding: "6px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+            <ChevronDown size={14} style={{ transform: showApiRef ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.2s" }} />
+            API Reference ({models.length} models)
+          </button>
+          {showApiRef && (
+            <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginTop: "8px" }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "12px" }}>Available Models from API</div>
+              {models.map((m) => (
+                <div key={m.id || m.name} style={{ padding: "12px", borderRadius: "8px", border: `1px solid ${T.borderLight}`, marginBottom: "8px" }}>
+                  <div style={{ fontWeight: 600, color: T.text }}>{m.name}</div>
+                  {m.description && <div style={{ fontSize: "12px", color: T.textSec, marginTop: "4px" }}>{m.description}</div>}
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
     </div>
@@ -6093,7 +6103,7 @@ const ResearchPage = ({ connected }) => {
       {/* ═══ Section 5: Platform Roadmap ═══ */}
       <CollapsibleSection title="Platform Roadmap" defaultOpen={false}>
         <p style={{ fontSize: "12px", color: RS.muted, marginBottom: "16px", lineHeight: 1.7 }}>
-          Planned capabilities for the GUARD platform. Each module requires specific experimental input before activation.
+          Planned capabilities aligned with PhD milestones. Each module builds on experimental data collected during the doctoral programme.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "14px" }}>
           {[
@@ -6101,28 +6111,28 @@ const ResearchPage = ({ connected }) => {
               icon: <RefreshCw size={18} />,
               title: "Active Learning Loop",
               desc: "Feed experimental measurements back into GUARD-Net. Fluorescence or electrochemical data recalibrates the ensemble, closing the gap between in silico and platform-specific signal.",
-              input: "Validation data (fluorescence or electrochemical)",
+              milestone: "PhD Year 1 — Experimental validation",
               ready: true,
             },
             {
               icon: <Zap size={18} />,
               title: "Electrochemical Transfer Function",
               desc: "Model the relationship between solution-phase trans-cleavage and surface-tethered MB reporter degradation on LIG electrodes.",
-              input: "Electrode current drop measurements",
+              milestone: "PhD Year 2 — Electrode characterisation",
               ready: false,
             },
             {
               icon: <Grid3x3 size={18} />,
               title: "Spatial Multiplexing Optimiser",
               desc: "Assign targets to electrode pads on the spatially addressed array, minimising electrochemical crosstalk. Replaces solution-phase M8 when using in-situ complexation.",
-              input: "Chip geometry definition",
+              milestone: "PhD Year 2–3 — Array fabrication",
               ready: false,
             },
             {
               icon: <FlaskConical size={18} />,
               title: "Nuclease Adaptation Engine",
               desc: "Swap Cas12a variants via transfer learning. Freeze sequence encoders, fine-tune RLPA attention and output heads on variant-specific data.",
-              input: "50\u2013100 measurements on new variant",
+              milestone: "PhD Year 3 — Variant screening",
               ready: false,
             },
           ].map((card, i) => (
@@ -6133,14 +6143,14 @@ const ResearchPage = ({ connected }) => {
               </div>
               <p style={{ fontSize: "12px", color: RS.muted, lineHeight: 1.7, margin: "0 0 12px" }}>{card.desc}</p>
               <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "8px" }}>
-                <strong>Input needed:</strong> {card.input}
+                <strong>Milestone:</strong> {card.milestone}
               </div>
               <span style={{
                 display: "inline-block", fontSize: "10px", fontWeight: 700, padding: "3px 10px", borderRadius: "12px",
                 background: card.ready ? `${RS.positive}18` : `${RS.muted}18`,
                 color: card.ready ? RS.positive : RS.muted,
               }}>
-                {card.ready ? "Ready to start" : `Requires ${card.input.split(" ")[0].toLowerCase()} data`}
+                {card.ready ? "Ready to start" : "Planned"}
               </span>
             </div>
           ))}

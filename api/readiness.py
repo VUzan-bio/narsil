@@ -129,8 +129,14 @@ def compute_readiness_scores(targets: list[dict[str, Any]]) -> list[dict[str, An
         )
         readiness_scores.append(score)
 
-    # Priority ranking (descending by readiness)
-    priority_order = sorted(range(n), key=lambda i: readiness_scores[i], reverse=True)
+    # Priority ranking: direct candidates first (they test crRNA discrimination
+    # directly), then proximity candidates (AS-RPA validation track).
+    # Within each group, rank by readiness score.
+    priority_scores = []
+    for i in range(n):
+        strategy_boost = 1.0 if strategies[i].lower() == "direct" else 0.0
+        priority_scores.append((strategy_boost, readiness_scores[i]))
+    priority_order = sorted(range(n), key=lambda i: priority_scores[i], reverse=True)
     priority_map = {idx: rank + 1 for rank, idx in enumerate(priority_order)}
 
     # Check for shared amplicons (same fwd + rev primer pair)
