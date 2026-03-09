@@ -19,7 +19,7 @@ mv GCF_000195955.2_ASM19595v2_genomic.gff H37Rv.gff3
 bowtie2-build H37Rv.fasta H37Rv
 ```
 
-## Human reference (optional, for blood-based specificity)
+## Human reference (optional for GUARD, blood-based specificity)
 
 ```bash
 # GRCh38 — only needed if screening off-targets against human genome
