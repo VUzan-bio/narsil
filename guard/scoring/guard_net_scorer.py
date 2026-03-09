@@ -233,6 +233,7 @@ class GUARDNetScorer(Scorer):
         self,
         candidate: CrRNACandidate,
         wt_context_34: Optional[str] = None,
+        mm_position: Optional[int] = None,
     ) -> dict[str, float]:
         """Predict efficiency and optionally discrimination ratio.
 
@@ -240,9 +241,10 @@ class GUARDNetScorer(Scorer):
             candidate: The crRNA candidate (mutant target).
             wt_context_34: 34-nt wildtype target DNA string. If provided
                 and model has multitask head, returns discrimination too.
+            mm_position: PAM-relative mismatch position (1-24), or None.
 
         Returns:
-            dict with "efficiency" and optionally "discrimination".
+            dict with "efficiency" and optionally "neural_disc", "disc_method".
         """
         if self.model is None:
             return {"efficiency": 0.5}
@@ -265,18 +267,110 @@ class GUARDNetScorer(Scorer):
             wt_tensor = torch.tensor(wt_onehot, dtype=torch.float32).unsqueeze(0)
             wt_tensor = wt_tensor.to(self._device)
 
+        # Compute thermo features if model has them
+        thermo_tensor = None
+        if self._n_thermo > 0 and wt_context_34 is not None and mm_position is not None:
+            thermo_tensor = self._compute_thermo_feats(
+                candidate, wt_context_34, mm_position,
+            )
+            if thermo_tensor is not None:
+                thermo_tensor = thermo_tensor.to(self._device)
+
+        # Mismatch position tensor
+        mm_tensor = None
+        if self._pos_embed_dim > 0 and mm_position is not None:
+            mm_tensor = torch.tensor([mm_position], dtype=torch.long, device=self._device)
+
         with torch.no_grad():
             output = self.model(
                 target_onehot=target_tensor,
                 crrna_rnafm_emb=rnafm_tensor,
                 wt_target_onehot=wt_tensor,
+                thermo_feats=thermo_tensor,
+                mm_position=mm_tensor,
             )
 
         result = {"efficiency": output["efficiency"].item()}
         if "discrimination" in output:
             result["neural_disc"] = output["discrimination"].item()
-            result["disc_method"] = "neural"
+            result["disc_method"] = "neural_enhanced" if (self._n_thermo > 0 or self._pos_embed_dim > 0) else "neural"
+            if mm_position is not None:
+                result["mm_position_pam"] = mm_position
+            if thermo_tensor is not None:
+                # Return raw ddG (first feature, un-normalized)
+                raw_ddg = thermo_tensor[0, 0].item() * self._thermo_norm_std[0] + self._thermo_norm_mean[0]
+                result["thermo_ddg"] = round(raw_ddg, 3)
         return result
+
+    def _compute_thermo_feats(
+        self,
+        candidate: CrRNACandidate,
+        wt_context_34: str,
+        mm_position: int,
+    ) -> Optional["torch.Tensor"]:
+        """Compute 3 thermodynamic features for a MUT/WT pair."""
+        import torch
+        try:
+            guard_net_str = str(_GUARD_NET_DIR)
+            if guard_net_str not in sys.path:
+                sys.path.insert(0, guard_net_str)
+            from features.thermodynamic import RNA_DNA_NN, compute_hybrid_dg
+
+            # Extract crRNA from candidate spacer
+            spacer_dna = candidate.spacer_seq
+            crrna = "".join(
+                _DNA_TO_RNA_RC.get(b, "N") for b in reversed(spacer_dna.upper())
+            )
+
+            # ddg_hybrid: dinucleotide contribution at mismatch position
+            T = 37.0 + 273.15
+            idx = mm_position - 1
+            penalty = 0.0
+            for i in [idx - 1, idx]:
+                if 0 <= i < len(crrna) - 1:
+                    dinuc = crrna[i:i + 2]
+                    if dinuc in RNA_DNA_NN:
+                        dH, dS = RNA_DNA_NN[dinuc]
+                        penalty += dH - T * (dS / 1000.0)
+            ddg_hybrid = penalty
+
+            # cumulative_dg_at_mm
+            cumulative = [0.0]
+            running = 0.0
+            for i in range(len(crrna) - 1):
+                dinuc = crrna[i:i + 2]
+                if dinuc in RNA_DNA_NN:
+                    dH, dS = RNA_DNA_NN[dinuc]
+                    step = dH - T * (dS / 1000.0)
+                else:
+                    step = -1.0
+                running += step
+                cumulative.append(running)
+            cum_idx = min(mm_position, len(cumulative) - 1)
+            cumulative_dg = cumulative[cum_idx]
+
+            # local_dg
+            steps = []
+            for i in [idx - 1, idx]:
+                if 0 <= i < len(crrna) - 1:
+                    dinuc = crrna[i:i + 2]
+                    if dinuc in RNA_DNA_NN:
+                        dH, dS = RNA_DNA_NN[dinuc]
+                        steps.append(dH - T * (dS / 1000.0))
+            local_dg = sum(steps) / max(len(steps), 1)
+
+            feats = torch.tensor([ddg_hybrid, cumulative_dg, local_dg], dtype=torch.float32)
+
+            # Z-score normalise using training stats
+            if self._thermo_norm_mean and self._thermo_norm_std:
+                mean = torch.tensor(self._thermo_norm_mean, dtype=torch.float32)
+                std = torch.tensor(self._thermo_norm_std, dtype=torch.float32)
+                feats = (feats - mean) / (std + 1e-8)
+
+            return feats.unsqueeze(0)  # (1, 3)
+        except Exception as e:
+            logger.warning("Failed to compute thermo features: %s", e)
+            return None
 
     # ------------------------------------------------------------------
     # Private — model loading
@@ -335,10 +429,33 @@ class GUARDNetScorer(Scorer):
                 multitask = True
                 self._multitask = True
 
+            # Auto-detect enhanced disc head features from checkpoint
+            n_thermo = 0
+            pos_embed_dim = 0
+            if has_disc_head:
+                for k in state_dict:
+                    if "pos_embedding.weight" in k:
+                        pos_embed_dim = state_dict[k].shape[1]
+                    if "disc_head.head.0.weight" in k:
+                        disc_input = state_dict[k].shape[1]
+                        # base = 512 (4 * 128), extra = thermo + pos
+                for k in state_dict:
+                    if "disc_head.head.0.weight" in k:
+                        disc_input = state_dict[k].shape[1]
+                        n_thermo = disc_input - 512 - pos_embed_dim
+                        if n_thermo < 0:
+                            n_thermo = 0
+                        break
+
+            self._n_thermo = n_thermo
+            self._pos_embed_dim = pos_embed_dim
+
             self.model = GUARDNet(
                 use_rnafm=use_rnafm,
                 use_rloop_attention=use_rlpa,
                 multitask=multitask,
+                n_thermo=n_thermo,
+                pos_embed_dim=pos_embed_dim,
             )
 
             # Handle partial loading: filter out unexpected keys (e.g.
@@ -379,6 +496,11 @@ class GUARDNetScorer(Scorer):
                 k: v for k, v in checkpoint.items()
                 if k != "model_state_dict"
             }
+
+            # Thermo normalisation params from enhanced checkpoint
+            metadata = checkpoint.get("metadata", {})
+            self._thermo_norm_mean = metadata.get("thermo_norm_mean", [])
+            self._thermo_norm_std = metadata.get("thermo_norm_std", [])
 
             logger.info(
                 "Loaded GUARD-Net from %s (%d params, val_rho=%.4f, rnafm=%s, rlpa=%s, mt=%s)",

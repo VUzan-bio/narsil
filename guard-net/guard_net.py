@@ -58,6 +58,9 @@ class GUARDNet(nn.Module):
         n_scalar_features: int = 0,
         # Domain-adversarial (for multi-dataset training)
         n_domains: int | None = None,
+        # Discrimination head enhancements
+        n_thermo: int = 0,
+        pos_embed_dim: int = 0,
         # Head params
         hidden_dim: int = 64,
         dropout: float = 0.3,
@@ -118,7 +121,11 @@ class GUARDNet(nn.Module):
         # -- Discrimination head (optional) --
         self.multitask = multitask
         if self.multitask:
-            self.disc_head = DiscriminationHead(dense_input_dim, hidden_dim)
+            self.disc_head = DiscriminationHead(
+                dense_input_dim, hidden_dim,
+                n_thermo=n_thermo,
+                pos_embed_dim=pos_embed_dim,
+            )
 
         # -- Domain-adversarial head (optional, for multi-dataset training) --
         self.use_domain_adversarial = n_domains is not None and n_domains > 1
@@ -187,6 +194,9 @@ class GUARDNet(nn.Module):
         # For multi-task: wildtype TARGET DNA (crRNA stays the same)
         wt_target_onehot: torch.Tensor | None = None,
         # wt_crrna_rnafm_emb is NOT needed -- same guide for both conditions
+        # Discrimination head enhancements
+        thermo_feats: torch.Tensor | None = None,
+        mm_position: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """Forward pass.
 
@@ -221,7 +231,11 @@ class GUARDNet(nn.Module):
             # Encode wildtype target with the SAME crRNA
             wt_feat = self.encode(wt_target_onehot, crrna_rnafm_emb, crrna_sequences)
             wt_pooled = self._pool_and_append_scalars(wt_feat, scalar_features)
-            output["discrimination"] = self.disc_head(mut_pooled, wt_pooled)
+            output["discrimination"] = self.disc_head(
+                mut_pooled, wt_pooled, thermo_feats, mm_position,
+            )
+            output["z_mut"] = mut_pooled
+            output["z_wt"] = wt_pooled
 
         if self._attn_weights is not None:
             output["attn_weights"] = self._attn_weights
@@ -251,6 +265,8 @@ class GUARDNet(nn.Module):
         crrna_rnafm_emb: torch.Tensor | None = None,
         crrna_sequences: list[str] | None = None,
         scalar_features: torch.Tensor | None = None,
+        thermo_feats: torch.Tensor | None = None,
+        mm_position: torch.Tensor | None = None,
     ) -> torch.Tensor | None:
         """Predict discrimination ratio from paired targets.
 
@@ -265,7 +281,7 @@ class GUARDNet(nn.Module):
         wt_emb = self.get_embedding(
             wt_target_onehot, crrna_rnafm_emb, crrna_sequences, scalar_features,
         )
-        return self.disc_head(mut_emb, wt_emb)
+        return self.disc_head(mut_emb, wt_emb, thermo_feats, mm_position)
 
     def count_trainable_params(self) -> int:
         """Count trainable parameters (RNA-FM is frozen, only projection trains)."""

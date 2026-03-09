@@ -137,6 +137,8 @@ def _build_target_result(member: dict[str, Any]) -> TargetResult:
         disc_method=disc_method,
         neural_disc=neural_disc,
         feature_disc=feature_disc,
+        thermo_ddg=disc.get("thermo_ddg") if disc else None,
+        mm_position_pam=disc.get("mm_position_pam") if disc else None,
         ml_scores=selected.get("ml_scores", []),
         rank=selected.get("rank"),
     ) if candidate.get("candidate_id") else None

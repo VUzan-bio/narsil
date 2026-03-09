@@ -89,9 +89,11 @@ class CandidateSummary(BaseModel):
     ensemble_score: Optional[float] = None
     discrimination_ratio: Optional[float] = None
     discrimination: Optional[dict] = None
-    disc_method: Optional[str] = None  # "neural" (GUARD-Net disc head) or "feature" (XGBoost/LightGBM)
+    disc_method: Optional[str] = None  # "neural", "neural_enhanced", or "feature"
     neural_disc: Optional[float] = None  # Neural disc head prediction (if available)
     feature_disc: Optional[float] = None  # Feature-based disc prediction (if available)
+    thermo_ddg: Optional[float] = None  # RNA:DNA hybrid ddG at mismatch (kcal/mol)
+    mm_position_pam: Optional[int] = None  # Mismatch position relative to PAM (1-20)
     ml_scores: list[dict] = Field(default_factory=list)
     rank: Optional[int] = None
 
