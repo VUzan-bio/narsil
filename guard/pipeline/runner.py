@@ -546,8 +546,9 @@ class GUARDPipeline:
 
                     # --- UMAP: broad PAM scan for dense background ---
                     # Scan ±5kb genome windows × 6 spacer lengths × 2 strands
-                    # per target using fast regex PAM matching → ~34K background.
+                    # per target. Capped at 8K to stay within container RAM.
                     import re as _re
+                    import random as _rng
                     from guard.candidates.scanner import _gc
                     from types import SimpleNamespace
 
@@ -555,6 +556,7 @@ class GUARDPipeline:
                     bg_spacers: list[tuple] = []
                     _RC = str.maketrans("ACGT", "TGCA")
                     UMAP_WINDOW = 5000
+                    UMAP_MAX_BG = 8000  # cap to avoid OOM on small containers
                     sp_lengths = self.scanner.lengths  # (18..23)
 
                     # Build a single regex for all PAM patterns (fast)
@@ -568,8 +570,7 @@ class GUARDPipeline:
                         pam_alts.append(rx)
                     pam_re = _re.compile("|".join(f"(?={p})" for p in pam_alts))
 
-                    genome = self._load_genome_seq()
-                    max_sp = max(sp_lengths)
+                    genome = self._genome_seq  # already loaded, don't reload
 
                     for target in targets:
                         drug = drug_by_label.get(target.label, "OTHER")
@@ -595,24 +596,26 @@ class GUARDPipeline:
                                     collected_spacers.add(spacer)
                                     bg_spacers.append((spacer, pam4, target.label, drug, _gc(spacer)))
 
+                    # Downsample if too many to fit in container memory
+                    if len(bg_spacers) > UMAP_MAX_BG:
+                        _rng.seed(42)
+                        bg_spacers = _rng.sample(bg_spacers, UMAP_MAX_BG)
+
                     if bg_spacers:
                         logger.info(
                             "UMAP: encoding %d background PAM spacers for dense embedding...",
                             len(bg_spacers),
                         )
-                        # Minimal duck-typed objects for _encode_context (needs .pam_seq, .spacer_seq)
-                        # and _get_rnafm_embedding (needs .spacer_seq)
-                        bg_objs = [
-                            SimpleNamespace(pam_seq=pam, spacer_seq=sp)
-                            for sp, pam, _, _, _ in bg_spacers
-                        ]
 
-                        CHUNK = 4096
-                        for start in range(0, len(bg_objs), CHUNK):
-                            chunk = bg_objs[start:start + CHUNK]
-                            ctx = [self.ml_scorer._encode_context(c) for c in chunk]
-                            rfm = [self.ml_scorer._get_rnafm_embedding(c) for c in chunk]
+                        CHUNK = 512  # small chunks to limit peak memory
+                        for start in range(0, len(bg_spacers), CHUNK):
+                            batch = bg_spacers[start:start + CHUNK]
+                            objs = [SimpleNamespace(pam_seq=p, spacer_seq=s)
+                                    for s, p, _, _, _ in batch]
+                            ctx = [self.ml_scorer._encode_context(c) for c in objs]
+                            rfm = [self.ml_scorer._get_rnafm_embedding(c) for c in objs]
                             chunk_preds = self.ml_scorer._predict_batch(ctx, rfm)
+                            del ctx, rfm  # free immediately
 
                             if self.ml_scorer._last_batch_embeddings is not None:
                                 chunk_embs = self.ml_scorer._last_batch_embeddings
