@@ -282,7 +282,7 @@ python -m guard.scoring.calibrate
 
 Developed for the BRIDGE Discovery grant project on CRISPR-Cas12a electrochemical diagnostics for drug-resistant tuberculosis, in collaboration with the deMello Group (ETH Zurich) and CSEM.
 
-Frontend, backend, and implementation code were developed with the assistance of [Claude Code](https://claude.ai) (Anthropic).
+
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.

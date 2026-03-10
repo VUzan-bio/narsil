@@ -570,7 +570,7 @@ class GUARDPipeline:
                         pam_alts.append(rx)
                     pam_re = _re.compile("|".join(f"(?={p})" for p in pam_alts))
 
-                    genome = self._genome_seq  # already loaded, don't reload
+                    genome = self._genome_seq or self._load_genome_seq()
 
                     for target in targets:
                         drug = drug_by_label.get(target.label, "OTHER")
@@ -619,7 +619,7 @@ class GUARDPipeline:
 
                             if self.ml_scorer._last_batch_embeddings is not None:
                                 chunk_embs = self.ml_scorer._last_batch_embeddings
-                                for idx in range(len(chunk)):
+                                for idx in range(len(batch)):
                                     sp, pam, tl, dr, gc = bg_spacers[start + idx]
                                     self.ml_scorer._collected_embeddings.append({
                                         "target_label": tl,
