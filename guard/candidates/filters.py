@@ -732,16 +732,19 @@ class CandidateFilter:
         if self.check_low_complexity:
             decisions.append(self._check_low_complexity(spacer))
 
-        # --- Filter 7: Self-complementarity ---
-        if self.check_self_complementarity:
-            decisions.append(self._check_self_complementarity(spacer))
+        # Early exit: skip expensive checks if already failed cheap ones
+        already_failed = not all(d.passed for d in decisions)
+        if not already_failed or self.soft_mode:
+            # --- Filter 7: Self-complementarity ---
+            if self.check_self_complementarity:
+                decisions.append(self._check_self_complementarity(spacer))
 
-        # --- Filter 8: Secondary structure (MFE) ---
-        if self.check_structure:
-            decisions.append(self._check_mfe(spacer, candidate))
+            # --- Filter 8: Secondary structure (MFE) ---
+            if self.check_structure:
+                decisions.append(self._check_mfe(spacer, candidate))
 
         # Overall pass/fail
-        all_passed = all(d.passed for d in decisions)
+        all_passed = not already_failed and all(d.passed for d in decisions)
 
         return CandidateFilterResult(
             candidate_id=candidate.candidate_id,
@@ -908,7 +911,7 @@ class CandidateFilter:
         Long self-complementary regions compete with target binding
         and reduce effective concentration.
         """
-        max_comp = self._max_self_complement(spacer)
+        max_comp = self._max_self_complement(spacer, threshold=self.self_comp_max + 1)
         ok = max_comp <= self.self_comp_max
         return FilterDecision(
             filter_name=FilterName.SELF_COMPLEMENTARITY,
@@ -999,12 +1002,12 @@ class CandidateFilter:
         return most_common_count / len(dinucs)
 
     @staticmethod
-    def _max_self_complement(seq: str) -> int:
+    def _max_self_complement(seq: str, threshold: int = 6) -> int:
         """Find the longest stretch where a subsequence is complementary
         to another subsequence (potential for self-folding / dimerization).
 
-        Uses a simple O(n²) approach: for each pair of positions,
-        check how long the complementary stretch extends.
+        Uses O(n²) scanning with early exit once *threshold* is reached
+        (we only need to know pass/fail, not the exact max).
         """
         complement = {"A": "T", "T": "A", "G": "C", "C": "G"}
         n = len(seq)
@@ -1015,11 +1018,14 @@ class CandidateFilter:
                 k = 0
                 while (
                     i + k < j - k
-                    and j + k < n  # Note: j scans forward, i scans forward
+                    and j + k < n
                     and complement.get(seq[i + k], "") == seq[j - k]
                 ):
                     k += 1
-                max_len = max(max_len, k)
+                if k > max_len:
+                    max_len = k
+                    if max_len >= threshold:
+                        return max_len  # early exit — already fails filter
 
         return max_len
 
