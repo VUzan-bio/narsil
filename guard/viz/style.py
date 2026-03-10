@@ -27,7 +27,7 @@ PALETTE = {
     "red": "#C0392B",
     "green": "#27AE60",
     "orange": "#E67E22",
-    "purple": "#8E44AD",
+    "purple": "#2563EB",
     "teal": "#16A085",
 
     # Muted / fills

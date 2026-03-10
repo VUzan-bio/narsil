@@ -34,7 +34,7 @@ const T = {
   success: "#16A34A", successLight: "#DCFCE7",
   warning: "#D97706", warningLight: "#FEF3C7",
   danger: "#DC2626", dangerLight: "#FEE2E2",
-  purple: "#7C3AED", purpleLight: "#F3E8FF",
+  purple: "#2563EB", purpleLight: "#DBEAFE",
   sidebar: "#FAFBFD", sidebarActive: "#EEF2FF", sidebarHover: "#F3F4F6", sidebarText: "#374151",
   riskGreen: "#6BBF8A", riskGreenBg: "#E8F5EC",
   riskAmber: "#E8A855", riskAmberBg: "#FDF2E0",
@@ -218,7 +218,7 @@ const BIBLIOGRAPHY = [
    ═══════════════════════════════════════════════════════════════════ */
 const DRUG_COLORS = {
   RIF: { bg: "#DBEAFE", text: "#1E40AF" }, INH: { bg: "#FEF3C7", text: "#92400E" },
-  EMB: { bg: "#F3E8FF", text: "#6B21A8" }, FQ: { bg: "#FFE4E6", text: "#9F1239" },
+  EMB: { bg: "#DBEAFE", text: "#1E40AF" }, FQ: { bg: "#FFE4E6", text: "#9F1239" },
   AG: { bg: "#E0E7FF", text: "#3730A3" }, PZA: { bg: "#F0FDF4", text: "#166534" },
 };
 const DEFAULT_DRUG = { bg: "#F3F4F6", text: "#6B7280" };
@@ -230,7 +230,7 @@ const Badge = ({ children, variant = "default" }) => {
     success: { background: "#DCFCE7", color: "#166534" },
     warning: { background: "#FEF3C7", color: "#92400E" },
     danger: { background: "#FEE2E2", color: "#991B1B" },
-    purple: { background: "#F3E8FF", color: "#6B21A8" },
+    purple: { background: "#DBEAFE", color: "#1E40AF" },
   };
   return (
     <span style={{ ...(s[variant] || s.default), padding: "3px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.01em", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>{children}</span>
@@ -415,8 +415,8 @@ const AmpliconMap = ({ r }) => {
       <line x1={pad} y1={45} x2={W - pad} y2={45} stroke={T.border} strokeWidth={2} />
       {r.fwd && <rect x={x(0)} y={36} width={fwdEnd * scale} height={18} rx={3} fill="#16A34A" fillOpacity={0.15} stroke="#16A34A" strokeWidth={1} />}
       {r.fwd && <text x={x(fwdEnd / 2)} y={32} textAnchor="middle" fontSize={8} fill="#16A34A" fontWeight={600}>FWD</text>}
-      {r.rev && <rect x={x(revStart)} y={36} width={30 * scale} height={18} rx={3} fill="#7C3AED" fillOpacity={0.15} stroke="#7C3AED" strokeWidth={1} />}
-      {r.rev && <text x={x(revStart + 15)} y={32} textAnchor="middle" fontSize={8} fill="#7C3AED" fontWeight={600}>REV</text>}
+      {r.rev && <rect x={x(revStart)} y={36} width={30 * scale} height={18} rx={3} fill="#2563EB" fillOpacity={0.15} stroke="#2563EB" strokeWidth={1} />}
+      {r.rev && <text x={x(revStart + 15)} y={32} textAnchor="middle" fontSize={8} fill="#2563EB" fontWeight={600}>REV</text>}
       <rect x={x(pamStart)} y={36} width={4 * scale} height={18} rx={2} fill={T.warning} fillOpacity={0.3} stroke={T.warning} strokeWidth={1} />
       <text x={x(pamStart + 2)} y={72} textAnchor="middle" fontSize={8} fill={T.warning} fontWeight={600}>PAM</text>
       <rect x={x(spacerStart)} y={36} width={r.spacer.length * scale} height={18} rx={3} fill={T.primary} fillOpacity={0.25} stroke={T.primary} strokeWidth={1.5} />
@@ -550,7 +550,7 @@ const CandidateViewer = ({ r, onClose }) => {
         {r.strategy === "Proximity" && (
           <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "10px", padding: "16px 20px", marginBottom: "24px" }}>
             <div style={{ fontSize: "13px", fontWeight: 700, color: T.purple, fontFamily: HEADING, marginBottom: "6px" }}>Proximity Detection — PAM Desert Region</div>
-            <div style={{ fontSize: "12px", color: "#6B21A8", lineHeight: 1.6 }}>
+            <div style={{ fontSize: "12px", color: "#1E40AF", lineHeight: 1.6 }}>
               <p style={{ margin: "0 0 6px" }}>
                 The <strong>{r.gene} {r.ref}{r.pos}{r.alt}</strong> mutation sits in a high-GC region with no Cas12a PAM placing the SNP within any spacer.
                 Instead, the crRNA binds a conserved site <strong>{r.proximityDistance ? `${r.proximityDistance} bp` : "nearby"}</strong> from the mutation.
@@ -1867,7 +1867,7 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
 const RISK_COLORS = { green: T.riskGreen, amber: T.riskAmber, red: T.riskRed };
 const RISK_BG = { green: T.riskGreenBg, amber: T.riskAmberBg, red: T.riskRedBg };
 /* GreenBlue colormap — single-cell omics UMAP aesthetic.
-   Stops: light gray → pale green → teal → blue → deep purple. */
+   Stops: light gray → pale green → teal → blue → deep blue. */
 const gradientColor = (t) => {
   t = Math.max(0, Math.min(1, t));
   const stops = [
@@ -1875,7 +1875,7 @@ const gradientColor = (t) => {
     { t: 0.25, r: 171, g: 221, b: 164 },  // #abdda4 — pale green
     { t: 0.50, r: 102, g: 194, b: 165 },  // #66c2a5 — teal
     { t: 0.75, r: 50,  g: 136, b: 189 },  // #3288bd — blue
-    { t: 1.00, r: 94,  g: 79,  b: 162 },  // #5e4fa2 — deep purple (high)
+    { t: 1.00, r: 37,  g: 99,  b: 235 },  // #2563EB — deep blue (high)
   ];
   let lower = stops[0], upper = stops[stops.length - 1];
   for (let i = 0; i < stops.length - 1; i++) {
@@ -1888,12 +1888,12 @@ const gradientColor = (t) => {
   const b = Math.round(lower.b + f * (upper.b - lower.b));
   return `rgb(${r},${g},${b})`;
 };
-const gradientCSS = "linear-gradient(90deg, #b4b9c3, #abdda4, #66c2a5, #3288bd, #5e4fa2)";
+const gradientCSS = "linear-gradient(90deg, #b4b9c3, #abdda4, #66c2a5, #3288bd, #2563EB)";
 const CHART_TEXT = "#1f2937";
 const CHART_TEXT_SEC = "#6b7280";
 const CHART_GRID = "#e5e7eb";
 const PASS_GREEN = "#22c55e";
-const AXIS_COLORS = { efficiency: "#abdda4", discrimination: "#5e4fa2", primers: "#3288bd", safety: "#66c2a5", gc: "#b0b0b0" };
+const AXIS_COLORS = { efficiency: "#abdda4", discrimination: "#2563EB", primers: "#3288bd", safety: "#66c2a5", gc: "#b0b0b0" };
 const AXIS_LABELS = { efficiency: "Activity", discrimination: "Discrimination", primers: "Primers", safety: "Off-target", gc: "GC" };
 
 const RiskDot = ({ level, size = 12 }) => (
@@ -1926,9 +1926,9 @@ const PriorityBadge = ({ rank }) => {
       width: isTop3 ? 28 : 24, height: isTop3 ? 28 : 24, borderRadius: "50%",
       fontSize: isTop3 ? "13px" : "11px", fontWeight: isTop3 ? 700 : 400,
       fontFamily: MONO,
-      background: isTop3 ? "#5e4fa2" : "transparent",
+      background: isTop3 ? "#2563EB" : "transparent",
       color: isTop3 ? "#fff" : T.textSec,
-      border: isTop3 ? "2px solid #5e4fa2" : `1px solid ${T.border}`,
+      border: isTop3 ? "2px solid #2563EB" : `1px solid ${T.border}`,
     }}>
       {rank}
     </span>
@@ -2096,7 +2096,7 @@ const ReadinessChart = ({ results }) => {
 /* ═══════════════════════════════════════════════════════════════════
    UMAP EMBEDDING PANEL
    ═══════════════════════════════════════════════════════════════════ */
-const DRUG_CANVAS = { RIF: "#2563EB", INH: "#D97706", EMB: "#7C3AED", FQ: "#E11D48", AG: "#4F46E5", PZA: "#16A34A", OTHER: "#6B7280" };
+const DRUG_CANVAS = { RIF: "#2563EB", INH: "#D97706", EMB: "#2563EB", FQ: "#E11D48", AG: "#4F46E5", PZA: "#16A34A", OTHER: "#6B7280" };
 
 const UMAPPanel = ({ jobId }) => {
   const [umapData, setUmapData] = useState(null);
@@ -2153,7 +2153,7 @@ const UMAPPanel = ({ jobId }) => {
         const gcNorm = 1 - Math.min(Math.abs(gc - 0.5) / 0.25, 1);
         return gradientColor(gcNorm);
       }
-      if (colorBy === "strategy") return p.detection_strategy === "direct" ? "#3288bd" : "#5e4fa2";
+      if (colorBy === "strategy") return p.detection_strategy === "direct" ? "#3288bd" : "#2563EB";
       return gradientColor(0.5);
     };
 
@@ -2992,7 +2992,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
       {r.strategy === "Proximity" && (
         <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "10px", padding: "14px 18px", marginBottom: "16px" }}>
           <div style={{ fontSize: "12px", fontWeight: 700, color: T.purple, fontFamily: HEADING, marginBottom: "4px" }}>Proximity Detection — PAM Desert</div>
-          <div style={{ fontSize: "11px", color: "#6B21A8", lineHeight: 1.5 }}>
+          <div style={{ fontSize: "11px", color: "#1E40AF", lineHeight: 1.5 }}>
             crRNA binds a conserved site {r.proximityDistance ? `${r.proximityDistance} bp` : "near"} the mutation. Discrimination via AS-RPA primers.
           </div>
         </div>
@@ -3481,7 +3481,7 @@ const DiscriminationTab = ({ results }) => {
 
       {/* Discrimination chart — drug-colored bars, sorted desc */}
       {(() => {
-        const DRUG_DC = { RIF: "#2563EB", INH: "#D97706", EMB: "#7C3AED", FQ: "#E11D48", AG: "#4F46E5", PZA: "#16A34A", OTHER: "#9CA3AF" };
+        const DRUG_DC = { RIF: "#2563EB", INH: "#D97706", EMB: "#2563EB", FQ: "#E11D48", AG: "#4F46E5", PZA: "#16A34A", OTHER: "#9CA3AF" };
         const DRUG_DC_LIGHT = { RIF: "rgba(37,99,235,0.15)", INH: "rgba(217,119,6,0.15)", EMB: "rgba(124,58,237,0.15)", FQ: "rgba(225,29,72,0.15)", AG: "rgba(79,70,229,0.15)", PZA: "rgba(22,163,74,0.15)", OTHER: "rgba(156,163,175,0.15)" };
         const sorted = [...directCands].sort((a, b) => b.disc - a.disc);
         const discChart = sorted.map((r) => ({ name: r.label, disc: +r.disc, score: r.score, drug: r.drug }));
@@ -3887,12 +3887,12 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   const specificity = poolData?.specificity || null;
 
   // Pool colors — greenBlue gradient palette
-  const POOL_COLORS = { A: "#5e4fa2", B: "#3288bd", C: "#66c2a5" };
-  const POOL_BG = { A: "#f0eef8", B: "#e8f4fa", C: "#ecf8f4" };
+  const POOL_COLORS = { A: "#2563EB", B: "#3288bd", C: "#66c2a5" };
+  const POOL_BG = { A: "#EFF6FF", B: "#e8f4fa", C: "#ecf8f4" };
 
   // Drug colors — greenBlue-derived palette
-  const PAD_DRUG_COLORS = { RIF: "#5e4fa2", INH: "#3288bd", EMB: "#66c2a5", PZA: "#abdda4", FQ: "#8073b3", AG: "#4ba3cc", CTRL: "#9ca3af" };
-  const PAD_DRUG_BG = { RIF: "#f0eef8", INH: "#e8f4fa", EMB: "#ecf8f4", PZA: "#f2f9ee", FQ: "#f3f0fa", AG: "#eaf6fc", CTRL: "#f3f4f6" };
+  const PAD_DRUG_COLORS = { RIF: "#2563EB", INH: "#3288bd", EMB: "#66c2a5", PZA: "#abdda4", FQ: "#60A5FA", AG: "#4ba3cc", CTRL: "#9ca3af" };
+  const PAD_DRUG_BG = { RIF: "#EFF6FF", INH: "#e8f4fa", EMB: "#ecf8f4", PZA: "#f2f9ee", FQ: "#EFF6FF", AG: "#eaf6fc", CTRL: "#f3f4f6" };
 
   // Target metadata helpers
   const targetDrug = (t) => {
@@ -3963,7 +3963,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
             {/* RPA chambers — left side */}
             {[
-              { pool: "Pool A", y: 110, color: "#5e4fa2", bg: "#f0eef8" },
+              { pool: "Pool A", y: 110, color: "#2563EB", bg: "#EFF6FF" },
               { pool: "Pool B", y: 175, color: "#3288bd", bg: "#e8f4fa" },
               { pool: "Pool C", y: 240, color: "#66c2a5", bg: "#ecf8f4" },
             ].map(p => (
@@ -4184,7 +4184,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   bgCol = POOL_BG[pool] || "#F3F4F6";
                 } else {
                   borderCol = strategy === "Direct" ? T.success : T.purple;
-                  bgCol = strategy === "Direct" ? "#DCFCE7" : "#F3E8FF";
+                  bgCol = strategy === "Direct" ? "#DCFCE7" : "#DBEAFE";
                 }
 
                 return (
@@ -4282,11 +4282,11 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             </thead>
             <tbody>
               {(kinetics.phases || []).map((phase, i) => (
-                <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}`, background: phase.is_bottleneck ? "#5e4fa208" : "transparent" }}>
+                <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}`, background: phase.is_bottleneck ? "#2563EB08" : "transparent" }}>
                   <td style={{ padding: "8px 12px", fontWeight: phase.is_bottleneck ? 600 : 400 }}>
                     {phase.phase}
                     {phase.is_bottleneck && (
-                      <span style={{ fontSize: "9px", fontWeight: 700, color: "#5e4fa2", marginLeft: "8px", padding: "1px 6px", background: "#5e4fa215", borderRadius: "4px" }}>RATE-LIMITING</span>
+                      <span style={{ fontSize: "9px", fontWeight: 700, color: "#2563EB", marginLeft: "8px", padding: "1px 6px", background: "#2563EB15", borderRadius: "4px" }}>RATE-LIMITING</span>
                     )}
                   </td>
                   <td style={{ textAlign: "center", padding: "8px 12px", color: T.textSec, fontFamily: MONO }}>{phase.solution_bound}</td>
@@ -4319,11 +4319,11 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
         </div>
 
         {/* Key Insights callout */}
-        <div style={{ background: "#f0eef8", border: "1px solid #d4d0e8", borderRadius: "8px", padding: "14px 18px", marginBottom: "12px" }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#5e4fa2", fontFamily: HEADING, marginBottom: "8px" }}>Key Insights</div>
+        <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "8px", padding: "14px 18px", marginBottom: "12px" }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "#2563EB", fontFamily: HEADING, marginBottom: "8px" }}>Key Insights</div>
           {(kinetics.insights || []).map((ins, i) => (
             <div key={i} style={{ marginBottom: i < (kinetics.insights || []).length - 1 ? "8px" : 0 }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "#5e4fa2", opacity: 0.9 }}>{i + 1}. {ins.title}</div>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "#2563EB", opacity: 0.9 }}>{i + 1}. {ins.title}</div>
               <p style={{ fontSize: "11px", color: "#4a3d8f", lineHeight: 1.6, margin: "2px 0 0", opacity: 0.8 }}>{ins.text}</p>
             </div>
           ))}
@@ -4394,7 +4394,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       </CollapsibleSection>
       )}
 
-      <CollapsibleSection title="Panel Composition" defaultOpen={true} badge={{ text: `${results.length} targets`, bg: "#f0eef8", color: "#5e4fa2" }}>
+      <CollapsibleSection title="Panel Composition" defaultOpen={true} badge={{ text: `${results.length} targets`, bg: "#EFF6FF", color: "#2563EB" }}>
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
         <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "16px" }}>Panel Composition</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
@@ -4911,8 +4911,8 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <AreaChart data={combined} margin={{ top: 10, right: 15, bottom: 25, left: 15 }}>
                     <defs>
                       <linearGradient id="mutAreaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#5e4fa2" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#5e4fa2" stopOpacity={0.03} />
+                        <stop offset="0%" stopColor="#2563EB" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#2563EB" stopOpacity={0.03} />
                       </linearGradient>
                       <linearGradient id="wtAreaFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#9ca3af" stopOpacity={0.3} />
@@ -4931,17 +4931,17 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                         <div style={{ ...tooltipStyle, padding: "10px 14px" }}>
                           <div style={{ fontWeight: 600, fontSize: "11px", color: T.text, marginBottom: "4px" }}>Activity: {label}</div>
                           {payload.map(p => p.dataKey !== "overlap" && (
-                            <div key={p.dataKey} style={{ fontSize: "11px", color: p.dataKey === "mut" ? "#5e4fa2" : "#9ca3af" }}>
+                            <div key={p.dataKey} style={{ fontSize: "11px", color: p.dataKey === "mut" ? "#2563EB" : "#9ca3af" }}>
                               {p.dataKey === "mut" ? "Mutant" : "Wildtype"}: {p.value?.toFixed(4)}
                             </div>
                           ))}
                         </div>
                       );
                     }} />
-                    <ReferenceLine x={meanMut} stroke="#5e4fa2" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ MUT", position: "insideTopRight", fontSize: 9, fill: "#5e4fa2", fontWeight: 700 }} />
+                    <ReferenceLine x={meanMut} stroke="#2563EB" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ MUT", position: "insideTopRight", fontSize: 9, fill: "#2563EB", fontWeight: 700 }} />
                     <ReferenceLine x={meanWt} stroke="#9ca3af" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ WT", position: "insideTopRight", fontSize: 9, fill: "#9ca3af", fontWeight: 700 }} />
                     <Area type="monotone" dataKey="overlap" stroke="none" fill="url(#overlapAreaFill)" isAnimationActive={false} />
-                    <Area type="monotone" dataKey="mut" stroke="#5e4fa2" strokeWidth={2.5} fill="url(#mutAreaFill)" isAnimationActive={false} />
+                    <Area type="monotone" dataKey="mut" stroke="#2563EB" strokeWidth={2.5} fill="url(#mutAreaFill)" isAnimationActive={false} />
                     <Area type="monotone" dataKey="wt" stroke="#9ca3af" strokeWidth={2} fill="url(#wtAreaFill)" isAnimationActive={false} strokeDasharray="6 3" />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -4949,7 +4949,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", flexWrap: "wrap", gap: "12px" }}>
                   <div style={{ display: "flex", gap: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                      <div style={{ width: "16px", height: "3px", background: "#5e4fa2", borderRadius: "2px" }} />
+                      <div style={{ width: "16px", height: "3px", background: "#2563EB", borderRadius: "2px" }} />
                       <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>Mutant (A<sub>MUT</sub>)</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -4964,7 +4964,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <div style={{ display: "flex", gap: "20px" }}>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ MUT</div>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#5e4fa2", fontFamily: MONO }}>{meanMut}</div>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#2563EB", fontFamily: MONO }}>{meanMut}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ WT</div>
@@ -5183,7 +5183,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                             <td style={{ padding: "10px 12px", fontWeight: 600, fontFamily: MONO, fontSize: "11px", color: T.text }}>{t.target_label}</td>
                             <td style={{ padding: "10px 12px" }}><DrugBadge drug={drugDisplay} /></td>
                             <td style={{ padding: "10px 12px" }}>
-                              <span style={{ fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "10px", background: stratDisplay === "Direct" ? "rgba(37,99,235,0.08)" : "rgba(147,51,234,0.08)", color: stratDisplay === "Direct" ? T.primary : T.purple }}>{stratDisplay}</span>
+                              <span style={{ fontSize: "10px", fontWeight: 600, padding: "2px 8px", borderRadius: "10px", background: stratDisplay === "Direct" ? "rgba(37,99,235,0.08)" : "rgba(37,99,235,0.08)", color: stratDisplay === "Direct" ? T.primary : T.purple }}>{stratDisplay}</span>
                             </td>
                             <td style={{ padding: "10px 12px" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>

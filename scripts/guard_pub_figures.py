@@ -2,7 +2,7 @@
 """GUARD Publication Figure Suite.
 
 Style reference: Cas12a diagnostic papers (NAR / Cell Rep Methods).
-Yellow gRNA background, green/red highlights, purple heatmaps,
+Yellow gRNA background, green/red highlights, blue heatmaps,
 black gene maps, generous whitespace.
 
 Usage:  python guard_pub_figures.py -o figures/
@@ -57,7 +57,7 @@ def _style():
 
 # ── Palette matching reference papers ──
 # Nucleotide tiles: yellow bg, green match, red mismatch
-# Heatmaps: purple/magenta
+# Heatmaps: blue
 # Gene map: black boxes white text
 # Data: steel blue scatter, red thresholds
 
@@ -81,9 +81,9 @@ Y = dict(
     enhanced  = "#00897B",    # teal
     baseline  = "#BDBDBD",
     threshold = "#E53935",    # red
-    # heatmap — purple gradient like reference
+    # heatmap — blue gradient
     hm_lo     = "#FFFFFF",
-    hm_hi     = "#7B1FA2",    # deep purple
+    hm_hi     = "#2563EB",    # blue
     # text
     ink       = "#212121",
     muted     = "#757575",
@@ -92,7 +92,7 @@ Y = dict(
 
 DRUG = {
     "RIF":"#3F51B5","INH":"#E53935","EMB":"#2E7D32","PZA":"#FF8F00",
-    "LFX":"#6A1B9A","MFX":"#6A1B9A","AMK":"#00695C","KAN":"#BF360C",
+    "LFX":"#2563EB","MFX":"#2563EB","AMK":"#00695C","KAN":"#BF360C",
     "INH/ETH":"#E53935",
 }
 
@@ -302,7 +302,7 @@ def fig1(cands, out):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  FIG 2 — MISMATCH HEATMAP  (purple gradient like ref Fig C)
+#  FIG 2 — MISMATCH HEATMAP  (blue gradient like ref Fig C)
 # ═══════════════════════════════════════════════════════════════
 
 def fig2(out):
@@ -321,9 +321,9 @@ def fig2(out):
     fig, ax = plt.subplots(figsize=(7.5, 4.5))
     fig.subplots_adjust(left=0.10, right=0.86, top=0.82, bottom=0.13)
 
-    # purple gradient (reference paper style)
-    cmap = LinearSegmentedColormap.from_list("pur",
-        ["#FFFFFF","#E1BEE7","#CE93D8","#AB47BC","#7B1FA2","#4A148C"], N=256)
+    # blue gradient
+    cmap = LinearSegmentedColormap.from_list("blu",
+        ["#FFFFFF","#DBEAFE","#93C5FD","#3B82F6","#2563EB","#1E3A8A"], N=256)
 
     im = ax.imshow(mat, cmap=cmap, aspect="auto", vmin=0, vmax=1,
                    interpolation="nearest")
@@ -699,7 +699,7 @@ NT_COLOR = {"A":"#EF5350","T":"#FFEB3B","G":"#66BB6A","C":"#42A5F5",
             "N":"#BDBDBD"}
 
 DRUG_C = {"RIF":"#3F51B5","INH":"#E53935","EMB":"#2E7D32",
-           "PZA":"#FF8F00","LFX":"#6A1B9A","AMK":"#00897B","KAN":"#BF360C"}
+           "PZA":"#FF8F00","LFX":"#2563EB","AMK":"#00897B","KAN":"#BF360C"}
 
 def fig8(out):
     _style()
@@ -1009,7 +1009,7 @@ def fig10(out):
 
 # ═══════════════════════════════════════════════════════════════
 #  FIG 11 — DRUG-RESISTANCE COVERAGE HEATMAP + SUMMARY TABLE
-#  (like reference Fig 3C — purple heatmap with numbers,
+#  (like reference Fig 3C — blue heatmap with numbers,
 #   adjacent summary table)
 # ═══════════════════════════════════════════════════════════════
 
@@ -1052,8 +1052,8 @@ def fig11(out):
     # ── heatmap ──
     ax_h = fig.add_subplot(gs[0])
 
-    cmap = LinearSegmentedColormap.from_list("pur",
-        ["#F3E5F5","#CE93D8","#AB47BC","#7B1FA2","#4A148C"], N=256)
+    cmap = LinearSegmentedColormap.from_list("blu",
+        ["#EFF6FF","#93C5FD","#3B82F6","#2563EB","#1E3A8A"], N=256)
 
     im = ax_h.imshow(mat, cmap=cmap, aspect="auto", vmin=0.3, vmax=1.0,
                      interpolation="nearest")

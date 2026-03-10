@@ -48,11 +48,11 @@ class TargetDashboard:
         "RIF": "#2C6FAC",
         "INH": "#27AE60",
         "EMB": "#E67E22",
-        "PZA": "#8E44AD",
+        "PZA": "#2563EB",
         "FQ": "#C0392B",
         "AG": "#16A085",
         "BDQ": "#D4AC0D",
-        "LZD": "#6C3483",
+        "LZD": "#1E40AF",
     }
 
     def plot_dashboard(
