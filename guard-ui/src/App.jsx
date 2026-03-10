@@ -1349,6 +1349,9 @@ const HomePage = ({ goTo, connected }) => {
                     <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark }}>{activeModule.name}</span>
                   </div>
                   <div style={{ fontSize: "11px", color: T.primary + "BB", lineHeight: 1.4 }}>{activeModule.execDesc}</div>
+                  <div style={{ width: "100%", height: "4px", borderRadius: "2px", background: T.primary + "22", marginTop: "6px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: "2px", background: T.primary, width: `${((pipeStep + 1) / MODULES.length) * 100}%`, transition: "width 0.4s ease-out" }} />
+                  </div>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
