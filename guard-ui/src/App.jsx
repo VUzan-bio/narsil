@@ -1249,7 +1249,7 @@ const HomePage = ({ goTo, connected }) => {
                 <div style={{ display: "flex", gap: "6px" }}>
                   {[
                     { id: "AsCas12a", label: "WT AsCas12a", pams: "TTTV", tip: "Canonical PAM only" },
-                    { id: "enAsCas12a", label: "enAsCas12a", pams: "8 PAMs", tip: "Expanded PAM (Kleinstiver 2019)" },
+                    { id: "enAsCas12a", label: "enAsCas12a", pams: "9 PAMs", tip: "Expanded PAM (Kleinstiver 2019)" },
                   ].map(e => (
                     <button key={e.id} onClick={() => setEnzymeId(e.id)}
                       style={{
@@ -1267,14 +1267,14 @@ const HomePage = ({ goTo, connected }) => {
                 </div>
                 {enzymeId === "enAsCas12a" && (
                   <div style={{ marginTop: "8px", padding: "8px 12px", borderRadius: "6px", background: T.primaryLight + "40", border: `1px solid ${T.primary}20`, fontSize: "10px", color: T.textSec, lineHeight: 1.5 }}>
-                    <strong style={{ color: T.primaryDark }}>enAsCas12a</strong> (E174R/S542R/K548R) recognizes 8 PAM variants with activity penalties from Kleinstiver et al. 2019. Non-canonical PAMs receive a multiplicative score penalty: TTCV 0.65×, TATV 0.55×, CTTV 0.45×, TCTV 0.40×, TGTV 0.35×, ATTV 0.30×, GTTV 0.25×.
+                    <strong style={{ color: T.primaryDark }}>enAsCas12a</strong> (E174R/S542R/K548R) recognizes 9 PAM variants with activity penalties from Kleinstiver et al. 2019. Non-canonical PAMs receive a multiplicative score penalty: TTTT 0.75×, TTCV 0.65×, TATV 0.55×, CTTV 0.45×, TCTV 0.40×, TGTV 0.35×, ATTV 0.30×, GTTV 0.25×. Note: TTTT is not covered by TTTV (V = A/C/G) and is a distinct expanded recognition.
                   </div>
                 )}
               </div>
               {/* Parameter defaults */}
               <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "0 32px" }}>
                 {[
-                  ["PAM Patterns", enzymeId === "enAsCas12a" ? "TTTV + 7 expanded" : "TTTV only"],
+                  ["PAM Patterns", enzymeId === "enAsCas12a" ? "TTTV + 8 expanded (incl. TTTT)" : "TTTV only"],
                   ["Spacer Lengths", "18–23 nt"], ["GC Range", "30–70%"],
                   ["Min Discrimination", "2.0×"], ["SM Enhancement", "Enabled"],
                   ["RPA Amplicon", "100–200 bp"],
@@ -1564,10 +1564,10 @@ const HomePage = ({ goTo, connected }) => {
           <p style={{ margin: "0 0 10px" }}>Two output heads per candidate:</p>
           <ul style={{ margin: "0 0 10px", paddingLeft: "20px" }}>
             <li style={{ marginBottom: "4px" }}><strong style={{ color: T.text }}>Efficiency</strong> (0-1): predicted trans-cleavage signal strength. Head: 128 {"\u2192"} 64 {"\u2192"} 32 {"\u2192"} 1, sigmoid.</li>
-            <li style={{ marginBottom: "4px" }}><strong style={{ color: T.text }}>Discrimination</strong> (x): predicted ability to distinguish resistant from susceptible bacteria. Head: 1024 {"\u2192"} 64 {"\u2192"} 32 {"\u2192"} 1, Softplus.</li>
+            <li style={{ marginBottom: "4px" }}><strong style={{ color: T.text }}>Discrimination</strong> (x): predicted ability to distinguish resistant from susceptible bacteria. Head: 547 (512 embedding + 3 thermo + 32 position) {"\u2192"} 64 {"\u2192"} 32 {"\u2192"} 1, Softplus.</li>
           </ul>
           <p style={{ margin: 0, fontFamily: MONO, fontSize: "12px", color: T.text }}>
-            235,000 params {"\u00B7"} {"\u03C1"} = 0.55 on trans-cleavage {"\u00B7"} Loss: L<sub>Huber</sub> + 0.5(1-{"\u03C1"}<sub>soft</sub>) + {"\u03BB"}<sub>disc</sub>L<sub>Huber</sub>(log D) {"\u00B7"} CPU ~50ms
+            235,000 params {"\u00B7"} {"\u03C1"} = 0.55 on cross-dataset trans-cleavage (EasyDesign) {"\u00B7"} Loss: L<sub>Huber</sub> + 0.5(1-{"\u03C1"}<sub>soft</sub>) + {"\u03BB"}<sub>disc</sub>(0.6·L<sub>Huber</sub> + 0.4·L<sub>contrastive</sub>) {"\u00B7"} CPU ~50ms
           </p>
         </div>
 
@@ -1600,7 +1600,7 @@ const HomePage = ({ goTo, connected }) => {
                     {
                       label: "Output", title: "Multi-Task Prediction Heads", accent: "#e11d48",
                       input: "RLPA-weighted representation, globally pooled to a single vector.",
-                      process: "Efficiency head: 128 -> 64 -> 32 -> 1 (sigmoid). Discrimination head: 1024 -> 64 -> 32 -> 1 (Softplus, predicts log MUT/WT ratio). Joint loss: L_Huber(efficiency) + 0.5 * (1 - rho_soft_Spearman) + lambda_disc * L_Huber(log D).",
+                      process: "Efficiency head: 128 -> 64 -> 32 -> 1 (sigmoid). Discrimination head: 547 (512 embedding + 3 thermo + 32 position) -> 64 -> 32 -> 1 (Softplus, predicts log MUT/WT ratio). Joint loss: L_Huber(efficiency) + 0.5 * (1 - rho_soft_Spearman) + lambda_disc * (0.6 * L_Huber(log D) + 0.4 * L_contrastive_margin).",
                       output: "Two scalars: efficiency score (0-1) and discrimination ratio (fold-change MUT/WT). These drive panel selection and WHO compliance assessment.",
                     },
                   ].map((block, idx, arr) => (
@@ -1661,7 +1661,7 @@ const HomePage = ({ goTo, connected }) => {
       {/* ═══ DISCRIMINATION ═══ */}
       {sectionTitle("Discrimination Analysis")}
       <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 16px 0" }}>
-        Discrimination quantifies the panel's ability to distinguish the resistance allele from wildtype at each target. For Direct candidates, this is the Cas12a cleavage activity ratio (MUT/WT) — predicted by a gradient-boosted model trained on 6,136 paired measurements using 15 thermodynamic features. For Proximity candidates, discrimination is provided by allele-specific RPA primers — the crRNA cleaves equally on both alleles, but only the mutant template is amplified. Higher ratios indicate more reliable resistance calls.
+        Discrimination quantifies the panel's ability to distinguish the resistance allele from wildtype at each target. For Direct candidates, this is the Cas12a cleavage activity ratio (MUT/WT) — predicted by GUARD-Net's neural discrimination head (r = 0.44 on EasyDesign cross-validation) when available, or a gradient-boosted model (LightGBM, r = 0.46, 15 thermodynamic features) as fallback, trained on 6,136 paired measurements. For Proximity candidates, discrimination is provided by allele-specific RPA primers — the crRNA cleaves equally on both alleles, but only the mutant template is amplified. Higher ratios indicate more reliable resistance calls.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "8px", marginBottom: "16px" }}>
@@ -1697,19 +1697,20 @@ const HomePage = ({ goTo, connected }) => {
           Cas12a (formerly Cpf1) is a Class 2, Type V-A CRISPR effector discovered in <em>Francisella novicida</em> (Zetsche et al. 2015).
           Unlike Cas9, it recognises a T-rich PAM upstream of the target, processes its own pre-crRNA without tracrRNA,
           and generates staggered double-strand breaks with 5' overhangs. Crucially for diagnostics, target binding activates
-          a non-specific single-stranded DNase (<em>trans</em>-cleavage) that degrades fluorophore-quencher reporters, enabling
+          a non-specific single-stranded DNase (<em>trans</em>-cleavage) that degrades reporters (fluorophore-quencher in solution, or MB-ssDNA on electrochemical platforms), enabling
           isothermal detection without thermocycling.
         </p>
         <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: "0 0 12px 0" }}>
-          GUARD uses the engineered <strong>enAsCas12a</strong> variant (Kleinstiver et al. 2019), which expands PAM recognition
-          from canonical TTTV to include TTTT, VTTV, and TRTV motifs, increasing targetable sites by approximately 7-fold.
-          This variant maintains high fidelity while operating at 37 °C — compatible with recombinase polymerase amplification (RPA)
-          for single-tube, equipment-free diagnostics at point of care.
+          GUARD supports both wild-type AsCas12a (canonical TTTV PAM) and the engineered <strong>enAsCas12a</strong> variant
+          (E174R/S542R/K548R; Kleinstiver et al. 2019), which expands PAM recognition
+          from canonical TTTV to include TTTT, TTCV, TATV, CTTV, TCTV, TGTV, ATTV, and GTTV motifs, increasing targetable sites by approximately 8-fold in GC-rich genomes.
+          Both variants operate at 37 °C — compatible with recombinase polymerase amplification (RPA)
+          for equipment-free diagnostics at point of care.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "6px", marginBottom: "12px" }}>
           {[
-            ["Variant", "enAsCas12a (engineered)"],
-            ["PAM", "5'-TTTV-3' + 7 expanded (TTCV, TATV, CTTV, TCTV, TGTV, ATTV, GTTV)"],
+            ["Variant", "WT AsCas12a / enAsCas12a (selectable)"],
+            ["PAM", "5'-TTTV-3' (WT) or + 8 expanded: TTTT, TTCV, TATV, CTTV, TCTV, TGTV, ATTV, GTTV (enAsCas12a)"],
             ["Spacer", "5' → 3', non-target strand"],
             ["crRNA", "19 nt direct repeat + 20–23 nt spacer"],
             ["Cis-cleavage", "Staggered dsDNA cut, 5' overhang"],
@@ -1717,7 +1718,7 @@ const HomePage = ({ goTo, connected }) => {
             ["Temperature", "37 °C (RPA-compatible)"],
             ["Readouts", "Electrochemical (SWV on LIG) · lateral flow · fluorescence"],
             ["Sensitivity", "Attomolar with RPA pre-amplification (electrode sensitivity platform-dependent)"],
-            ["Multiplexing", "Orthogonal reporters per crRNA in single tube"],
+            ["Multiplexing", "Spatial multiplexing via LIG electrode array \u2014 each crRNA on a dedicated electrode pad"],
           ].map(([k, v]) => (
             <div key={k} style={{ display: "flex", gap: "8px", padding: "8px 12px", background: T.bgSub, borderRadius: "6px" }}>
               <span style={{ fontSize: "11px", color: T.textTer, fontWeight: 600, minWidth: mobile ? 80 : 110, flexShrink: 0 }}>{k}</span>
@@ -1726,7 +1727,7 @@ const HomePage = ({ goTo, connected }) => {
           ))}
         </div>
         <div style={{ background: T.primaryLight, borderRadius: "8px", padding: "10px 14px", fontSize: "11px", color: T.primaryDark, lineHeight: 1.5 }}>
-          <strong>Why Cas12a over Cas9 for diagnostics?</strong> (1) T-rich PAM provides orthogonal target space to Cas9's NGG. The engineered enAsCas12a variant (E174R/S542R/K548R) expands recognition to 8 PAM variants (TTTV + TTCV/TATV/CTTV/TCTV/TGTV/ATTV/GTTV), mitigating PAM scarcity in GC-rich genomes like M. tuberculosis. Activity penalties from Kleinstiver et al. 2019 are applied during scoring. (2) Self-processing crRNA simplifies guide design. (3) Trans-cleavage enables signal amplification without PCR. (4) Staggered cuts improve allele discrimination at single-nucleotide resolution.
+          <strong>Why Cas12a over Cas9 for diagnostics?</strong> (1) T-rich PAM provides orthogonal target space to Cas9's NGG. The engineered enAsCas12a variant (E174R/S542R/K548R) expands recognition to 9 PAM variants (TTTV + TTTT/TTCV/TATV/CTTV/TCTV/TGTV/ATTV/GTTV), mitigating PAM scarcity in GC-rich genomes like M. tuberculosis. Activity penalties from Kleinstiver et al. 2019 are applied during scoring. (2) Self-processing crRNA simplifies guide design. (3) Trans-cleavage enables signal amplification without PCR. (4) Staggered cuts improve allele discrimination at single-nucleotide resolution.
         </div>
       </CollapsibleSection>
 
@@ -1758,7 +1759,7 @@ const HomePage = ({ goTo, connected }) => {
           {[
             {
               title: "Discrimination prediction",
-              text: "Discrimination ratios are predicted by a gradient-boosted model trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a). The model uses 15 thermodynamic features including R-loop cumulative \u0394G, mismatch \u0394\u0394G penalties (Sugimoto 2000), and position sensitivity. Cross-validated correlation r\u22480.46 (vs r\u22480.30 for heuristic baseline). Falls back to position-dependent heuristics when the trained model is unavailable.",
+              text: "Discrimination ratios are predicted by GUARD-Net\u2019s neural discrimination head (r = 0.44, trained end-to-end with contrastive margin loss on 6,136 paired MUT/WT trans-cleavage measurements from EasyDesign, Huang et al. 2024, LbCas12a). When GUARD-Net is unavailable, falls back to a standalone LightGBM model (r = 0.46, 15 thermodynamic features including R-loop cumulative \u0394G, mismatch \u0394\u0394G penalties per Sugimoto 2000, and position sensitivity), then to position-dependent heuristics (r \u2248 0.30). Note: XGBoost r = 0.46 is within-distribution 3-fold CV; the neural head\u2019s r = 0.44 reflects the harder task of predicting from sequence alone without hand-crafted thermodynamic features.",
             },
             {
               title: "Training data & domain shift",

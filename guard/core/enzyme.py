@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple
 
 KLEINSTIVER_2019_PENALTIES: Dict[str, float] = {
     "TTTV": 1.00,   # canonical — no penalty
+    "TTTT": 0.75,   # recognized by enAsCas12a but not WT; not in IUPAC V
     "TTCV": 0.65,   # moderate activity
     "TATV": 0.55,   # moderate activity
     "CTTV": 0.45,   # reduced
@@ -123,6 +124,7 @@ EN_AS_CAS12A = EnzymeConfig(
     ),
     pam_specs=(
         PAMSpec("TTTV", 1.00, "TTTV"),
+        PAMSpec("TTTT", 0.75, "TTTT"),
         PAMSpec("TTCV", 0.65, "TTCV"),
         PAMSpec("TATV", 0.55, "TATV"),
         PAMSpec("CTTV", 0.45, "CTTV"),

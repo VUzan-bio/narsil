@@ -138,6 +138,7 @@ CONFIGS: dict[str, ScanConfig] = {
         pams=(
             # Kleinstiver et al., Nature Biotechnology 2019, Fig. 2d
             PAMDef("TTTV", 4, 1.00, "TTTV"),   # canonical
+            PAMDef("TTTT", 4, 0.75, "TTTT"),   # not in TTTV (V excludes T); enAsCas12a-specific
             PAMDef("TTCV", 4, 0.65, "TTCV"),   # moderate
             PAMDef("TATV", 4, 0.55, "TATV"),   # moderate
             PAMDef("CTTV", 4, 0.45, "CTTV"),   # reduced

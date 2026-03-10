@@ -44,13 +44,14 @@ class PAMVariant(str, Enum):
     """Cas12a PAM types across all supported variants.
 
     AsCas12a:       TTTV (canonical)
-    enAsCas12a:     TTTV, TTCV, TATV, CTTV, TCTV, TGTV, ATTV, GTTV
+    enAsCas12a:     TTTV, TTTT, TTCV, TATV, CTTV, TCTV, TGTV, ATTV, GTTV
                     (Kleinstiver et al., Nature Biotechnology 2019)
     LbCas12a:       TTTV
     FnCas12a:       TTTV, KYTV
     Cas12a Ultra:   TTTV, TTTN, TTCN
     """
     TTTV = "TTTV"           # canonical AsCas12a / all variants
+    TTTT = "TTTT"           # enAsCas12a only — 75% activity; not in TTTV (V excludes T)
     TTCV = "TTCV"           # enAsCas12a — 65% activity (Kleinstiver 2019)
     TATV = "TATV"           # enAsCas12a — 55% activity
     CTTV = "CTTV"           # enAsCas12a — 45% activity
