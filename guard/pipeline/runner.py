@@ -416,7 +416,7 @@ class GUARDPipeline:
                 "direct_hits": total_direct,
                 "proximity_hits": total_proximity,
                 "pam_deserts": n_deserts,
-                "cas_variant": cas_variant,
+                "cas_variant": self.config.candidates.resolve_enzyme_id(),
             },
         })
 
