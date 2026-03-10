@@ -1075,10 +1075,36 @@ const HomePage = ({ goTo, connected }) => {
             ))}
           </div>
 
-          {/* Collapsible summary bar */}
+        </div>
+
+        {/* Scoring Model */}
+        <div style={{ marginBottom: "28px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "10px" }}>Scoring Model</div>
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
+            {[
+              { id: "heuristic", label: "Heuristic", desc: "Position-weighted composite across 5 biophysical features. Fast, interpretable, no GPU required.", tag: "Baseline" },
+              { id: "guard_net", label: "GUARD-Net", desc: "Dual-branch CNN + RNA-FM with R-loop propagation attention. Trained on 25K+ cis- and trans-cleavage measurements. \u03C1 = 0.55 on diagnostic trans-cleavage prediction.", tag: "Recommended" },
+            ].map(s => (
+              <button key={s.id} onClick={() => setScorer(s.id)} style={{
+                padding: "16px", borderRadius: "10px", cursor: "pointer", fontFamily: FONT, textAlign: "left",
+                border: `2px solid ${scorer === s.id ? T.primary : T.border}`,
+                background: scorer === s.id ? T.primaryLight : T.bg, transition: "all 0.15s",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "14px", fontWeight: 700, color: scorer === s.id ? T.primaryDark : T.text, fontFamily: HEADING }}>{s.label}</span>
+                  <span style={{ fontSize: "9px", fontWeight: 700, color: scorer === s.id ? T.primary : T.textTer, textTransform: "uppercase", letterSpacing: "0.08em", padding: "2px 8px", borderRadius: "4px", background: scorer === s.id ? T.primary + "15" : T.bgSub }}>{s.tag}</span>
+                </div>
+                <div style={{ fontSize: "12px", color: scorer === s.id ? T.primaryDark : T.textSec, lineHeight: 1.5, opacity: 0.85 }}>{s.desc}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Mutations selected (collapsible card) */}
+        <div style={{ marginBottom: "16px" }}>
           <div style={{ background: T.bgSub, border: `1px solid ${T.borderLight}`, borderRadius: "10px", overflow: "hidden" }}>
             <button onClick={() => setTargetsOpen(!targetsOpen)} style={{
-              width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "12px 16px",
+              width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px",
               background: "none", border: "none", cursor: "pointer", fontFamily: FONT,
             }}>
               <span style={{ fontSize: "13px", fontWeight: 600, color: T.text }}>{selected.size} mutations selected</span>
@@ -1154,39 +1180,20 @@ const HomePage = ({ goTo, connected }) => {
           </div>
         </div>
 
-        {/* Scoring Model */}
+        {/* Advanced Configuration (collapsible card — matching mutations card design) */}
         <div style={{ marginBottom: "28px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "10px" }}>Scoring Model</div>
-          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
-            {[
-              { id: "heuristic", label: "Heuristic", desc: "Position-weighted composite across 5 biophysical features. Fast, interpretable, no GPU required.", tag: "Baseline" },
-              { id: "guard_net", label: "GUARD-Net", desc: "Dual-branch CNN + RNA-FM with R-loop propagation attention. Trained on 25K+ cis- and trans-cleavage measurements. \u03C1 = 0.55 on diagnostic trans-cleavage prediction.", tag: "Recommended" },
-            ].map(s => (
-              <button key={s.id} onClick={() => setScorer(s.id)} style={{
-                padding: "16px", borderRadius: "10px", cursor: "pointer", fontFamily: FONT, textAlign: "left",
-                border: `2px solid ${scorer === s.id ? T.primary : T.border}`,
-                background: scorer === s.id ? T.primaryLight : T.bg, transition: "all 0.15s",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "14px", fontWeight: 700, color: scorer === s.id ? T.primaryDark : T.text, fontFamily: HEADING }}>{s.label}</span>
-                  <span style={{ fontSize: "9px", fontWeight: 700, color: scorer === s.id ? T.primary : T.textTer, textTransform: "uppercase", letterSpacing: "0.08em", padding: "2px 8px", borderRadius: "4px", background: scorer === s.id ? T.primary + "15" : T.bgSub }}>{s.tag}</span>
-                </div>
-                <div style={{ fontSize: "12px", color: scorer === s.id ? T.primaryDark : T.textSec, lineHeight: 1.5, opacity: 0.85 }}>{s.desc}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Advanced Configuration (collapsible) */}
-        <div style={{ marginBottom: "28px" }}>
-          <button onClick={() => setConfigOpen(!configOpen)} style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", background: "none", border: "none", cursor: "pointer", padding: "0 0 10px 0", fontFamily: FONT }}>
+          <div style={{ background: T.bgSub, border: `1px solid ${T.borderLight}`, borderRadius: "10px", overflow: "hidden" }}>
+          <button onClick={() => setConfigOpen(!configOpen)} style={{
+            width: "100%", display: "flex", alignItems: "center", gap: "10px", padding: "14px 16px",
+            background: "none", border: "none", cursor: "pointer", fontFamily: FONT,
+          }}>
             <Settings size={14} color={T.textSec} />
             <span style={{ fontSize: "13px", fontWeight: 600, color: T.text, flex: 1, textAlign: "left" }}>Advanced Configuration</span>
             <span style={{ fontSize: "11px", color: T.textTer, marginRight: "4px" }}>defaults</span>
             <ChevronDown size={14} color={T.textSec} style={{ transform: configOpen ? "rotate(180deg)" : "none", transition: "0.2s" }} />
           </button>
           {configOpen && (
-            <div style={{ background: T.bgSub, borderRadius: "10px", padding: "16px 20px", border: `1px solid ${T.borderLight}` }}>
+            <div style={{ padding: "16px 20px", borderTop: `1px solid ${T.borderLight}` }}>
               {/* Pipeline mode toggle */}
               <div style={{ marginBottom: "16px" }}>
                 <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px" }}>Pipeline Mode</div>
@@ -1282,6 +1289,7 @@ const HomePage = ({ goTo, connected }) => {
               </div>
             </div>
           )}
+          </div>
         </div>
 
         {/* Divider */}
