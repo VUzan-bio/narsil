@@ -2,8 +2,10 @@
 
 Two complementary approaches:
 
-Approach A — FeatureDiscriminationModel (XGBoost/LightGBM):
+Approach A — FeatureDiscriminationModel (LightGBM, XGBoost fallback):
   Gradient-boosted trees on 15 thermodynamic features.
+  Production uses LightGBM (pyproject.toml dependency); XGBoost used
+  if available; sklearn GBR as final fallback.
   Fast inference, interpretable feature importance, no GPU needed.
   Best when paired experimental data is limited (<10K pairs).
 
@@ -36,11 +38,11 @@ logger = logging.getLogger(__name__)
 
 
 # ======================================================================
-# Approach A: Feature-based discrimination model (XGBoost)
+# Approach A: Feature-based discrimination model (LightGBM / XGBoost)
 # ======================================================================
 
 class FeatureDiscriminationModel:
-    """XGBoost model predicting discrimination from thermodynamic features.
+    """Gradient-boosted model predicting discrimination from thermodynamic features.
 
     Input: 15 thermodynamic features (see thermo_discrimination_features.py)
     Output: delta_logk (MUT - WT activity in log space)

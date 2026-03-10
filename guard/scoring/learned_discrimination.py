@@ -1,7 +1,7 @@
 """Learned discrimination scoring — trained on EasyDesign paired data.
 
-Replaces the heuristic position×destabilisation model with a gradient-boosted
-tree model trained on 6,136 paired MUT/WT trans-cleavage measurements.
+Replaces the heuristic position×destabilisation model with a LightGBM
+gradient-boosted tree trained on 6,136 paired MUT/WT trans-cleavage measurements.
 
 The model predicts delta_logk (MUT - WT activity in log space) from 15
 thermodynamic features. Discrimination ratio = 10^(delta_logk).

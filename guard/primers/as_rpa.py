@@ -300,11 +300,13 @@ class ASRPADesigner:
 
                     seq = list(genome[start:end].upper())
 
-                    # 3' terminal base (position 0 before RC) = mut complement
-                    comp_mut = str(Seq(mut_base).complement())
-                    seq[0] = comp_mut.upper()
+                    # 3' terminal base: set genomic position to mut_base so
+                    # that after RC the primer 3' = complement(mut_base),
+                    # which Watson-Crick pairs with the plus-strand mutant allele.
+                    seq[0] = mut_base.upper()
 
-                    # Deliberate mismatch near 3' (near position 0 before RC)
+                    # Deliberate mismatch near 3' end (position 0 is 3' after RC)
+                    # mm_idx in genomic coords: after RC, idx 1 → pos -2 from 3'
                     mm_idx = -mm_offset - 1  # e.g. -2 → idx 1
                     if 0 < mm_idx < length:
                         original = seq[mm_idx]
