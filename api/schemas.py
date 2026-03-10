@@ -52,6 +52,7 @@ class PipelineRunRequest(BaseModel):
     name: str = "GUARD Run"
     mode: PipelineMode = PipelineMode.FULL
     mutations: list[MutationInput]
+    enzyme_id: Optional[str] = None  # "AsCas12a" or "enAsCas12a"; None = use default
     config_overrides: dict = Field(default_factory=dict)
 
 
@@ -94,6 +95,9 @@ class CandidateSummary(BaseModel):
     feature_disc: Optional[float] = None  # Feature-based disc prediction (if available)
     thermo_ddg: Optional[float] = None  # RNA:DNA hybrid ddG at mismatch (kcal/mol)
     mm_position_pam: Optional[int] = None  # Mismatch position relative to PAM (1-20)
+    pam_penalty: Optional[float] = None       # PAM activity penalty (1.0 = canonical, <1.0 = expanded)
+    is_canonical_pam: Optional[bool] = None   # True if TTTV
+    enzyme_id: Optional[str] = None           # Cas12a variant used
     ml_scores: list[dict] = Field(default_factory=list)
     rank: Optional[int] = None
 
@@ -134,6 +138,9 @@ class PanelSummary(BaseModel):
     mean_discrimination: Optional[float] = None
     direct_count: int = 0
     proximity_count: int = 0
+    enzyme_id: Optional[str] = None
+    canonical_pam_count: int = 0       # targets using TTTV
+    expanded_pam_count: int = 0        # targets using non-canonical PAMs
 
 
 class ModuleStats(BaseModel):

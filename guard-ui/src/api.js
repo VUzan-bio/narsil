@@ -36,11 +36,20 @@ export async function healthCheck() {
 }
 
 // Pipeline
-export async function submitRun(name, mode, mutations, configOverrides = {}) {
+export async function submitRun(name, mode, mutations, configOverrides = {}, enzymeId = null) {
   return request("/api/pipeline/run", {
     method: "POST",
-    body: JSON.stringify({ name, mode, mutations, config_overrides: configOverrides }),
+    body: JSON.stringify({
+      name, mode, mutations,
+      config_overrides: configOverrides,
+      ...(enzymeId ? { enzyme_id: enzymeId } : {}),
+    }),
   });
+}
+
+// Enzymes
+export async function getEnzymes() {
+  return request("/api/pipeline/enzymes");
 }
 
 export async function listJobs() {

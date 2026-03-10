@@ -136,11 +136,15 @@ CONFIGS: dict[str, ScanConfig] = {
     "enAsCas12a": ScanConfig(
         "enAsCas12a",
         pams=(
-            PAMDef("TTTV", 4, 1.0, "TTTV"),
-            PAMDef("TTTN", 4, 0.7, "TTTN"),
-            PAMDef("TTCN", 4, 0.4, "TTCN"),
-            PAMDef("TCTV", 4, 0.3, "TCTV"),
-            PAMDef("CTTV", 4, 0.2, "CTTV"),
+            # Kleinstiver et al., Nature Biotechnology 2019, Fig. 2d
+            PAMDef("TTTV", 4, 1.00, "TTTV"),   # canonical
+            PAMDef("TTCV", 4, 0.65, "TTCV"),   # moderate
+            PAMDef("TATV", 4, 0.55, "TATV"),   # moderate
+            PAMDef("CTTV", 4, 0.45, "CTTV"),   # reduced
+            PAMDef("TCTV", 4, 0.40, "TCTV"),   # reduced
+            PAMDef("TGTV", 4, 0.35, "TGTV"),   # low
+            PAMDef("ATTV", 4, 0.30, "ATTV"),   # low
+            PAMDef("GTTV", 4, 0.25, "GTTV"),   # low
         ),
         lengths=_LENGTHS_DEFAULT,
         seed_start=1, seed_end=8,

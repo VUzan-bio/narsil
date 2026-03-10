@@ -44,18 +44,25 @@ class PAMVariant(str, Enum):
     """Cas12a PAM types across all supported variants.
 
     AsCas12a:       TTTV (canonical)
-    enAsCas12a:     TTTV, TTTN, TTCN, TCTV, CTTV
+    enAsCas12a:     TTTV, TTCV, TATV, CTTV, TCTV, TGTV, ATTV, GTTV
+                    (Kleinstiver et al., Nature Biotechnology 2019)
     LbCas12a:       TTTV
     FnCas12a:       TTTV, KYTV
     Cas12a Ultra:   TTTV, TTTN, TTCN
     """
     TTTV = "TTTV"           # canonical AsCas12a / all variants
-    TTTN = "TTTN"           # enAsCas12a relaxed 4th position
-    TTCN = "TTCN"           # enAsCas12a C at position 3
-    TCTV = "TCTV"           # enAsCas12a C at position 2
-    CTTV = "CTTV"           # enAsCas12a C at position 1
-    TTYN = "TTYN"           # legacy label (enAsCas12a)
-    VTTV = "VTTV"           # legacy label (enAsCas12a)
+    TTCV = "TTCV"           # enAsCas12a — 65% activity (Kleinstiver 2019)
+    TATV = "TATV"           # enAsCas12a — 55% activity
+    CTTV = "CTTV"           # enAsCas12a — 45% activity
+    TCTV = "TCTV"           # enAsCas12a — 40% activity
+    TGTV = "TGTV"           # enAsCas12a — 35% activity
+    ATTV = "ATTV"           # enAsCas12a — 30% activity
+    GTTV = "GTTV"           # enAsCas12a — 25% activity
+    # Legacy / other variants
+    TTTN = "TTTN"           # enAsCas12a relaxed 4th position (legacy)
+    TTCN = "TTCN"           # enAsCas12a C at position 3 (legacy)
+    TTYN = "TTYN"           # legacy label
+    VTTV = "VTTV"           # legacy label
     KYTV = "KYTV"           # FnCas12a relaxed
 
 
@@ -432,6 +439,7 @@ class HeuristicScore(BaseModel):
     offtarget_penalty: float
     composite: float                                # weighted sum
     proximity_bonus: float = 0.0                    # bonus for nearby proximity (smaller dist)
+    pam_penalty: float = 1.0                        # PAM activity penalty (Kleinstiver 2019)
 
     @property
     def breakdown(self) -> dict[str, float]:
@@ -442,6 +450,7 @@ class HeuristicScore(BaseModel):
             "homopolymer": self.homopolymer_penalty,
             "offtarget": self.offtarget_penalty,
             "proximity_bonus": self.proximity_bonus,
+            "pam_penalty": self.pam_penalty,
             "composite": self.composite,
         }
 

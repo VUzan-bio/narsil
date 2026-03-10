@@ -91,6 +91,15 @@ class HeuristicScorer(Scorer):
         if is_proximity:
             composite += self.weights["seed_position"] * prox_bonus
 
+        # Apply PAM activity penalty as multiplicative factor.
+        # Canonical TTTV = 1.0 (no change). Non-canonical PAMs reduce the
+        # composite proportionally to their relative activity from
+        # Kleinstiver et al. 2019. This naturally ranks TTTV candidates
+        # higher while still allowing expanded-PAM candidates to compete
+        # when they have superior seed position or other features.
+        pam_penalty = getattr(candidate, "pam_activity_weight", 1.0)
+        composite *= pam_penalty
+
         heuristic = HeuristicScore(
             seed_position_score=seed_score,
             gc_penalty=gc_penalty,
@@ -99,6 +108,7 @@ class HeuristicScorer(Scorer):
             offtarget_penalty=ot_penalty,
             composite=composite,
             proximity_bonus=prox_bonus,
+            pam_penalty=pam_penalty,
         )
 
         return ScoredCandidate(

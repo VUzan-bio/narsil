@@ -27,11 +27,23 @@ class CandidateConfig(BaseModel):
     spacer_lengths: list[int] = Field(default=[20, 21, 23])
     use_enascas12a: bool = True
     cas_variant: Optional[str] = None
+    enzyme_id: Optional[str] = None  # maps to ENZYME_REGISTRY; overrides cas_variant/use_enascas12a
     require_seed_mutation: bool = True
     gc_min: float = 0.40
     gc_max: float = 0.60
     homopolymer_max: int = 4
     mfe_threshold: float = -2.0
+
+    def resolve_enzyme_id(self) -> str:
+        """Resolve the effective enzyme ID from config fields.
+
+        Priority: enzyme_id > cas_variant > use_enascas12a flag.
+        """
+        if self.enzyme_id:
+            return self.enzyme_id
+        if self.cas_variant:
+            return self.cas_variant
+        return "enAsCas12a" if self.use_enascas12a else "AsCas12a"
 
 
 class SyntheticMismatchConfig(BaseModel):

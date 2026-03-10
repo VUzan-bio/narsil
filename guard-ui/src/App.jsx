@@ -20,6 +20,7 @@ import {
   getTopK, runSweep, runPareto,
   compareScorers, getThermoProfile, getThermoStandalone, getAblation,
   getNucleaseProfiles, getNucleaseComparison, getUmapData, getPoolData,
+  getEnzymes,
 } from "./api";
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -113,7 +114,10 @@ const RESULTS = MUTATIONS.map((m, i) => {
   return {
     ...m, label: refKey,
     strategy: i % 3 === 0 ? "Direct" : i % 3 === 1 ? "Proximity" : "Direct",
-    spacer, wtSpacer, pam: ["TTTV", "TTTG", "TTTA", "TTTC"][i % 4],
+    spacer, wtSpacer, pam: ["TTTG", "TTCA", "TATA", "CTTG", "TTTC", "TCTG", "TGTC", "ATTG"][i % 8],
+    pamVariant: ["TTTV", "TTCV", "TATV", "CTTV", "TTTV", "TCTV", "TGTV", "ATTV"][i % 8],
+    pamPenalty: [1.0, 0.65, 0.55, 0.45, 1.0, 0.40, 0.35, 0.30][i % 8],
+    isCanonicalPam: i % 8 === 0 || i % 8 === 4,
     score: heuristic, cnnScore: cnnRaw, cnnCalibrated: cnnCal, ensembleScore: ensemble,
     mlScores: [{ model_name: "guard_net", predicted_efficiency: cnnRaw }],
     disc: discRatio,
@@ -130,7 +134,8 @@ const RESULTS = MUTATIONS.map((m, i) => {
 RESULTS.push({
   gene: "IS6110", ref: "N", pos: 0, alt: "N", drug: "OTHER", drugFull: "Other", conf: "N/A", tier: 0,
   label: "IS6110_NON", strategy: "Direct", spacer: "AATGTCGCCGCGATCGAGCG", wtSpacer: "AATGTCGCCGCGATCGAGCG",
-  pam: "TTTG", score: 0.95, cnnScore: 0.88, cnnCalibrated: 0.91, ensembleScore: 0.924,
+  pam: "TTTG", pamVariant: "TTTV", pamPenalty: 1.0, isCanonicalPam: true,
+  score: 0.95, cnnScore: 0.88, cnnCalibrated: 0.91, ensembleScore: 0.924,
   mlScores: [{ model_name: "guard_net", predicted_efficiency: 0.88 }],
   disc: 999, discrimination: { model_name: "learned_lightgbm", ratio: 999, mut_activity: 0.95, wt_activity: 0.001 },
   gc: 0.65, ot: 0, hasPrimers: true, hasSM: false,
@@ -338,6 +343,7 @@ function transformApiCandidate(c) {
       drug: c.drug, drugFull: c.drug || "", conf: "", tier: "",
       label: c.label, strategy: c.detection_strategy === "direct" ? "Direct" : "Proximity",
       spacer: sc.spacer_seq, wtSpacer: sc.wt_spacer_seq || "", pam: sc.pam_seq,
+      pamVariant: sc.pam_variant || "", pamPenalty: sc.pam_penalty ?? null, isCanonicalPam: sc.is_canonical_pam ?? null,
       score: sc.composite_score, disc: +(sc.discrimination_ratio || 0).toFixed(1), gc: sc.gc_content,
       discrimination: sc.discrimination || null, discMethod: sc.disc_method || null,
       neuralDisc: sc.neural_disc ?? null, featureDisc: sc.feature_disc ?? null,
@@ -368,6 +374,7 @@ function transformApiCandidate(c) {
     drug: c.drug, drugFull: c.drug_full, conf: c.who_confidence, tier: c.tier,
     label: c.target_label, strategy: c.detection_strategy === "direct" ? "Direct" : "Proximity",
     spacer: c.spacer_seq, wtSpacer: c.wt_spacer_seq, pam: c.pam_seq,
+    pamVariant: c.pam_variant || "", pamPenalty: c.pam_penalty ?? null, isCanonicalPam: c.is_canonical_pam ?? null,
     score: c.score, disc: +(c.discrimination?.ratio || 0).toFixed(1), gc: c.gc_content,
     discrimination: c.discrimination || null,
     cnnScore: c.cnn_score ?? null,
@@ -529,11 +536,12 @@ const CandidateViewer = ({ r, onClose }) => {
             ...(r.strategy === "Proximity" && r.proximityDistance ? [{ l: "Distance", v: `${r.proximityDistance} bp`, c: T.purple }] : []),
             { l: "GC%", v: `${(r.gc * 100).toFixed(0)}%`, c: T.text },
             { l: "Off-targets", v: r.ot, c: r.ot === 0 ? T.success : T.warning },
-            { l: "PAM", v: r.pam, c: T.text },
+            { l: "PAM", v: r.pam, c: T.text, badge: r.pamVariant && r.pamVariant !== "TTTV" ? r.pamVariant : null, penalty: r.pamPenalty },
           ].map((s, i) => (
             <div key={s.l} style={{ flex: mobile ? "1 1 40%" : 1, textAlign: "center", borderLeft: !mobile && i > 0 ? `1px dashed ${T.border}` : "none", minWidth: mobile ? "30%" : "auto" }}>
               <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>{s.l}</div>
               <div style={{ fontSize: mobile ? "15px" : "18px", fontWeight: 700, color: s.c, fontFamily: MONO }}>{s.v}</div>
+              {s.badge && <div style={{ marginTop: "3px", display: "inline-block", padding: "1px 5px", borderRadius: "4px", fontSize: "9px", fontWeight: 700, fontFamily: MONO, background: s.penalty >= 0.5 ? "#FEF3C7" : "#FEE2E2", color: s.penalty >= 0.5 ? "#92400E" : "#991B1B" }}>{s.badge} {s.penalty != null ? `${s.penalty}×` : ""}</div>}
             </div>
           ))}
         </div>
@@ -852,6 +860,7 @@ const HomePage = ({ goTo, connected }) => {
   const [selectedModules, setSelectedModules] = useState(new Set(MODULES.map(m => m.id)));
   const [configOpen, setConfigOpen] = useState(false);
   const [scorer, setScorer] = useState("guard_net"); // "heuristic" | "guard_net"
+  const [enzymeId, setEnzymeId] = useState("enAsCas12a"); // "AsCas12a" | "enAsCas12a"
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState(null);
 
@@ -901,7 +910,7 @@ const HomePage = ({ goTo, connected }) => {
     const apiMode = "full";
     const overrides = scorer !== "heuristic" ? { scorer } : {};
     if (connected) {
-      const { data, error: err } = await submitRun(runName, apiMode, muts, overrides);
+      const { data, error: err } = await submitRun(runName, apiMode, muts, overrides, enzymeId);
       if (err) { setError(err); setLaunching(false); return; }
       startInlinePipeline(data.job_id);
     } else {
@@ -1227,14 +1236,43 @@ const HomePage = ({ goTo, connected }) => {
                   <div style={{ marginTop: "6px", fontSize: "10px", color: T.textTer }}>{selectedModules.size}/{MODULES.length} modules</div>
                 </div>
               )}
+              {/* Enzyme selector */}
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px" }}>Cas12a Variant</div>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {[
+                    { id: "AsCas12a", label: "WT AsCas12a", pams: "TTTV", tip: "Canonical PAM only" },
+                    { id: "enAsCas12a", label: "enAsCas12a", pams: "8 PAMs", tip: "Expanded PAM (Kleinstiver 2019)" },
+                  ].map(e => (
+                    <button key={e.id} onClick={() => setEnzymeId(e.id)}
+                      style={{
+                        flex: 1, padding: "10px 12px", borderRadius: "8px", cursor: "pointer", textAlign: "left",
+                        border: `2px solid ${enzymeId === e.id ? T.primary : T.border}`,
+                        background: enzymeId === e.id ? T.primaryLight : T.bg,
+                        fontFamily: FONT, transition: "all 0.15s",
+                      }}
+                    >
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: enzymeId === e.id ? T.primaryDark : T.text, marginBottom: "2px" }}>{e.label}</div>
+                      <div style={{ fontSize: "10px", color: T.textTer }}>{e.tip}</div>
+                      <div style={{ marginTop: "4px", display: "inline-block", padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 600, fontFamily: MONO, background: enzymeId === e.id ? T.primary + "20" : T.bgSub, color: enzymeId === e.id ? T.primary : T.textSec }}>{e.pams}</div>
+                    </button>
+                  ))}
+                </div>
+                {enzymeId === "enAsCas12a" && (
+                  <div style={{ marginTop: "8px", padding: "8px 12px", borderRadius: "6px", background: T.primaryLight + "40", border: `1px solid ${T.primary}20`, fontSize: "10px", color: T.textSec, lineHeight: 1.5 }}>
+                    <strong style={{ color: T.primaryDark }}>enAsCas12a</strong> (E174R/S542R/K548R) recognizes 8 PAM variants with activity penalties from Kleinstiver et al. 2019. Non-canonical PAMs receive a multiplicative score penalty: TTCV 0.65×, TATV 0.55×, CTTV 0.45×, TCTV 0.40×, TGTV 0.35×, ATTV 0.30×, GTTV 0.25×.
+                  </div>
+                )}
+              </div>
               {/* Parameter defaults */}
               <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "0 32px" }}>
                 {[
-                  ["Cas12a Variant", "enAsCas12a"], ["PAM Pattern", "TTTV"],
-                  ["Spacer Lengths", "20–23 nt"], ["GC Range", "30–70%"],
+                  ["PAM Patterns", enzymeId === "enAsCas12a" ? "TTTV + 7 expanded" : "TTTV only"],
+                  ["Spacer Lengths", "18–23 nt"], ["GC Range", "30–70%"],
                   ["Min Discrimination", "2.0×"], ["SM Enhancement", "Enabled"],
                   ["RPA Amplicon", "100–200 bp"],
                   ["Scoring Model", scorer === "guard_net" ? "GUARD-Net" : "Heuristic"],
+                  ["PAM Penalty", enzymeId === "enAsCas12a" ? "Kleinstiver 2019" : "N/A (canonical only)"],
                 ].map(([k, v]) => (
                   <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.borderLight}`, fontSize: "12px" }}>
                     <span style={{ color: T.textSec }}>{k}</span>
@@ -1663,7 +1701,7 @@ const HomePage = ({ goTo, connected }) => {
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "6px", marginBottom: "12px" }}>
           {[
             ["Variant", "enAsCas12a (engineered)"],
-            ["PAM", "5'-TTTV-3' (expanded: VTTV, TRTV)"],
+            ["PAM", "5'-TTTV-3' + 7 expanded (TTCV, TATV, CTTV, TCTV, TGTV, ATTV, GTTV)"],
             ["Spacer", "5' → 3', non-target strand"],
             ["crRNA", "19 nt direct repeat + 20–23 nt spacer"],
             ["Cis-cleavage", "Staggered dsDNA cut, 5' overhang"],
@@ -1680,13 +1718,13 @@ const HomePage = ({ goTo, connected }) => {
           ))}
         </div>
         <div style={{ background: T.primaryLight, borderRadius: "8px", padding: "10px 14px", fontSize: "11px", color: T.primaryDark, lineHeight: 1.5 }}>
-          <strong>Why Cas12a over Cas9 for diagnostics?</strong> (1) T-rich PAM provides orthogonal target space to Cas9's NGG. The engineered enAsCas12a variant (E174R/S542R/K548R) expands recognition to VTTV and TRTV motifs, mitigating PAM scarcity in GC-rich genomes like M. tuberculosis. (2) Self-processing crRNA simplifies guide design. (3) Trans-cleavage enables signal amplification without PCR. (4) Staggered cuts improve allele discrimination at single-nucleotide resolution.
+          <strong>Why Cas12a over Cas9 for diagnostics?</strong> (1) T-rich PAM provides orthogonal target space to Cas9's NGG. The engineered enAsCas12a variant (E174R/S542R/K548R) expands recognition to 8 PAM variants (TTTV + TTCV/TATV/CTTV/TCTV/TGTV/ATTV/GTTV), mitigating PAM scarcity in GC-rich genomes like M. tuberculosis. Activity penalties from Kleinstiver et al. 2019 are applied during scoring. (2) Self-processing crRNA simplifies guide design. (3) Trans-cleavage enables signal amplification without PCR. (4) Staggered cuts improve allele discrimination at single-nucleotide resolution.
         </div>
       </CollapsibleSection>
 
       <CollapsibleSection title="Pipeline Defaults">
         {[
-          ["PAM", "TTTV", "~4× more sites than TTTG-only"],
+          ["PAM", "TTTV + 7 expanded", "enAsCas12a: 8 PAM variants with Kleinstiver 2019 activity penalties"],
           ["Spacer length", "20–23 nt", "20nt canonical; 21–23 for high-GC"],
           ["GC range", "30–70%", "Below 30% weak R-loop; above 70% self-structure"],
           ["Max homopolymer", "4 nt", "Poly-T ≥5 = Pol III termination"],
@@ -2818,8 +2856,12 @@ const generateInterpretation = (r) => {
 
   // PAM quality
   const pam = (r.pam || "").toUpperCase();
-  if (pam.match(/^TTT[ACGV]/)) lines.push(`Canonical PAM (${r.pam}) \u2014 optimal Cas12a recognition. LbCas12a binds this PAM with highest affinity.`);
-  else lines.push(`Non-canonical PAM (${r.pam}) \u2014 reduced binding affinity compared to TTTV. This is the best available PAM site in the GC-rich M. tuberculosis genomic context around this mutation.`);
+  if (r.isCanonicalPam || pam.match(/^TTT[ACG]/)) {
+    lines.push(`Canonical PAM (${r.pam}) \u2014 optimal Cas12a recognition, no activity penalty applied.`);
+  } else {
+    const penaltyStr = r.pamPenalty != null ? ` Activity penalty: ${r.pamPenalty}\u00d7 (Kleinstiver et al. 2019).` : "";
+    lines.push(`Expanded PAM (${r.pam}${r.pamVariant ? `, ${r.pamVariant}` : ""}) \u2014 recognized by enAsCas12a with reduced activity vs canonical TTTV.${penaltyStr} This is the best available PAM site in the GC-rich M. tuberculosis genomic context around this mutation.`);
+  }
 
   // Discrimination
   const discModelName = r.discrimination?.model_name || "";
@@ -2999,9 +3041,10 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
                     <div style={{ color: T.textTer, marginBottom: "2px" }}>Amplicon</div>
                     <div style={{ fontWeight: 700, fontFamily: MONO, color: T.text }}>{r.amplicon} bp</div>
                   </div>
-                  <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "10px", border: `1px solid ${T.borderLight}`, fontSize: "11px" }}>
+                  <div style={{ flex: 1, background: r.isCanonicalPam === false ? "#FEF3C7" : T.bgSub, borderRadius: "8px", padding: "10px", border: `1px solid ${r.isCanonicalPam === false ? "#F59E0B40" : T.borderLight}`, fontSize: "11px" }}>
                     <div style={{ color: T.textTer, marginBottom: "2px" }}>PAM</div>
                     <div style={{ fontWeight: 700, fontFamily: MONO, color: T.text }}>{r.pam}</div>
+                    {r.pamVariant && <div style={{ marginTop: "2px", fontSize: "9px", fontWeight: 600, color: r.isCanonicalPam ? T.success : "#B45309" }}>{r.pamVariant}{r.pamPenalty != null && r.pamPenalty < 1.0 ? ` · ${r.pamPenalty}× activity` : ""}</div>}
                   </div>
                   <div style={{ flex: 1, background: r.hasSM ? T.primaryLight : T.bgSub, borderRadius: "8px", padding: "10px", border: `1px solid ${T.borderLight}`, fontSize: "11px" }}>
                     <div style={{ color: T.textTer, marginBottom: "2px" }}>SM</div>
@@ -3062,7 +3105,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
                     ["Drug Class", r.drug],
                     ["Gene", r.gene],
                     ["Strategy", r.strategy],
-                    ["PAM Sequence", r.pam],
+                    ["PAM Sequence", `${r.pam}${r.pamVariant ? ` (${r.pamVariant})` : ""}${r.pamPenalty != null && r.pamPenalty < 1.0 ? ` — ${r.pamPenalty}× activity` : ""}`],
                     ["Spacer Length", `${(r.spacer || "").length} nt`],
                     ["GC Content", `${(r.gc * 100).toFixed(1)}%`],
                     ...(r.amplicon ? [["Amplicon Size", `${r.amplicon} bp`]] : []),
@@ -4524,6 +4567,26 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>primers + viable discrimination</div>
           </div>
         </div>
+        {/* PAM distribution */}
+        {(() => {
+          const canonicalCount = results.filter(r => r.isCanonicalPam === true || (r.pamVariant || "").startsWith("TTT")).length;
+          const expandedCount = results.filter(r => r.isCanonicalPam === false && r.pamVariant && !r.pamVariant.startsWith("TTT")).length;
+          if (expandedCount === 0 && canonicalCount === 0) return null;
+          return (
+            <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+              <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
+                <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.success }}>{canonicalCount}</div>
+                <div style={{ fontSize: "11px", color: T.textSec }}>Canonical PAM</div>
+                <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>TTTV — full activity</div>
+              </div>
+              <div style={{ flex: 1, background: expandedCount > 0 ? "#FEF3C7" : T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${expandedCount > 0 ? "#F59E0B40" : T.borderLight}`, textAlign: "center" }}>
+                <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: expandedCount > 0 ? "#B45309" : T.textTer }}>{expandedCount}</div>
+                <div style={{ fontSize: "11px", color: T.textSec }}>Expanded PAM</div>
+                <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>enAsCas12a — penalised</div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* IS6110 Control — reframed for dedicated pad */}

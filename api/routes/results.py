@@ -140,6 +140,9 @@ def _build_target_result(member: dict[str, Any]) -> TargetResult:
         feature_disc=feature_disc,
         thermo_ddg=disc.get("thermo_ddg") if disc else None,
         mm_position_pam=disc.get("mm_position_pam") if disc else None,
+        pam_penalty=heuristic.get("pam_penalty", candidate.get("pam_activity_weight")),
+        is_canonical_pam=candidate.get("pam_variant") == "TTTV" if candidate.get("pam_variant") else None,
+        enzyme_id=candidate.get("enzyme_id") or member.get("enzyme_id"),
         ml_scores=selected.get("ml_scores", []),
         rank=selected.get("rank"),
     ) if candidate.get("candidate_id") else None

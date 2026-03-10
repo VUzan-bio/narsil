@@ -126,9 +126,7 @@ class GUARDPipeline:
         )
 
         # Module 2: PAM scanner
-        cas_variant = "enAsCas12a" if config.candidates.use_enascas12a else "AsCas12a"
-        if config.candidates.cas_variant:
-            cas_variant = config.candidates.cas_variant
+        cas_variant = config.candidates.resolve_enzyme_id()
         self.scanner = PAMScanner(cas_variant=cas_variant)
 
         # Module 3: Candidate filter
@@ -418,7 +416,7 @@ class GUARDPipeline:
                 "direct_hits": total_direct,
                 "proximity_hits": total_proximity,
                 "pam_deserts": n_deserts,
-                "cas_variant": "enAsCas12a",
+                "cas_variant": cas_variant,
             },
         })
 
@@ -744,7 +742,7 @@ class GUARDPipeline:
         t0 = time.perf_counter_ns()
         logger.info("Module 6: Synthetic mismatch enhancement...")
         sm_config = EnhancementConfig(
-            cas_variant=self.config.candidates.cas_variant or "enAsCas12a",
+            cas_variant=self.config.candidates.resolve_enzyme_id(),
             allow_double_synthetic=self.config.synthetic_mismatch.allow_double_sm,
             min_activity_vs_mut=self.config.synthetic_mismatch.min_activity_vs_mut,
             search_radius=6,
