@@ -879,10 +879,14 @@ const HomePage = ({ goTo, connected }) => {
   const [showLog, setShowLog] = useState(false);
   const [archOpen, setArchOpen] = useState(false);
   const pipeStartRef = useRef(Date.now());
+  const pipeStepStartRef = useRef(Date.now());
   const pipeTimerRef = useRef(null);
   const pipeWsRef = useRef(null);
   const pipePollRef = useRef(null);
   const prevPipeStep = useRef(-1);
+
+  // Reset step timer whenever pipeStep changes (drives continuous progress bar)
+  useEffect(() => { pipeStepStartRef.current = Date.now(); }, [pipeStep]);
 
   /* ── Preset panel definitions ── */
   const ALL_INDICES = MUTATIONS.map((_, i) => i);
@@ -933,6 +937,7 @@ const HomePage = ({ goTo, connected }) => {
     setPipeElapsed(0);
     prevPipeStep.current = -1;
     pipeStartRef.current = Date.now();
+    pipeStepStartRef.current = Date.now();
     setLaunching(false);
 
     // Elapsed timer
@@ -1349,9 +1354,18 @@ const HomePage = ({ goTo, connected }) => {
                     <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark }}>{activeModule.name}</span>
                   </div>
                   <div style={{ fontSize: "11px", color: T.primary + "BB", lineHeight: 1.4 }}>{activeModule.execDesc}</div>
-                  <div style={{ width: "100%", height: "4px", borderRadius: "2px", background: T.primary + "22", marginTop: "6px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", borderRadius: "2px", background: T.primary, width: `${((pipeStep + 1) / MODULES.length) * 100}%`, transition: "width 0.4s ease-out" }} />
-                  </div>
+                  {(() => {
+                    const stepEstSec = activeModule.estSec || 10;
+                    const stepElapsed = (Date.now() - pipeStepStartRef.current) / 1000;
+                    // Ease toward 95% within estimated time, never reaches 100% until step completes
+                    const intraStep = Math.min(0.95, 1 - Math.exp(-2.5 * stepElapsed / stepEstSec));
+                    const pct = ((pipeStep + intraStep) / MODULES.length) * 100;
+                    return (
+                      <div style={{ width: "100%", height: "4px", borderRadius: "2px", background: T.primary + "22", marginTop: "6px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", borderRadius: "2px", background: T.primary, width: `${pct}%`, transition: "width 0.15s linear" }} />
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
