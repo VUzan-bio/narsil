@@ -150,7 +150,7 @@ const MODULES = [
   { id: "M4", name: "Off-Target Screening", desc: "Bowtie2 alignment + heuristic fallback", icon: Shield, execDesc: "Bowtie2 alignment against H37Rv genome, flagging off-target binding sites", estSec: 45 },
   { id: "M5", name: "Heuristic Scoring", desc: "Position-weighted composite scoring", icon: BarChart3, execDesc: "Position-weighted composite scoring across 5 biophysical features", estSec: 10 },
   { id: "M5.5", name: "Mismatch Pairs", desc: "WT/MUT spacer pair generation", icon: GitBranch, execDesc: "Generating wildtype spacers for each mutant candidate (MUT/WT discrimination pairs)", estSec: 5 },
-  { id: "M6", name: "SM Enhancement", desc: "Synthetic mismatch for 10–100× discrimination", icon: Zap, execDesc: "Engineering synthetic mismatches at seed positions 2–6 for enhanced discrimination", estSec: 20 },
+  { id: "M6", name: "SM Enhancement", desc: "Synthetic mismatch for enhanced discrimination", icon: Zap, execDesc: "Engineering synthetic mismatches at seed positions 1–8 for enhanced discrimination", estSec: 20 },
   { id: "M6.5", name: "Discrimination", desc: "MUT/WT activity ratio quantification", icon: TrendingUp, execDesc: "Quantifying MUT/WT activity ratios for diagnostic-grade discrimination assessment", estSec: 15 },
   { id: "M7", name: "Multiplex Optimization", desc: "Simulated annealing panel selection", icon: Grid3x3, execDesc: "Simulated annealing over candidate combinations for optimal panel selection", estSec: 30 },
   { id: "M8", name: "RPA Primer Design", desc: "Standard + allele-specific RPA", icon: Crosshair, execDesc: "Designing RPA primers (25–38 nt, Tm 57–72 °C) with dimer checking", estSec: 60 },
@@ -170,8 +170,8 @@ const MODULE_NAME_MAP = {
 /* Scoring feature weights — matches guard/core/constants.py HEURISTIC_WEIGHTS exactly */
 const SCORING_FEATURES = [
   { name: "Seed Position", key: "seed_position", weight: 0.35, desc: "Positions 1–8 (PAM-proximal) perfect match penalty. Mismatches in seed dramatically reduce cleavage.", source: "Kim et al. 2017" },
-  { name: "GC Content", key: "gc", weight: 0.20, desc: "Optimal 40–60%. Extreme GC causes secondary structure (high) or weak binding (low).", source: "Empirical" },
-  { name: "Secondary Structure", key: "structure", weight: 0.20, desc: "Spacer folding ΔG penalty. Strong secondary structure blocks Cas12a loading.", source: "ViennaRNA / SantaLucia 1998" },
+  { name: "GC Content", key: "gc", weight: 0.20, desc: "Optimal 40–60%. Extreme GC causes self-complementarity (high) or weak binding (low).", source: "Empirical" },
+  { name: "Self-Complementarity", key: "structure", weight: 0.20, desc: "Spacer self-complementarity penalty. High self-complementarity blocks Cas12a loading.", source: "SantaLucia 1998" },
   { name: "Homopolymer", key: "homopolymer", weight: 0.10, desc: "≥4 consecutive identical nucleotides penalized (includes poly-T terminator risk).", source: "Heuristic" },
   { name: "Off-Target", key: "offtarget", weight: 0.15, desc: "Bowtie2 alignment to H37Rv genome. Each hit with ≤3 mismatches reduces score.", source: "Langmead & Salzberg 2012" },
 ];
@@ -1437,9 +1437,9 @@ const HomePage = ({ goTo, connected }) => {
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "12px", marginBottom: "32px" }}>
         {[
           { step: "1", icon: Target, title: "Define Targets", desc: "Input WHO resistance mutations. The pipeline resolves each mutation to its exact genomic position on the M. tuberculosis H37Rv reference genome, identifies the codon context, and determines which drug class it confers resistance to." },
-          { step: "2", icon: Search, title: "Generate & Score Candidates", desc: "For each target, GUARD scans for Cas12a-compatible PAM sites, generates crRNA candidates, filters by biophysical criteria (GC content, secondary structure, off-targets), and scores them using two models: GUARD-Net for cleavage efficiency (trained on 25,000+ cis- and trans-cleavage measurements from Kim et al. 2018 and Huang et al. 2024) and a thermodynamic discrimination model for MUT/WT selectivity (trained on 6,136 paired measurements, 15 features, r = 0.46)." },
+          { step: "2", icon: Search, title: "Generate & Score Candidates", desc: "For each target, GUARD scans for Cas12a-compatible PAM sites, generates crRNA candidates, filters by biophysical criteria (GC content, homopolymer runs, self-complementarity, off-targets), and scores them using GUARD-Net for cleavage efficiency (trained on 25,000+ cis- and trans-cleavage measurements from Kim et al. 2018 and Huang et al. 2024) and GUARD-Net's neural discrimination head for MUT/WT selectivity (r = 0.44 on held-out validation, trained end-to-end on 6,136 paired measurements) with a standalone feature-based model (XGBoost, 15 thermodynamic features, r = 0.46) as fallback." },
           { step: "3", icon: Grid3x3, title: "Optimise the Panel", desc: "Panel composition is optimised via simulated annealing (10,000 iterations) over the combinatorial space of candidate assignments, maximising a weighted objective of efficiency, discrimination, and cross-reactivity avoidance. RPA primers are co-designed for each guide, with allele-specific primers for proximity targets." },
-          { step: "4", icon: Shield, title: "Assess Clinical Performance", desc: "Block 3 evaluates the panel against WHO Target Product Profiles: per-drug-class sensitivity, specificity estimates, and ranked backup alternatives for each target. Three operating modes (field screening, clinical deployment, reference lab) adjust thresholds automatically." },
+          { step: "4", icon: Shield, title: "Assess Clinical Performance", desc: "The clinical assessment module evaluates the panel against WHO Target Product Profiles: per-drug-class sensitivity, specificity estimates, and ranked backup alternatives for each target. Three operating modes (field screening, clinical deployment, reference lab) adjust thresholds automatically." },
         ].map(c => (
           <div key={c.title} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: "24px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
@@ -1488,7 +1488,7 @@ const HomePage = ({ goTo, connected }) => {
             <div style={{ flex: 1, textAlign: "center" }}>
               <div style={{ width: "1px", height: "16px", background: T.text, margin: "0 auto" }} />
               <div style={{ border: `1.5px solid ${T.primary}`, borderRadius: "6px", padding: "10px 14px", background: "#fff" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: T.primary }}>Block 3</div>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: T.primary }}>Clinical Assessment</div>
                 <div style={{ fontSize: "10px", color: T.textSec, marginTop: "2px" }}>Sensitivity + Specificity + WHO TPP</div>
               </div>
             </div>
@@ -1535,13 +1535,13 @@ const HomePage = ({ goTo, connected }) => {
             ["Architecture", "Dual-branch CNN + RNA-FM with RLPA"],
             ["Parameters", "235,000 trainable"],
             ["Training data", "Kim et al. 2018 (15K cis) + Huang et al. 2024 EasyDesign (10K trans)"],
-            ["Trans-cleavage \u03C1", "0.55 (EasyDesign benchmark)"],
-            ["Cis-cleavage \u03C1", "0.49 (Kim 2018 benchmark)"],
+            ["Trans-cleavage \u03C1", "0.55 (cross-dataset, EasyDesign benchmark)"],
+            ["Cis-cleavage \u03C1", "0.49 (Kim 2018 cross-library, multi-task production checkpoint)"],
             ["Attention", "R-Loop Propagation Attention (RLPA)"],
             ["RLPA improvement", "+6.7% on Kim 2018 cross-library evaluation"],
             ["Training protocol", "3-phase: pretrain, RLPA, multi-task"],
             ["Multi-task heads", "Efficiency (sigmoid) + Discrimination (Softplus)"],
-            ["Inference", "CPU-compatible (~50ms per candidate)"],
+            ["Inference", "CPU-compatible (<1ms per candidate)"],
           ].map(([k, v]) => (
             <div key={k} style={{ display: "flex", gap: "8px", padding: "8px 12px", background: T.bgSub, borderRadius: "6px" }}>
               <span style={{ fontSize: "11px", color: T.textTer, fontWeight: 600, minWidth: 130, flexShrink: 0 }}>{k}</span>
@@ -1551,7 +1551,7 @@ const HomePage = ({ goTo, connected }) => {
         </div>
         {/* Benchmark finding */}
         <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "8px", padding: "12px 16px", marginBottom: "12px", fontSize: "12px", color: T.primaryDark, lineHeight: 1.65 }}>
-          <strong>Benchmark validation:</strong> Models trained only on gene-editing data (Kim et al. 2018, cis-cleavage) show near-zero predictive value for diagnostic trans-cleavage ({"\u03C1"} = 0.04). The production model incorporates trans-cleavage training data (Huang et al. 2024) and achieves {"\u03C1"} = 0.55 on diagnostic predictions — a 12x improvement in predictive accuracy for the relevant readout.
+          <strong>Benchmark validation:</strong> Models trained only on gene-editing data (Kim et al. 2018, cis-cleavage) show near-zero predictive value for diagnostic trans-cleavage ({"\u03C1"} = 0.04). The production model incorporates trans-cleavage training data (Huang et al. 2024) and achieves {"\u03C1"} = 0.55 on diagnostic predictions — an order-of-magnitude improvement in predictive accuracy for the relevant readout ({"\u03C1"} = 0.04 → 0.55).
         </div>
         <p style={{ fontSize: "11px", color: T.textTer, margin: 0, lineHeight: 1.5 }}>
           All predictions are in silico estimates. Predicted discrimination ratios are derived from mismatch penalty models, not from clinical trial data. Experimental confirmation is required before diagnostic deployment.
@@ -1573,7 +1573,7 @@ const HomePage = ({ goTo, connected }) => {
             <li style={{ marginBottom: "4px" }}><strong style={{ color: T.text }}>Discrimination</strong> (x): predicted ability to distinguish resistant from susceptible bacteria. Head: 547 (512 embedding + 3 thermo + 32 position) {"\u2192"} 64 {"\u2192"} 32 {"\u2192"} 1, Softplus.</li>
           </ul>
           <p style={{ margin: 0, fontFamily: MONO, fontSize: "12px", color: T.text }}>
-            235,000 params {"\u00B7"} {"\u03C1"} = 0.55 on cross-dataset trans-cleavage (EasyDesign) {"\u00B7"} Loss: L<sub>Huber</sub> + 0.5(1-{"\u03C1"}<sub>soft</sub>) + {"\u03BB"}<sub>disc</sub>(0.6·L<sub>Huber</sub> + 0.4·L<sub>contrastive</sub>) {"\u00B7"} CPU ~50ms
+            235,000 params {"\u00B7"} {"\u03C1"} = 0.55 on cross-dataset trans-cleavage (EasyDesign) {"\u00B7"} Loss: L<sub>Huber</sub> + 0.5(1-{"\u03C1"}<sub>soft</sub>) + {"\u03BB"}<sub>disc</sub>(0.6·L<sub>Huber</sub> + 0.4·L<sub>contrastive</sub>) {"\u00B7"} CPU {"<"}1ms
           </p>
         </div>
 
@@ -1592,7 +1592,7 @@ const HomePage = ({ goTo, connected }) => {
                       output: "64-dimensional feature vector per position capturing local sequence determinants: dinucleotide preferences, seed complementarity, PAM-proximal patterns.",
                     },
                     {
-                      label: "Branch 2", title: "RNA-FM Projection", accent: "#7c3aed",
+                      label: "Branch 2", title: "RNA-FM Projection", accent: "#2563EB",
                       input: "Guide RNA sequence (20-23 nt spacer). Processed by frozen RNA-FM (Chen et al. 2022, trained on 23M non-coding RNAs via masked language modelling).",
                       process: "RNA-FM generates 640-dim per-nucleotide embeddings encoding secondary structure propensity and thermodynamic stability. A trainable linear projection maps 640-dim to 64-dim. Sequence is zero-padded from 20 to 34 positions for alignment with the CNN branch.",
                       output: "64-dimensional structural embedding per position. Captures folding, stability, and 5' accessibility properties governing Cas12a loading.",
@@ -1607,7 +1607,7 @@ const HomePage = ({ goTo, connected }) => {
                       label: "Output", title: "Multi-Task Prediction Heads", accent: "#e11d48",
                       input: "RLPA-weighted representation, globally pooled to a single vector.",
                       process: "Efficiency head: 128 -> 64 -> 32 -> 1 (sigmoid). Discrimination head: 547 (512 embedding + 3 thermo + 32 position) -> 64 -> 32 -> 1 (Softplus, predicts log MUT/WT ratio). Joint loss: L_Huber(efficiency) + 0.5 * (1 - rho_soft_Spearman) + lambda_disc * (0.6 * L_Huber(log D) + 0.4 * L_contrastive_margin).",
-                      output: "Two scalars: efficiency score (0-1) and discrimination ratio (fold-change MUT/WT). These drive panel selection and WHO compliance assessment.",
+                      output: "Two scalars: efficiency score (0-1) and discrimination ratio (fold-change MUT/WT). Efficiency scores are post-processed through temperature-scaled calibration to align the predicted distribution with observed trans-cleavage activity ranges. These drive panel selection and WHO compliance assessment.",
                     },
                   ].map((block, idx, arr) => (
                     <div key={block.title} style={{ padding: mobile ? "16px 0" : "20px 0", borderBottom: idx < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
@@ -1640,7 +1640,7 @@ const HomePage = ({ goTo, connected }) => {
               )}
       </CollapsibleSection>
 
-      {/* ═══ BLOCK 3 — Clinical Performance Dashboard ═══ */}
+      {/* ═══ Clinical Performance Dashboard ═══ */}
       {sectionTitle("WHO-Benchmarked Diagnostic Assessment")}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "20px" : "28px 32px", marginBottom: "16px" }}>
         <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 20px" }}>
@@ -1648,7 +1648,7 @@ const HomePage = ({ goTo, connected }) => {
         </p>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
           {[
-            { title: "Per-drug-class sensitivity", desc: "Does the panel detect resistance to each antibiotic? WHO requires ≥95% for rifampicin, ≥90% for isoniazid and fluoroquinolones, ≥80% for ethambutol, pyrazinamide, and aminoglycosides.", icon: TrendingUp },
+            { title: "Per-drug-class sensitivity", desc: "Does the panel detect resistance to each antibiotic? WHO TPP minimum acceptable sensitivity: ≥95% for rifampicin, ≥90% for isoniazid and fluoroquinolones, ≥80% for ethambutol, pyrazinamide, and aminoglycosides.", icon: TrendingUp },
             { title: "Specificity estimate", desc: "For each target, the discrimination ratio (mutant vs wildtype signal) predicts false positive rates. A ratio ≥3× is diagnostic-grade; ≥10× is reference-lab quality. Estimated from discrimination ratios, not from clinical trials.", icon: Shield },
             { title: "Three operating modes", desc: "High Sensitivity (field screening), Balanced (WHO TPP deployment), High Specificity (reference labs). Each mode adjusts scoring and discrimination thresholds to optimise for different clinical settings.", icon: Settings },
             { title: "Ranked alternatives", desc: "For every target, GUARD stores 3–5 backup candidates with annotated tradeoffs. If the first choice fails in the lab, backups are ready with documented efficiency-discrimination tradeoffs.", icon: Layers },
@@ -1667,7 +1667,7 @@ const HomePage = ({ goTo, connected }) => {
       {/* ═══ DISCRIMINATION ═══ */}
       {sectionTitle("Discrimination Analysis")}
       <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 16px 0" }}>
-        Discrimination quantifies the panel's ability to distinguish the resistance allele from wildtype at each target. For Direct candidates, this is the Cas12a cleavage activity ratio (MUT/WT) — predicted by GUARD-Net's neural discrimination head (r = 0.44 on EasyDesign cross-validation) when available, or a gradient-boosted model (LightGBM, r = 0.46, 15 thermodynamic features) as fallback, trained on 6,136 paired measurements. For Proximity candidates, discrimination is provided by allele-specific RPA primers — the crRNA cleaves equally on both alleles, but only the mutant template is amplified. Higher ratios indicate more reliable resistance calls.
+        Discrimination quantifies the panel's ability to distinguish the resistance allele from wildtype at each target. For Direct candidates, this is the Cas12a cleavage activity ratio (MUT/WT) — predicted by GUARD-Net's neural discrimination head (r = 0.44 on held-out validation) when available, or a gradient-boosted model (XGBoost, r = 0.46, 15 thermodynamic features) as fallback, trained on 6,136 paired measurements. For Proximity candidates, discrimination is provided by allele-specific RPA primers — the crRNA cleaves equally on both alleles, but only the mutant template is amplified. Higher ratios indicate more reliable resistance calls.
       </p>
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "8px", marginBottom: "16px" }}>
@@ -1690,8 +1690,8 @@ const HomePage = ({ goTo, connected }) => {
           <Zap size={18} color={T.primary} strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
           <div>
             <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: "0 0 8px 0" }}>
-              For candidates with insufficient discrimination, deliberate mismatches at positions 2–6 destabilize wildtype binding
-              while preserving mutant recognition, boosting discrimination from ~2× to 10–100×.
+              For candidates with insufficient discrimination, deliberate mismatches within the seed region (positions 1–8) destabilize wildtype binding
+              while preserving mutant recognition, significantly improving discrimination, with published improvements ranging from 2× to {">"}50× depending on mismatch identity, position, and local sequence context (Kohabir et al. 2024).
             </p>
           </div>
         </div>
@@ -1709,7 +1709,7 @@ const HomePage = ({ goTo, connected }) => {
         <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: "0 0 12px 0" }}>
           GUARD supports both wild-type AsCas12a (canonical TTTV PAM) and the engineered <strong>enAsCas12a</strong> variant
           (E174R/S542R/K548R; Kleinstiver et al. 2019), which expands PAM recognition
-          from canonical TTTV to include TTTT, TTCV, TATV, CTTV, TCTV, TGTV, ATTV, and GTTV motifs, increasing targetable sites by approximately 8-fold in GC-rich genomes.
+          from canonical TTTV to include TTTT, TTCV, TATV, CTTV, TCTV, TGTV, ATTV, and GTTV motifs, increasing the number of recognized PAM motifs by approximately 8-fold.
           Both variants operate at 37 °C — compatible with recombinase polymerase amplification (RPA)
           for equipment-free diagnostics at point of care.
         </p>
@@ -1733,16 +1733,16 @@ const HomePage = ({ goTo, connected }) => {
           ))}
         </div>
         <div style={{ background: T.primaryLight, borderRadius: "8px", padding: "10px 14px", fontSize: "11px", color: T.primaryDark, lineHeight: 1.5 }}>
-          <strong>Why Cas12a over Cas9 for diagnostics?</strong> (1) T-rich PAM provides orthogonal target space to Cas9's NGG. The engineered enAsCas12a variant (E174R/S542R/K548R) expands recognition to 9 PAM variants (TTTV + TTTT/TTCV/TATV/CTTV/TCTV/TGTV/ATTV/GTTV), mitigating PAM scarcity in GC-rich genomes like M. tuberculosis. Activity penalties from Kleinstiver et al. 2019 are applied during scoring. (2) Self-processing crRNA simplifies guide design. (3) Trans-cleavage enables signal amplification without PCR. (4) Staggered cuts improve allele discrimination at single-nucleotide resolution.
+          <strong>Why Cas12a over Cas9 for diagnostics?</strong> (1) T-rich PAM provides orthogonal target space to Cas9's NGG. The engineered enAsCas12a variant (E174R/S542R/K548R) expands recognition to 9 PAM variants (TTTV + TTTT/TTCV/TATV/CTTV/TCTV/TGTV/ATTV/GTTV), mitigating PAM scarcity in GC-rich genomes like M. tuberculosis. Activity penalties from Kleinstiver et al. 2019 are applied during scoring. (2) Self-processing crRNA simplifies guide design. (3) Trans-cleavage enables signal amplification without PCR. (4) Stringent seed-region mismatch intolerance enables single-nucleotide discrimination for diagnostic applications.
         </div>
       </CollapsibleSection>
 
       <CollapsibleSection title="Pipeline Defaults">
         {[
-          ["PAM", "TTTV + 7 expanded", "enAsCas12a: 8 PAM variants with Kleinstiver 2019 activity penalties"],
+          ["PAM", "TTTV + 8 expanded", "enAsCas12a: 9 PAM variants with Kleinstiver 2019 activity penalties"],
           ["Spacer length", "20–23 nt", "20nt canonical; 21–23 for high-GC"],
           ["GC range", "30–70%", "Below 30% weak R-loop; above 70% self-structure"],
-          ["Max homopolymer", "4 nt", "Poly-T ≥5 = Pol III termination"],
+          ["Max homopolymer", "4 nt", "Poly-T ≥5 causes Cas12a R-loop stalling; also reduces primer specificity"],
           ["Off-target", "≤3 mismatches", "Bowtie2 against full genome"],
           ["RPA amplicon", "100–200 bp", "Optimal RPA range"],
           ["Primer Tm", "57–72 \u00B0C", "Primer melting temperature (not reaction temperature). RPA runs at 37\u00B0C; high Tm ensures stable primer hybridisation."],
@@ -1765,7 +1765,7 @@ const HomePage = ({ goTo, connected }) => {
           {[
             {
               title: "Discrimination prediction",
-              text: "Discrimination ratios are predicted by GUARD-Net\u2019s neural discrimination head (r = 0.44, trained end-to-end with contrastive margin loss on 6,136 paired MUT/WT trans-cleavage measurements from EasyDesign, Huang et al. 2024, LbCas12a). When GUARD-Net is unavailable, falls back to a standalone LightGBM model (r = 0.46, 15 thermodynamic features including R-loop cumulative \u0394G, mismatch \u0394\u0394G penalties per Sugimoto 2000, and position sensitivity), then to position-dependent heuristics (r \u2248 0.30). Note: XGBoost r = 0.46 is within-distribution 3-fold CV; the neural head\u2019s r = 0.44 reflects the harder task of predicting from sequence alone without hand-crafted thermodynamic features.",
+              text: "Discrimination ratios are predicted by GUARD-Net\u2019s neural discrimination head (r = 0.44, trained end-to-end with contrastive margin loss on 6,136 paired MUT/WT trans-cleavage measurements from EasyDesign, Huang et al. 2024, LbCas12a). When GUARD-Net is unavailable, falls back to a standalone XGBoost model (r = 0.46, 15 thermodynamic features including R-loop cumulative \u0394G, mismatch \u0394\u0394G penalties per Sugimoto 2000, and position sensitivity), then to position-dependent heuristics (r \u2248 0.30). Note: XGBoost r = 0.46 is within-distribution 3-fold CV; the neural head\u2019s r = 0.44 reflects the harder task of predicting from sequence alone without hand-crafted thermodynamic features.",
             },
             {
               title: "Training data & domain shift",
@@ -3702,7 +3702,7 @@ const PrimersTab = ({ results }) => {
           <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: 0 }}>
             Symmetric flanking primers for <strong>DIRECT detection</strong> candidates. The crRNA spacer overlaps the mutation site,
             so allele discrimination comes from Cas12a mismatch intolerance — not from primers. Primers simply amplify the region
-            containing the crRNA binding site. Discrimination ratios are {results.some(r => r.discMethod === "neural") ? "predicted by GUARD-Net neural discrimination head (multi-task, trained on 6,136 EasyDesign pairs)" : results.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "predicted by a learned model (LightGBM, 15 thermodynamic features)" : "estimated by position × destabilisation heuristic"}.
+            containing the crRNA binding site. Discrimination ratios are {results.some(r => r.discMethod === "neural") ? "predicted by GUARD-Net neural discrimination head (multi-task, trained on 6,136 EasyDesign pairs)" : results.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "predicted by a learned model (XGBoost, 15 thermodynamic features)" : "estimated by position × destabilisation heuristic"}.
           </p>
         </div>
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: "20px" }}>
@@ -5018,7 +5018,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                 {results.some(r => r.discMethod === "neural")
                   ? "Discrimination ratios are predicted by GUARD-Net's neural discrimination head — a multi-task extension (235K params) trained end-to-end on efficiency and discrimination simultaneously. The disc head takes paired encoder representations [mut, wt, mut\u2212wt, mut\u00D7wt] from the shared CNN+RNA-FM+RLPA backbone and outputs a predicted MUT/WT ratio via Softplus. Trained on 6,136 paired trans-cleavage measurements from EasyDesign (Huang et al. 2024, LbCas12a). 3-fold CV: r = 0.440."
                   : results.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature")
-                  ? "Discrimination ratios are predicted by a gradient-boosted model (LightGBM) trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a). The model uses 15 thermodynamic features including R-loop cumulative \u0394G, mismatch \u0394\u0394G penalties, and position sensitivity. 3-fold CV: RMSE = 0.540, r = 0.459 (vs heuristic RMSE = 0.641, r = 0.298)."
+                  ? "Discrimination ratios are predicted by a gradient-boosted model (XGBoost) trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a). The model uses 15 thermodynamic features including R-loop cumulative \u0394G, mismatch \u0394\u0394G penalties, and position sensitivity. 3-fold CV: RMSE = 0.540, r = 0.459 (vs heuristic RMSE = 0.641, r = 0.298)."
                   : "Discrimination ratios are predicted by a heuristic model using position sensitivity \u00D7 mismatch destabilisation scores. A trained model (XGBoost on 15 thermodynamic features) is available but was not loaded for this run."
                 }
               </div>
@@ -5048,7 +5048,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                 </Badge>
               </div>
               <div style={{ padding: "12px 18px", fontSize: "11px", color: T.textSec, lineHeight: 1.6, borderBottom: `1px solid ${T.borderLight}`, background: T.bg }}>
-                WHO Target Product Profile (TPP) 2024 defines minimum sensitivity and specificity thresholds per drug class for diagnostic deployment. Sensitivity = fraction of resistance-conferring mutations detected (pass/fail per drug class). Specificity = approximate in silico estimate: Direct targets use 1−1/disc (assumes perfectly separated signal distributions — actual specificity depends on signal variance and threshold selection). Proximity targets use thermodynamic AS-RPA mismatch penalty. ≥98% required — marked "Pending" when below threshold as experimental validation is needed. {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Discrimination ratios used here are from the learned model (LightGBM, 15 thermodynamic features)." : "Discrimination ratios used here are from the heuristic model."}
+                WHO Target Product Profile (TPP) 2024 defines minimum sensitivity and specificity thresholds per drug class for diagnostic deployment. Sensitivity = fraction of resistance-conferring mutations detected (pass/fail per drug class). Specificity = approximate in silico estimate: Direct targets use 1−1/disc (assumes perfectly separated signal distributions — actual specificity depends on signal variance and threshold selection). Proximity targets use thermodynamic AS-RPA mismatch penalty. ≥98% required — marked "Pending" when below threshold as experimental validation is needed. {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Discrimination ratios used here are from the learned model (XGBoost, 15 thermodynamic features)." : "Discrimination ratios used here are from the heuristic model."}
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT, fontSize: "12px" }}>
@@ -5882,7 +5882,7 @@ const ScoringPage = ({ connected }) => {
           <span style={{ background: "#dcfce7", color: "#166534", padding: "3px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 600 }}>Trained</span>
         </div>
         <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 16px" }}>
-          Gradient-boosted model (LightGBM) trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a).
+          Gradient-boosted model (XGBoost) trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a).
           Predicts the discrimination ratio (\u0394log-k between perfect-match and single-mismatch targets) from 15 thermodynamic features encoding mismatch position, chemistry, R-loop energetics, and sequence context.
         </p>
         <div style={{ fontSize: "12px", fontWeight: 700, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Performance (3-fold stratified CV, guide-level split)</div>
