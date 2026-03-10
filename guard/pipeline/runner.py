@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Optional
 
@@ -425,17 +426,36 @@ class GUARDPipeline:
         total_before_filter = 0
         total_after_filter = 0
         filtered_by_target: dict[str, list] = {}
-        for label, sr in scan_results.items():
+
+        # Cap candidates per target to avoid combinatorial explosion with expanded PAMs.
+        # Sort by PAM activity weight (best PAM first) so canonical TTTV candidates are
+        # always retained. Cap at 50 per target — more than enough for downstream selection.
+        MAX_CANDIDATES_PER_TARGET = 50
+
+        def _filter_one(label_sr):
+            label, sr = label_sr
             candidates = sr.all_candidates
-            total_before_filter += len(candidates)
+            n_before = len(candidates)
             if not candidates:
-                filtered_by_target[label] = []
-                continue
+                return label, [], 0, 0
+            # Pre-sort by PAM activity weight (best first) and cap
+            candidates = sorted(
+                candidates,
+                key=lambda c: getattr(c, "pam_activity_weight", 1.0),
+                reverse=True,
+            )[:MAX_CANDIDATES_PER_TARGET]
             filtered = self.filter.filter_batch(candidates)
             if not filtered:
                 logger.warning("All %d candidates filtered for %s", len(candidates), label)
                 filtered = candidates
-            total_after_filter += len(filtered)
+            return label, filtered, n_before, len(filtered)
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            results = pool.map(_filter_one, scan_results.items())
+
+        for label, filtered, n_before, n_after in results:
+            total_before_filter += n_before
+            total_after_filter += n_after
             filtered_by_target[label] = filtered
 
         n_rejected_m3 = total_before_filter - total_after_filter
