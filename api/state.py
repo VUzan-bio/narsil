@@ -241,10 +241,14 @@ class AppState:
                 original_info = runner_mod.logger.info
 
                 stage_progress = {
+                    "Module 3:": (0.15, "Candidate Filtering"),
+                    "Module 4:": (0.20, "Off-Target Screening"),
                     "Module 5.5": (0.30, "Mismatch Pairs"),
-                    "Module 6:": (0.40, "SM Enhancement"),
+                    "Module 5:": (0.25, "Heuristic Scoring"),
                     "Module 6.5": (0.50, "Discrimination Scoring"),
+                    "Module 6:": (0.40, "SM Enhancement"),
                     "Module 7:": (0.60, "Multiplex Optimization"),
+                    "Module 8.5": (0.75, "Co-Selection Validation"),
                     "Module 8:": (0.70, "RPA Primer Design"),
                     "Module 9:": (0.85, "Panel Assembly"),
                     "PANEL COMPLETE": (0.95, "Export"),

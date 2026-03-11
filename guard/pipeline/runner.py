@@ -421,6 +421,7 @@ class GUARDPipeline:
         })
 
         # --- Module 3: Candidate filtering ---
+        logger.info("Module 3: Filtering candidates...")
         t0 = time.perf_counter_ns()
         total_before_filter = 0
         total_after_filter = 0
@@ -462,6 +463,7 @@ class GUARDPipeline:
         })
 
         # --- Module 4: Off-target screening ---
+        logger.info("Module 4: Off-target screening (Bowtie2)...")
         t0 = time.perf_counter_ns()
         total_before_ot = 0
         total_after_ot = 0
@@ -492,6 +494,7 @@ class GUARDPipeline:
         })
 
         # --- Module 5: Heuristic scoring ---
+        logger.info("Module 5: Heuristic scoring...")
         t0 = time.perf_counter_ns()
         scored_by_target: dict[str, list[ScoredCandidate]] = {}
         total_scored = 0

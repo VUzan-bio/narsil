@@ -145,19 +145,91 @@ RESULTS.push({
 });
 
 const MODULES = [
-  { id: "M1", name: "Target Resolution", desc: "WHO mutations → genomic coordinates", icon: Target, execDesc: "Resolving WHO-catalogued resistance mutations to genomic coordinates on H37Rv", estSec: 5 },
-  { id: "M2", name: "PAM Scanning", desc: "Multi-PAM, multi-length spacer search", icon: Search, execDesc: "Scanning both strands for Cas12a-compatible PAM sites (TTTV canonical + relaxed)", estSec: 30 },
-  { id: "M3", name: "Candidate Filtering", desc: "Biophysical constraints (GC, homopolymer, Tm)", icon: Filter, execDesc: "Applying biophysical filters: GC content, homopolymer runs, self-complementarity", estSec: 15 },
-  { id: "M4", name: "Off-Target Screening", desc: "Bowtie2 alignment + heuristic fallback", icon: Shield, execDesc: "Bowtie2 alignment against H37Rv genome, flagging off-target binding sites", estSec: 45 },
-  { id: "M5", name: "Heuristic Scoring", desc: "Position-weighted composite scoring", icon: BarChart3, execDesc: "Position-weighted composite scoring across 5 biophysical features", estSec: 10 },
-  { id: "M5.5", name: "Mismatch Pairs", desc: "WT/MUT spacer pair generation", icon: GitBranch, execDesc: "Generating wildtype spacers for each mutant candidate (MUT/WT discrimination pairs)", estSec: 5 },
-  { id: "M6", name: "SM Enhancement", desc: "Synthetic mismatch for enhanced discrimination", icon: Zap, execDesc: "Engineering synthetic mismatches at seed positions 1–8 for enhanced discrimination", estSec: 20 },
-  { id: "M6.5", name: "Discrimination", desc: "MUT/WT activity ratio quantification", icon: TrendingUp, execDesc: "Quantifying MUT/WT activity ratios for diagnostic-grade discrimination assessment", estSec: 15 },
-  { id: "M7", name: "Multiplex Optimization", desc: "Simulated annealing panel selection", icon: Grid3x3, execDesc: "Simulated annealing over candidate combinations for optimal panel selection", estSec: 30 },
-  { id: "M8", name: "RPA Primer Design", desc: "Standard + allele-specific RPA", icon: Crosshair, execDesc: "Designing RPA primers (25–38 nt, Tm 57–72 °C) with dimer checking", estSec: 60 },
-  { id: "M8.5", name: "Co-Selection", desc: "crRNA–primer compatibility check", icon: Check, execDesc: "Validating crRNA–primer compatibility and amplicon overlap constraints", estSec: 10 },
-  { id: "M9", name: "Panel Assembly", desc: "MultiplexPanel + IS6110 control", icon: Package, execDesc: "Assembling final panel: crRNA sequences, primer pairs, amplicon maps, discrimination predictions", estSec: 5 },
-  { id: "M10", name: "Export", desc: "JSON, TSV, FASTA structured output", icon: Download, execDesc: "Exporting structured output: JSON, TSV, FASTA", estSec: 3 },
+  { id: "M1", name: "Target Resolution", desc: "WHO mutations → genomic coordinates", icon: Target, execDesc: "Resolving WHO-catalogued resistance mutations to genomic coordinates on H37Rv", estSec: 5, substeps: [
+    "Loading H37Rv reference genome (NC_000962.3, 4.4 Mb)",
+    "Parsing 5,959 genes from GFF3 annotation",
+    "Resolving mutation coordinates to genomic positions",
+    "Mapping drug resistance class associations",
+  ]},
+  { id: "M2", name: "PAM Scanning", desc: "Multi-PAM, multi-length spacer search", icon: Search, execDesc: "Scanning both strands for Cas12a-compatible PAM sites (TTTV canonical + relaxed)", estSec: 30, substeps: [
+    "Scanning TTTV canonical PAM sites on both strands",
+    "Extending to relaxed PAMs (TTCV, TATV, CTTV, TCTV)",
+    "Evaluating spacer lengths 18–23 nt per PAM hit",
+    "Checking seed region (positions 1–8) for mutation coverage",
+    "Activating proximity scan for PAM desert targets (±200 bp)",
+    "Collecting direct + proximity candidates per target",
+  ]},
+  { id: "M3", name: "Candidate Filtering", desc: "Biophysical constraints (GC, homopolymer, Tm)", icon: Filter, execDesc: "Applying biophysical filters: GC content, homopolymer runs, self-complementarity", estSec: 15, substeps: [
+    "Checking GC content (40–85% for M. tuberculosis)",
+    "Screening for homopolymer runs ≥4 nt",
+    "Evaluating self-complementarity (MFE < −5.0 kcal/mol)",
+    "Filtering seed region violations",
+    "Compiling filter report per target",
+  ]},
+  { id: "M4", name: "Off-Target Screening", desc: "Bowtie2 alignment + heuristic fallback", icon: Shield, execDesc: "Bowtie2 alignment against H37Rv genome, flagging off-target binding sites", estSec: 45, substeps: [
+    "Preparing spacer FASTA for Bowtie2 alignment",
+    "Aligning candidates against H37Rv genome",
+    "Scoring off-target binding sites (≤3 mismatches)",
+    "Flagging high-risk off-target candidates",
+    "Generating off-target summary report",
+  ]},
+  { id: "M5", name: "Heuristic Scoring", desc: "Position-weighted composite scoring", icon: BarChart3, execDesc: "Position-weighted composite scoring across 5 biophysical features", estSec: 10, substeps: [
+    "Computing seed position scores (weight 0.35)",
+    "Evaluating GC content scores (weight 0.20)",
+    "Scoring self-complementarity (weight 0.20)",
+    "Computing homopolymer penalties (weight 0.10)",
+    "Calculating composite heuristic score per candidate",
+  ]},
+  { id: "M5.5", name: "Mismatch Pairs", desc: "WT/MUT spacer pair generation", icon: GitBranch, execDesc: "Generating wildtype spacers for each mutant candidate (MUT/WT discrimination pairs)", estSec: 5, substeps: [
+    "Generating wildtype spacer for each mutant candidate",
+    "Identifying mismatch type and position (e.g. C>G at pos 2)",
+    "Building MUT/WT discrimination pairs",
+  ]},
+  { id: "M6", name: "SM Enhancement", desc: "Synthetic mismatch for enhanced discrimination", icon: Zap, execDesc: "Engineering synthetic mismatches at seed positions 1–8 for enhanced discrimination", estSec: 20, substeps: [
+    "Testing synthetic mismatches at seed positions 1–8",
+    "Evaluating discrimination gain per mismatch position",
+    "Selecting optimal enhancement positions",
+    "Applying enhancements to panel members",
+  ]},
+  { id: "M6.5", name: "Discrimination", desc: "MUT/WT activity ratio quantification", icon: TrendingUp, execDesc: "Quantifying MUT/WT activity ratios for diagnostic-grade discrimination assessment", estSec: 15, substeps: [
+    "Computing MUT/WT activity ratios per candidate",
+    "Classifying diagnostic-grade candidates (≥2× threshold)",
+    "Ranking candidates by discrimination strength",
+    "Identifying direct vs. proximity strategy per target",
+  ]},
+  { id: "M7", name: "Multiplex Optimization", desc: "Simulated annealing panel selection", icon: Grid3x3, execDesc: "Simulated annealing over candidate combinations for optimal panel selection", estSec: 30, substeps: [
+    "Initializing simulated annealing (T₀ = 1.0, 10K iterations)",
+    "Iterating candidate combinations for optimal panel",
+    "Minimizing cross-reactivity between panel members",
+    "Cooling schedule: evaluating convergence",
+    "Assembling final panel with best score",
+  ]},
+  { id: "M8", name: "RPA Primer Design", desc: "Standard + allele-specific RPA", icon: Crosshair, execDesc: "Designing RPA primers (25–38 nt, Tm 57–72 °C) with dimer checking", estSec: 60, substeps: [
+    "Designing forward primers (25–38 nt, Tm 57–72°C)",
+    "Designing reverse primers with amplicon size constraints",
+    "Generating allele-specific RPA primers for proximity targets",
+    "Running primer dimer thermodynamic checks",
+    "Co-selecting crRNA-compatible primer pairs",
+    "Evaluating amplicon sizes (80–120 bp target range)",
+  ]},
+  { id: "M8.5", name: "Co-Selection", desc: "crRNA–primer compatibility check", icon: Check, execDesc: "Validating crRNA–primer compatibility and amplicon overlap constraints", estSec: 10, substeps: [
+    "Validating crRNA–primer amplicon overlap",
+    "Checking AS-RPA discrimination ratios (MUT vs WT)",
+    "Running full primer dimer analysis across all oligos",
+    "Scoring moderate and high-risk dimer interactions",
+  ]},
+  { id: "M9", name: "Panel Assembly", desc: "MultiplexPanel + IS6110 control", icon: Package, execDesc: "Assembling final panel: crRNA sequences, primer pairs, amplicon maps, discrimination predictions", estSec: 5, substeps: [
+    "Assembling MultiplexPanel structure",
+    "Designing IS6110 insertion element control primers",
+    "Computing panel sensitivity and specificity",
+    "Collecting top-5 alternatives per target",
+    "Generating full panel report (JSON + TSV)",
+  ]},
+  { id: "M10", name: "Export", desc: "JSON, TSV, FASTA structured output", icon: Download, execDesc: "Exporting structured output: JSON, TSV, FASTA", estSec: 3, substeps: [
+    "Serializing structured JSON report",
+    "Computing PCA embeddings for UMAP visualization",
+    "Exporting TSV summary and FASTA sequences",
+  ]},
 ];
 
 const MODULE_NAME_MAP = {
@@ -1343,43 +1415,48 @@ const HomePage = ({ goTo, connected }) => {
             marginBottom: "24px", overflow: "hidden",
             ...(pipeDone ? {} : { boxShadow: `0 2px 12px ${T.primary}1F` }),
           }}>
-            {/* Running state — module + detail swipe up */}
-            {!pipeDone && (
-              <div style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: "14px" }}>
-                <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", animation: "subtlePulse 2s ease-in-out infinite" }}>
-                  <ActiveIcon size={16} color={T.primary} strokeWidth={1.8} />
-                </div>
-                <div key={pipeStep} style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px", animation: "stepSwipeUp 0.25s ease-out" }}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-                    <span style={{ fontFamily: MONO, fontSize: "11px", color: T.primary }}>{activeModule.id}</span>
-                    <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark }}>{activeModule.name}</span>
-                  </div>
-                  <div style={{ fontSize: "11px", color: T.primary + "BB", lineHeight: 1.4 }}>{activeModule.execDesc}</div>
-                  {(() => {
-                    const stepEstSec = activeModule.estSec || 10;
-                    const stepElapsed = (Date.now() - pipeStepStartRef.current) / 1000;
-                    // Ease toward 95% within estimated time, never reaches 100% until step completes
-                    const intraStep = Math.min(0.95, 1 - Math.exp(-2.5 * stepElapsed / stepEstSec));
-                    const pct = ((pipeStep + intraStep) / MODULES.length) * 100;
-                    return (
-                      <div style={{ width: "100%", height: "4px", borderRadius: "2px", background: T.primary + "22", marginTop: "6px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", borderRadius: "2px", background: T.primary, width: `${pct}%`, transition: "width 0.15s linear" }} />
+            {/* Running state — module + dynamic substep cycling */}
+            {!pipeDone && (() => {
+              const stepEstSec = activeModule.estSec || 10;
+              const stepElapsed = (Date.now() - pipeStepStartRef.current) / 1000;
+              const subs = activeModule.substeps || [activeModule.execDesc];
+              const subDur = stepEstSec / subs.length;
+              const subIdx = Math.min(Math.floor(stepElapsed / Math.max(subDur, 0.5)), subs.length - 1);
+              const intraStep = Math.min(0.95, 1 - Math.exp(-2.5 * stepElapsed / stepEstSec));
+              const pct = ((pipeStep + intraStep) / MODULES.length) * 100;
+              return (
+                <div style={{ padding: "20px 24px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                    <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", animation: "subtlePulse 2s ease-in-out infinite" }}>
+                      <ActiveIcon size={16} color={T.primary} strokeWidth={1.8} />
+                    </div>
+                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
+                      <div key={pipeStep} style={{ display: "flex", alignItems: "baseline", gap: "8px", animation: "stepSwipeUp 0.25s ease-out" }}>
+                        <span style={{ fontFamily: MONO, fontSize: "11px", color: T.primary }}>{activeModule.id}</span>
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark }}>{activeModule.name}</span>
                       </div>
-                    );
-                  })()}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <svg width="16" height="16" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite" }}>
-                      <circle cx="8" cy="8" r="6" fill="none" stroke={T.primary + "33"} strokeWidth="2" />
-                      <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke={T.primary} strokeWidth="2" strokeLinecap="round" />
-                    </svg>
-                    <span style={{ fontFamily: MONO, fontSize: "11px", color: T.primary, fontVariantNumeric: "tabular-nums" }}>{pipeElapsed.toFixed(1)}s</span>
+                      <div key={`sub-${pipeStep}-${subIdx}`} style={{ fontSize: "11px", color: T.primary + "BB", lineHeight: 1.4, animation: "substepSwipe 0.35s ease-out", minHeight: "16px" }}>
+                        {subs[subIdx]}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite" }}>
+                          <circle cx="8" cy="8" r="6" fill="none" stroke={T.primary + "33"} strokeWidth="2" />
+                          <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke={T.primary} strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                        <span style={{ fontFamily: MONO, fontSize: "11px", color: T.primary, fontVariantNumeric: "tabular-nums" }}>{pipeElapsed.toFixed(1)}s</span>
+                      </div>
+                      <span style={{ fontSize: "10px", color: T.primary + "88", fontFamily: MONO }}>~{(() => { const remaining = MODULES.slice(pipeStep).reduce((s, m) => s + (m.estSec || 10), 0); return remaining >= 60 ? `${Math.ceil(remaining / 60)} min` : `${remaining}s`; })()}</span>
+                    </div>
                   </div>
-                  <span style={{ fontSize: "10px", color: T.primary + "88", fontFamily: MONO }}>~{(() => { const remaining = MODULES.slice(pipeStep).reduce((s, m) => s + (m.estSec || 10), 0); return remaining >= 60 ? `${Math.ceil(remaining / 60)} min` : `${remaining}s`; })()}</span>
+                  {/* Progress bar — outside keyed divs for smooth transitions */}
+                  <div style={{ width: "100%", height: "4px", borderRadius: "2px", background: T.primary + "22", marginTop: "10px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: "2px", background: T.primary, width: `${pct}%`, transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)" }} />
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Complete state — summary + logs toggle + CTA */}
             {pipeDone && (
@@ -7452,6 +7529,7 @@ const GUARDPlatform = () => {
         @keyframes pulseDot { 0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); } 40% { opacity: 1; transform: scale(1.2); } }
         @keyframes stepSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes stepSwipeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes substepSwipe { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes statReveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes subtlePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         @keyframes indeterminateProgress { 0% { width: 0%; margin-left: 0%; } 50% { width: 60%; margin-left: 20%; } 100% { width: 0%; margin-left: 100%; } }
