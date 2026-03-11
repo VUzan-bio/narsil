@@ -17,7 +17,7 @@ from typing import Any, AsyncGenerator
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.responses import Response
 
@@ -183,13 +183,17 @@ app.include_router(optimisation.router)
 app.include_router(ws.router)
 
 @app.get("/api/health")
-@app.get("/")
 async def health() -> dict:
     return {
         "status": "ok",
         "version": "0.2.0",
         "pipeline": "GUARD",
     }
+
+
+@app.get("/")
+async def root():
+    return RedirectResponse("https://guard-design.app")
 
 
 # Serve frontend static files if built.
