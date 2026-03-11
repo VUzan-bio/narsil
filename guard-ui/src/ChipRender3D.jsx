@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import * as THREE from "three";
 
 const DRUG_HEX = { RIF: 0x3288bd, INH: 0x66c2a5, EMB: 0xabdda4, PZA: 0xfee08b, FQ: 0xf46d43, AG: 0xd53e4f, CTRL: 0x888888 };
+const addAt = (parent, mesh, x, y, z) => { mesh.position.set(x, y, z); parent.add(mesh); return mesh; };
 const DRUG_CSS = { RIF: "#3288bd", INH: "#66c2a5", EMB: "#abdda4", PZA: "#fee08b", FQ: "#f46d43", AG: "#d53e4f", CTRL: "#888888" };
 
 // Inline SWV for mini voltammogram preview
@@ -81,8 +82,8 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     const waxRimMat = new THREE.MeshPhysicalMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.5, roughness: 0.2 });
     const goldMat = new THREE.MeshStandardMaterial({ color: 0xDAA520, metalness: 0.85, roughness: 0.15 });
 
-    chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(15, 0.1, 12), wellMat), { position: new THREE.Vector3(-22, 0.76, 0) }));
-    chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(14.5, 0.05, 11.5), new THREE.MeshStandardMaterial({ color: 0x93C5FD, transparent: true, opacity: 0.35 })), { position: new THREE.Vector3(-22, 0.82, 0) }));
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(15, 0.1, 12), wellMat), -22, 0.76, 0);
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(14.5, 0.05, 11.5), new THREE.MeshStandardMaterial({ color: 0x93C5FD, transparent: true, opacity: 0.35 })), -22, 0.82, 0);
     const beadMat = new THREE.MeshStandardMaterial({ color: 0x4B5563, metalness: 0.6, roughness: 0.3 });
     for (let i = 0; i < 15; i++) {
       const b = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 6), beadMat);
@@ -91,12 +92,12 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     }
 
     // Prep channel + central pad
-    chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(8, 0.06, 0.5), channelMat), { position: new THREE.Vector3(-11, 0.78, 0) }));
-    chipGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.08, 32), wellMat), { position: new THREE.Vector3(-6, 0.76, 0) }));
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(8, 0.06, 0.5), channelMat), -11, 0.78, 0);
+    addAt(chipGroup, new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 0.08, 32), wellMat), -6, 0.76, 0);
     const cRim = new THREE.Mesh(new THREE.TorusGeometry(2, 0.12, 8, 32), waxRimMat);
     cRim.rotation.x = Math.PI / 2; cRim.position.set(-6, 0.9, 0);
     chipGroup.add(cRim);
-    chipGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(2, 1, 0.3, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0xC8943E, transparent: true, opacity: 0.4, side: THREE.DoubleSide })), { position: new THREE.Vector3(-6, 1.1, 0) }));
+    addAt(chipGroup, new THREE.Mesh(new THREE.CylinderGeometry(2, 1, 0.3, 24, 1, true), new THREE.MeshStandardMaterial({ color: 0xC8943E, transparent: true, opacity: 0.4, side: THREE.DoubleSide })), -6, 1.1, 0);
 
     // Detection pads — 5×3 grid
     const flatPads = electrodeLayout.flat();
@@ -108,14 +109,14 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     for (let r = 0; r < 3; r++) {
       const rz = gZ + r * sZ;
       // Horizontal trunk
-      chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(sX * 4 + 4, 0.06, 0.4), channelMat), { position: new THREE.Vector3(gX + sX * 2, 0.78, rz) }));
+      addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(sX * 4 + 4, 0.06, 0.4), channelMat), gX + sX * 2, 0.78, rz);
       if (r === 1) {
         // Middle row: straight from center
-        chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(gX + 7, 0.06, 0.35), channelMat), { position: new THREE.Vector3((-6 + gX) / 2, 0.78, 0) }));
+        addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(gX + 7, 0.06, 0.35), channelMat), (-6 + gX) / 2, 0.78, 0);
       } else {
         // Top/bottom: vertical then horizontal (no crossing)
-        chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, Math.abs(rz)), channelMat), { position: new THREE.Vector3(-4, 0.78, rz / 2) }));
-        chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(gX + 5, 0.06, 0.35), channelMat), { position: new THREE.Vector3((-4 + gX) / 2 + 0.5, 0.78, rz) }));
+        addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, Math.abs(rz)), channelMat), -4, 0.78, rz / 2);
+        addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(gX + 5, 0.06, 0.35), channelMat), (-4 + gX) / 2 + 0.5, 0.78, rz);
       }
     }
 
@@ -132,7 +133,7 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
       ww.position.set(px, 0.45, pz); chipGroup.add(ww);
 
       // LIG floor
-      chipGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(1.85, 1.85, 0.08, 24), wellMat), { position: new THREE.Vector3(px, 0.15, pz) }));
+      addAt(chipGroup, new THREE.Mesh(new THREE.CylinderGeometry(1.85, 1.85, 0.08, 24), wellMat), px, 0.15, pz);
 
       // Drug glow ring (emissive)
       const gr = new THREE.Mesh(new THREE.RingGeometry(1.5, 1.85, 24), new THREE.MeshStandardMaterial({ color: padColor, emissive: padColor, emissiveIntensity: 0.35, transparent: true, opacity: 0.85, side: THREE.DoubleSide }));
@@ -150,7 +151,7 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
       pr.rotation.x = Math.PI / 2; pr.position.set(px, 0.80, pz); chipGroup.add(pr);
 
       // Lyophilized pellet
-      chipGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.1, 12), new THREE.MeshStandardMaterial({ color: 0xF5F0E0, roughness: 0.8, transparent: true, opacity: 0.6 })), { position: new THREE.Vector3(px, 0.45, pz) }));
+      addAt(chipGroup, new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.1, 12), new THREE.MeshStandardMaterial({ color: 0xF5F0E0, roughness: 0.8, transparent: true, opacity: 0.6 })), px, 0.45, pz);
 
       // Raycast mesh
       const pm = new THREE.Mesh(new THREE.CylinderGeometry(1.85, 1.85, 1.0, 16), new THREE.MeshBasicMaterial({ visible: false }));
@@ -160,9 +161,9 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
 
     // Enhancement 7: Shared counter electrode — visible LIG strip with tick marks
     const ceMat = new THREE.MeshStandardMaterial({ color: 0x2D2D2D, roughness: 0.7, metalness: 0.15 });
-    chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 22), ceMat), { position: new THREE.Vector3(gX + sX * 4 + 4, 0.78, 0) }));
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 22), ceMat), gX + sX * 4 + 4, 0.78, 0);
     for (let r = 0; r < 3; r++) {
-      chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.15), goldMat), { position: new THREE.Vector3(gX + sX * 4 + 4, 0.85, gZ + r * sZ) }));
+      addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.05, 0.15), goldMat), gX + sX * 4 + 4, 0.85, gZ + r * sZ);
     }
 
     // Enhancement 6 + 1: Contact pads flush with chip edge, non-crossing traces
@@ -173,26 +174,26 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
         const pad = padPositions[pi];
         if (!pad) continue;
         const cx = pad.x + (r - 1) * 0.6; // slight offset per row keeps traces parallel
-        chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 2.5), goldMat), { position: new THREE.Vector3(cx, 0.78, edgeZ) }));
+        addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 2.5), goldMat), cx, 0.78, edgeZ);
         // Vertical trace from pad down to contact (parallel = no crossing)
         const traceLen = edgeZ - 1.5 - pad.z;
         if (traceLen > 0.5) {
-          chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, traceLen), channelMat), { position: new THREE.Vector3(cx, 0.76, pad.z + traceLen / 2) }));
+          addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.04, traceLen), channelMat), cx, 0.76, pad.z + traceLen / 2);
         }
         // Small horizontal jog if offset
         const dx = cx - pad.x;
         if (Math.abs(dx) > 0.1) {
-          chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(Math.abs(dx) + 0.1, 0.04, 0.2), channelMat), { position: new THREE.Vector3((cx + pad.x) / 2, 0.76, pad.z) }));
+          addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(Math.abs(dx) + 0.1, 0.04, 0.2), channelMat), (cx + pad.x) / 2, 0.76, pad.z);
         }
       }
     }
     // CE contact (16th)
     const ceX = gX + sX * 4 + 4;
-    chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(2, 0.15, 2.5), goldMat), { position: new THREE.Vector3(ceX, 0.78, edgeZ) }));
-    chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, edgeZ - 11), channelMat), { position: new THREE.Vector3(ceX, 0.76, (edgeZ + 11) / 2 - 3) }));
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(2, 0.15, 2.5), goldMat), ceX, 0.78, edgeZ);
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.04, edgeZ - 11), channelMat), ceX, 0.76, (edgeZ + 11) / 2 - 3);
 
     // Insertion guide ridge
-    chipGroup.add(Object.assign(new THREE.Mesh(new THREE.BoxGeometry(58, 0.3, 0.4), new THREE.MeshStandardMaterial({ color: 0xB8860B, roughness: 0.4, metalness: 0.3 })), { position: new THREE.Vector3(10, 0.78, 17.5) }));
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(58, 0.3, 0.4), new THREE.MeshStandardMaterial({ color: 0xB8860B, roughness: 0.4, metalness: 0.3 })), 10, 0.78, 17.5);
 
     // ══════════ MODE 2: CROSS-SECTION ══════════
     const crossGroup = new THREE.Group();
@@ -219,7 +220,7 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     }
 
     // AuNP base layer
-    crossGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(secR, secR, 0.15, 32), new THREE.MeshStandardMaterial({ color: 0xFFD700, roughness: 0.2, metalness: 0.8 })), { position: new THREE.Vector3(0, 3.575, 0) }));
+    addAt(crossGroup, new THREE.Mesh(new THREE.CylinderGeometry(secR, secR, 0.15, 32), new THREE.MeshStandardMaterial({ color: 0xFFD700, roughness: 0.2, metalness: 0.8 })), 0, 3.575, 0);
 
     // Discrete AuNP hemispheres
     const auSurf = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.9, roughness: 0.1 });
@@ -230,7 +231,7 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     }
 
     // MCH backfill film
-    crossGroup.add(Object.assign(new THREE.Mesh(new THREE.CylinderGeometry(secR - 0.05, secR - 0.05, 0.08, 32), new THREE.MeshStandardMaterial({ color: 0xBBBBBB, transparent: true, opacity: 0.3, roughness: 0.5 })), { position: new THREE.Vector3(0, 3.69, 0) }));
+    addAt(crossGroup, new THREE.Mesh(new THREE.CylinderGeometry(secR - 0.05, secR - 0.05, 0.08, 32), new THREE.MeshStandardMaterial({ color: 0xBBBBBB, transparent: true, opacity: 0.3, roughness: 0.5 })), 0, 3.69, 0);
 
     const baseY = 3.73;
 
