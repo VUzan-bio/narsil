@@ -13,6 +13,7 @@ import {
   ScatterChart, Scatter, Cell, Legend, ComposedChart, ReferenceLine,
   LineChart, Line, Area, AreaChart,
 } from "recharts";
+import ChipRender3D from "./ChipRender3D";
 import {
   healthCheck, submitRun, getJob, getResults, exportResults,
   getFigureUrl, listPanels, createPanel, listJobs, connectJobWS,
@@ -4248,6 +4249,25 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
   return (
     <div>
+      {/* ═══════════ SECTION 0: 3D Interactive Chip Render ═══════════ */}
+      <CollapsibleSection title="Device Architecture · 3D" defaultOpen={true} badge={{ text: "interactive", bg: "#DBEAFE", color: "#2563EB" }}>
+        <ChipRender3D
+          electrodeLayout={electrodeLayout}
+          targetDrug={targetDrug}
+          targetStrategy={targetStrategy}
+          getEfficiency={getEfficiency}
+          results={results}
+          computeGamma={computeGamma}
+          echemTime={echemTime}
+          echemKtrans={echemKtrans}
+          echemGamma0_mol={echemGamma0_mol}
+          T={T}
+          HEADING={HEADING}
+          MONO={MONO}
+          mobile={mobile}
+        />
+      </CollapsibleSection>
+
       {/* ═══════════ SECTION 1: Integrated PoC Chip ═══════════ */}
       <CollapsibleSection title="Integrated PoC Chip" defaultOpen={true} badge={{ text: "per-pad one-pot", bg: T.primaryLight, color: T.primary }}>
         <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "10px", padding: mobile ? "16px" : "20px 24px", marginBottom: "24px", display: "flex", gap: "14px", alignItems: "flex-start" }}>
