@@ -1,5 +1,12 @@
-# GUARD Platform — Slim Docker build for Railway
-# API-only container: frontend is deployed separately on Vercel
+# GUARD Platform — Docker build for Railway (frontend + API)
+
+# Stage 0: Build frontend static files (Node.js discarded after this stage)
+FROM node:20-slim AS frontend
+WORKDIR /ui
+COPY guard-ui/package.json guard-ui/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY guard-ui/ ./
+RUN npm run build
 
 # Stage 1: Build Python packages that need compilers
 FROM python:3.11-slim AS builder
@@ -35,6 +42,9 @@ COPY guard/ ./guard/
 COPY api/ ./api/
 COPY configs/ ./configs/
 COPY data/ ./data/
+
+# Frontend static files (built in Stage 0, ~5MB)
+COPY --from=frontend /ui/dist ./guard-ui/dist/
 
 # GUARD-Net model package (architecture + checkpoints + features)
 COPY guard-net/ ./guard-net/
