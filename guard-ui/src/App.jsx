@@ -4154,6 +4154,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   const [echemGamma0, setEchemGamma0] = useState(1.5e11); // molecules/cm²
   const [echemPorosity, setEchemPorosity] = useState(3);
   const [echemIscale, setEchemIscale] = useState(3.0);    // μA
+  const [echemShowFwdRev, setEchemShowFwdRev] = useState(false); // SWV i_fwd/i_rev toggle
 
   const kinetics = poolData?.kinetics || {
     phases: [
@@ -4369,7 +4370,8 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     return computeGamma(t_s, S_eff / D, k_trans);
   }, [computeGamma, echemGamma0_mol]);
 
-  // SWV voltammogram
+  // SWV voltammogram — negative (cathodic) peaks for MB reduction
+  // FWHM ≈ 60–80 mV for surface-confined SWV (Bard & Faulkner §14)
   const computeSWV = useCallback((E_array, Gamma) => {
     const { n, F, R, Temp, E0, E_sw } = ECHEM;
     const nFRT = n * F / (R * Temp);
@@ -4378,11 +4380,26 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       const xi_plus = nFRT * (E + E_sw - E0);
       const xi_minus = nFRT * (E - E_sw - E0);
       const shape = 1 / (1 + Math.exp(xi_plus)) - 1 / (1 + Math.exp(xi_minus));
-      return scale * (Gamma / echemGamma0_mol) * shape;
+      // Negative sign: cathodic (reduction) current convention
+      return -scale * (Gamma / echemGamma0_mol) * shape;
     });
   }, [echemIscale, echemAeff, echemGamma0_mol]);
 
-  // DPV voltammogram
+  // SWV forward/reverse components for toggle display
+  const computeSWVComponents = useCallback((E_array, Gamma) => {
+    const { n, F, R, Temp, E0, E_sw } = ECHEM;
+    const nFRT = n * F / (R * Temp);
+    const scale = echemIscale * echemAeff * 0.6;
+    return E_array.map(E => {
+      const xi_fwd = nFRT * (E + E_sw - E0);
+      const xi_rev = nFRT * (E - E_sw - E0);
+      const i_fwd = -scale * (Gamma / echemGamma0_mol) / (1 + Math.exp(xi_fwd));
+      const i_rev = -scale * (Gamma / echemGamma0_mol) / (1 + Math.exp(xi_rev));
+      return { i_fwd, i_rev };
+    });
+  }, [echemIscale, echemAeff, echemGamma0_mol]);
+
+  // DPV voltammogram — negative peaks, broader FWHM ≈ 90–100 mV
   const computeDPV = useCallback((E_array, Gamma) => {
     const { n, F, R, Temp, E0, E_pulse } = ECHEM;
     const nFRT = n * F / (R * Temp);
@@ -4391,26 +4408,27 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       const xi_plus = nFRT * (E + E_pulse / 2 - E0);
       const xi_minus = nFRT * (E - E_pulse / 2 - E0);
       const shape = 1 / (1 + Math.exp(xi_plus)) - 1 / (1 + Math.exp(xi_minus));
-      return scale * (Gamma / echemGamma0_mol) * shape;
+      return -scale * (Gamma / echemGamma0_mol) * shape;
     });
   }, [echemAeff, echemGamma0_mol]);
 
-  // CV voltammogram (Laviron surface-confined reversible)
+  // CV voltammogram (Laviron surface-confined reversible) — negative cathodic peak
   const computeCV = useCallback((E_array, Gamma, scanRate) => {
     const { n, F, R, Temp, E0 } = ECHEM;
     const prefactor = (n * n * F * F * echemAeff * Gamma * scanRate) / (4 * R * Temp);
     return E_array.map(E => {
       const x = n * F * (E - E0) / (2 * R * Temp);
       const coshX = Math.cosh(x);
-      return prefactor * (1 / (coshX * coshX)) * 1e6; // μA
+      return -prefactor * (1 / (coshX * coshX)) * 1e6; // μA, negative = cathodic
     });
   }, [echemAeff]);
 
   // CV duck-shape: forward (cathodic) + reverse (anodic) scan with capacitive baseline
+  // ΔEp annotation: for surface-confined MB, ΔEp should be small (~0–45 mV)
   const computeCVDuck = useCallback((Gamma) => {
     const { n, F, R, Temp, E0, scan_rate } = ECHEM;
     const prefactor = (n * n * F * F * echemAeff * Gamma * scan_rate) / (4 * R * Temp);
-    const deltaEp = 0.045;
+    const deltaEp = 0.035; // near-ideal surface-confined ΔEp
     const E_pc = E0 - deltaEp / 2, E_pa = E0 + deltaEp / 2;
     const sigma = (R * Temp) / (n * F) * 1.5;
     const i_cap = 20e-6 * echemAeff * scan_rate * 1e6;
@@ -4426,7 +4444,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       const xi = (E - E_pa) / sigma;
       reverse.push({ E, I: (prefactor / (Math.cosh(xi) ** 2)) * 1e6 + i_cap });
     }
-    return { forward, reverse };
+    return { forward, reverse, deltaEp, E_pc, E_pa };
   }, [echemAeff]);
 
   // Potential array for voltammograms: -0.05 to -0.40 V
@@ -4463,27 +4481,51 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       after = computeCV(echemE, G_after, ECHEM.scan_rate);
     }
 
-    const peakBase = Math.max(...base);
-    const peakAfter = Math.max(...after);
+    // Peaks are negative (cathodic) — use min for peak magnitude
+    const peakBase = Math.min(...base);
+    const peakAfter = Math.min(...after);
+
+    // Also compute SWV forward/reverse if applicable
+    let fwdRevBase = null, fwdRevAfter = null;
+    if (echemTechnique === "SWV") {
+      fwdRevBase = computeSWVComponents(echemE, G_base);
+      fwdRevAfter = computeSWVComponents(echemE, G_after);
+    }
 
     return echemE.map((E, i) => ({
       E: +E.toFixed(3),
       baseline: +base[i].toFixed(4),
       after: +after[i].toFixed(4),
+      ...(fwdRevBase ? {
+        base_fwd: +fwdRevBase[i].i_fwd.toFixed(4),
+        base_rev: +fwdRevBase[i].i_rev.toFixed(4),
+        after_fwd: +fwdRevAfter[i].i_fwd.toFixed(4),
+        after_rev: +fwdRevAfter[i].i_rev.toFixed(4),
+      } : {}),
     })).concat({
       _meta: true, peakBase: +peakBase.toFixed(3), peakAfter: +peakAfter.toFixed(3), deltaI: +deltaI_pct.toFixed(1),
     });
-  }, [echemCandidateData, echemTime, echemKtrans, echemTechnique, echemGamma0_mol, echemE, computeGamma, computeSWV, computeDPV, computeCV]);
+  }, [echemCandidateData, echemTime, echemKtrans, echemTechnique, echemGamma0_mol, echemE, computeGamma, computeSWV, computeSWVComponents, computeDPV, computeCV]);
 
-  const echemMeta = echemVoltammogram[echemVoltammogram.length - 1];
+  const echemMetaRaw = echemVoltammogram[echemVoltammogram.length - 1];
+  // Display absolute peak values but note they are negative (cathodic)
+  const echemMeta = {
+    ...echemMetaRaw,
+    peakBaseAbs: Math.abs(echemMetaRaw.peakBase).toFixed(3),
+    peakAfterAbs: Math.abs(echemMetaRaw.peakAfter).toFixed(3),
+  };
   const echemPlotData = echemVoltammogram.slice(0, -1);
 
-  // Panel B: ΔI% time course
+  // Panel B: ΔI% time course with RNP formation lag phase
+  // Lag phase: ~5-10 min for in situ RNP assembly before significant trans-cleavage begins
   const echemTimeCourse = useMemo(() => {
     const cd = echemCandidateData;
+    const lagMin = 7; // lag phase in minutes (RNP formation + cis-cleavage initiation)
     const points = [];
     for (let t = 0; t <= 60; t += 1) {
-      const t_s = t * 60;
+      // Effective cleavage time accounts for lag
+      const t_eff = Math.max(0, t - lagMin);
+      const t_s = t_eff * 60;
       const G_mut = computeGamma(t_s, cd.efficiency, echemKtrans);
       const G_wt = computeGammaWT(t_s, cd.efficiency, cd.discrimination, echemKtrans, cd.isProximity);
       const G_mutHi = computeGamma(t_s, cd.efficiency, echemKtrans * 2);
@@ -4497,11 +4539,11 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
         neg: 0,
       });
     }
-    // Compute detection times
+    // Compute detection times (3σ threshold)
     const threshold = 3 * ECHEM.intra_device_rsd * 100; // 15%
     const timeMut = points.find(p => p.MUT >= threshold)?.time ?? null;
     const timeWt = points.find(p => p.WT >= threshold)?.time ?? null;
-    return { points, threshold, timeMut, timeWt };
+    return { points, threshold, timeMut, timeWt, lagMin };
   }, [echemCandidateData, echemKtrans, echemGamma0_mol, computeGamma, computeGammaWT]);
 
   // Panel C: MUT vs WT discrimination overlay
@@ -4527,11 +4569,12 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       wtCurve = computeCV(echemE, G_wt, ECHEM.scan_rate);
     }
 
-    const peakBase = Math.max(...baseCurve);
-    const peakMut = Math.max(...mutCurve);
-    const peakWt = Math.max(...wtCurve);
-    const diMut = ((1 - peakMut / peakBase) * 100);
-    const diWt = ((1 - peakWt / peakBase) * 100);
+    // Peaks are negative — use absolute magnitude for ΔI% computation
+    const peakBase = Math.min(...baseCurve);
+    const peakMut = Math.min(...mutCurve);
+    const peakWt = Math.min(...wtCurve);
+    const diMut = ((1 - Math.abs(peakMut) / Math.abs(peakBase)) * 100);
+    const diWt = ((1 - Math.abs(peakWt) / Math.abs(peakBase)) * 100);
     const measuredDisc = diWt > 0 ? diMut / diWt : Infinity;
 
     const data = echemE.map((E, i) => ({
@@ -4800,243 +4843,412 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             )}
           </div>
 
-          {/* ── 4-Panel Grid ── */}
+          {/* ── 3-Panel Grid: A (voltammogram), B (time course), C (discrimination) ── */}
+          {(() => {
+            // Electrochemistry panel color palette
+            const EC = { green: "#10b981", greenLight: "#10b98120", purple: "#8b5cf6", purpleLight: "#8b5cf610", pink: "#ec4899", pinkLight: "#ec489915", gray: "#9ca3af" };
+            return (
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
 
-            {/* ═══ PANEL A: Voltammogram ═══ */}
+            {/* ═══ PANEL A: Voltammogram — negative (cathodic) MB peaks ═══ */}
             <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: "#FAFAFA" }}>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: "4px" }}>
-                Panel A: {echemTechnique} Voltammogram
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>
+                  A {"\u00b7"} {echemTechnique} Voltammogram
+                </div>
+                {echemTechnique === "SWV" && (
+                  <button onClick={() => setEchemShowFwdRev(!echemShowFwdRev)} style={{
+                    background: echemShowFwdRev ? EC.purple + "18" : "transparent", border: `1px solid ${echemShowFwdRev ? EC.purple : T.border}`,
+                    borderRadius: "4px", padding: "2px 8px", fontSize: "9px", fontFamily: MONO, fontWeight: 600,
+                    color: echemShowFwdRev ? EC.purple : T.textSec, cursor: "pointer",
+                  }}>i_fwd / i_rev</button>
+                )}
               </div>
-              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: "'IBM Plex Mono', monospace" }}>
-                {echemCandidateData.label} {"\u00b7"} {"\u0394"}I% = <span style={{ fontWeight: 700, color: "#D63384" }}>{echemMeta.deltaI}%</span>
-                {" \u00b7 "}I{"\u2080"} = {echemMeta.peakBase} {"\u03bcA"} {"\u2192"} I_after = {echemMeta.peakAfter} {"\u03bcA"}
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: MONO }}>
+                {echemCandidateData.label} {"\u00b7"} {"\u0394"}I% = <span style={{ fontWeight: 700, color: EC.purple }}>{echemMeta.deltaI}%</span>
+                {" \u00b7 "}|I{"\u2080"}| = {echemMeta.peakBaseAbs} {"\u03bcA"} {"\u2192"} |I_after| = {echemMeta.peakAfterAbs} {"\u03bcA"}
               </div>
-              <div style={{ width: "100%", height: 260 }}>
-                {echemTechnique === "CV" && cvDuckData ? (() => {
-                  const pad = { top: 20, right: 20, bottom: 35, left: 50 };
-                  const w = 460, h = 260, pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
-                  const allI = [...cvDuckData.baseline.forward, ...cvDuckData.baseline.reverse, ...cvDuckData.mut.forward, ...cvDuckData.mut.reverse].map(p => p.I);
-                  const iMin = Math.min(...allI) * 1.15, iMax = Math.max(...allI) * 1.15;
-                  const xS = e => pad.left + ((e - (-0.05)) / (-0.40 - (-0.05))) * pw;
-                  const yS = i => pad.top + ((iMax - i) / (iMax - iMin)) * ph;
+              <div style={{ width: "100%", height: 280 }}>
+                {(() => {
+                  const mg = { top: 24, right: 20, bottom: 38, left: 54 };
+                  const w = 480, h = 280, pw = w - mg.left - mg.right, ph = h - mg.top - mg.bottom;
+
+                  if (echemTechnique === "CV" && cvDuckData) {
+                    const allI = [cvDuckData.baseline, cvDuckData.mut].flatMap(d => [...d.forward, ...d.reverse]).map(p => p.I);
+                    const iMin = Math.min(...allI) * 1.2, iMax = Math.max(...allI) * 1.2;
+                    const xS = e => mg.left + ((e - (-0.05)) / (-0.40 - (-0.05))) * pw;
+                    const yS = i => mg.top + ((iMax - i) / (iMax - iMin)) * ph;
+                    const zeroY = yS(0);
+                    return (
+                      <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: MONO }}>
+                        <rect width={w} height={h} fill="#FAFAFA" rx="8" />
+                        {[0.25, 0.5, 0.75].map(f => <line key={`gx${f}`} x1={mg.left + pw * f} y1={mg.top} x2={mg.left + pw * f} y2={mg.top + ph} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                        {[0.25, 0.5, 0.75].map(f => <line key={`gy${f}`} x1={mg.left} y1={mg.top + ph * f} x2={mg.left + pw} y2={mg.top + ph * f} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                        <line x1={mg.left} y1={zeroY} x2={mg.left + pw} y2={zeroY} stroke="#BBB" strokeWidth="1" strokeDasharray="4,3" />
+                        <line x1={mg.left} y1={mg.top} x2={mg.left} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                        <line x1={mg.left} y1={mg.top + ph} x2={mg.left + pw} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                        <path d={cvSvgPath(cvDuckData.baseline, xS, yS)} fill="none" stroke={EC.green} strokeWidth="2" strokeDasharray="7,4" opacity="0.75" />
+                        <path d={cvSvgPath(cvDuckData.mut, xS, yS)} fill={EC.purpleLight} stroke={EC.purple} strokeWidth="2.5" />
+                        {/* ΔEp annotation */}
+                        {cvDuckData.E_pc && cvDuckData.E_pa && (
+                          <>
+                            <line x1={xS(cvDuckData.E_pc)} y1={mg.top + ph * 0.15} x2={xS(cvDuckData.E_pa)} y2={mg.top + ph * 0.15} stroke="#666" strokeWidth="1" markerEnd="url(#arrowR)" markerStart="url(#arrowL)" />
+                            <text x={(xS(cvDuckData.E_pc) + xS(cvDuckData.E_pa)) / 2} y={mg.top + ph * 0.12} textAnchor="middle" fill="#666" fontSize="8">{"\u0394"}Ep = {(cvDuckData.deltaEp * 1000).toFixed(0)} mV</text>
+                          </>
+                        )}
+                        <defs>
+                          <marker id="arrowR" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><path d="M0,0 L6,2 L0,4" fill="#666" /></marker>
+                          <marker id="arrowL" markerWidth="6" markerHeight="4" refX="1" refY="2" orient="auto"><path d="M6,0 L0,2 L6,4" fill="#666" /></marker>
+                        </defs>
+                        <line x1={xS(-0.22)} y1={mg.top} x2={xS(-0.22)} y2={mg.top + ph} stroke="#999" strokeWidth="0.8" strokeDasharray="3,3" />
+                        <text x={xS(-0.22)} y={mg.top - 5} textAnchor="middle" fill="#999" fontSize="8">E{"\u00b0"} = {"\u2212"}0.22 V</text>
+                        <text x={mg.left + pw / 2} y={h - 3} textAnchor="middle" fill="#444" fontSize="10">E (V vs Ag/AgCl)</text>
+                        <text x={14} y={mg.top + ph / 2} textAnchor="middle" fill="#444" fontSize="10" transform={`rotate(-90, 14, ${mg.top + ph / 2})`}>I ({"\u03bc"}A)</text>
+                        {[-0.05, -0.10, -0.15, -0.20, -0.25, -0.30, -0.35, -0.40].map(e => <text key={e} x={xS(e)} y={mg.top + ph + 14} textAnchor="middle" fill="#666" fontSize="8">{e.toFixed(2)}</text>)}
+                        {/* Legend */}
+                        <line x1={mg.left + 10} y1={mg.top + 10} x2={mg.left + 30} y2={mg.top + 10} stroke={EC.green} strokeWidth="2" strokeDasharray="5,3" />
+                        <text x={mg.left + 34} y={mg.top + 14} fill={EC.green} fontSize="9" fontWeight="600">Baseline ({"\u0393\u2080"})</text>
+                        <line x1={mg.left + 10} y1={mg.top + 24} x2={mg.left + 30} y2={mg.top + 24} stroke={EC.purple} strokeWidth="2.5" />
+                        <text x={mg.left + 34} y={mg.top + 28} fill={EC.purple} fontSize="9" fontWeight="600">After cleavage ({"\u0394"}I={cvDuckData.deltaI}%)</text>
+                      </svg>
+                    );
+                  }
+
+                  // SWV / DPV — custom SVG with negative peaks
+                  const data = echemPlotData;
+                  const allY = data.flatMap(d => {
+                    const vals = [d.baseline, d.after];
+                    if (echemShowFwdRev && d.base_fwd != null) vals.push(d.base_fwd, d.base_rev, d.after_fwd, d.after_rev);
+                    return vals;
+                  });
+                  const yMin = Math.min(...allY) * 1.15;
+                  const yMax = Math.max(0, Math.max(...allY) * 1.1 + 0.05);
+                  const xS = e => mg.left + ((e - (-0.05)) / (-0.40 - (-0.05))) * pw;
+                  const yS = v => mg.top + ((yMax - v) / (yMax - yMin)) * ph;
                   const zeroY = yS(0);
+                  const pathD = (key) => data.map((d, i) => `${i === 0 ? 'M' : 'L'}${xS(d.E).toFixed(1)} ${yS(d[key]).toFixed(1)}`).join(' ');
+                  // Fill area between baseline and after curves (shaded ΔI region)
+                  const fillPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${xS(d.E).toFixed(1)} ${yS(d.baseline).toFixed(1)}`).join(' ')
+                    + data.slice().reverse().map((d, i) => `L${xS(d.E).toFixed(1)} ${yS(d.after).toFixed(1)}`).join(' ') + ' Z';
+
+                  // Y-axis ticks
+                  const yRange = yMax - yMin;
+                  const yTickStep = yRange > 2 ? 1 : yRange > 1 ? 0.5 : yRange > 0.5 ? 0.2 : 0.1;
+                  const yTicks = [];
+                  for (let v = Math.ceil(yMin / yTickStep) * yTickStep; v <= yMax; v += yTickStep) yTicks.push(+v.toFixed(2));
+
                   return (
-                    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: MONO }}>
                       <rect width={w} height={h} fill="#FAFAFA" rx="8" />
-                      {[0.25, 0.5, 0.75].map(f => <line key={`gx${f}`} x1={pad.left + pw * f} y1={pad.top} x2={pad.left + pw * f} y2={pad.top + ph} stroke="#E8E8E8" strokeWidth="0.5" />)}
-                      {[0.25, 0.5, 0.75].map(f => <line key={`gy${f}`} x1={pad.left} y1={pad.top + ph * f} x2={pad.left + pw} y2={pad.top + ph * f} stroke="#E8E8E8" strokeWidth="0.5" />)}
-                      <line x1={pad.left} y1={zeroY} x2={pad.left + pw} y2={zeroY} stroke="#BBB" strokeWidth="1" strokeDasharray="4,3" />
-                      <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + ph} stroke="#444" strokeWidth="1.5" />
-                      <line x1={pad.left} y1={pad.top + ph} x2={pad.left + pw} y2={pad.top + ph} stroke="#444" strokeWidth="1.5" />
-                      <path d={cvSvgPath(cvDuckData.baseline, xS, yS)} fill="none" stroke="#3B5FBD" strokeWidth="1.8" strokeDasharray="7,4" opacity="0.65" />
-                      <path d={cvSvgPath(cvDuckData.mut, xS, yS)} fill="rgba(214,51,132,0.06)" stroke="#D63384" strokeWidth="2.5" />
-                      <line x1={xS(-0.22)} y1={pad.top} x2={xS(-0.22)} y2={pad.top + ph} stroke="#999" strokeWidth="0.8" strokeDasharray="3,3" />
-                      <text x={xS(-0.22)} y={pad.top - 5} textAnchor="middle" fill="#999" fontSize="9">E° = −0.22 V</text>
-                      <text x={pad.left + pw / 2} y={h - 3} textAnchor="middle" fill="#444" fontSize="11">E (V vs Ag/AgCl)</text>
-                      <text x={12} y={pad.top + ph / 2} textAnchor="middle" fill="#444" fontSize="11" transform={`rotate(-90, 12, ${pad.top + ph / 2})`}>I (μA)</text>
-                      {[-0.05, -0.10, -0.15, -0.20, -0.25, -0.30, -0.35, -0.40].map(e => <text key={e} x={xS(e)} y={pad.top + ph + 14} textAnchor="middle" fill="#666" fontSize="8">{e.toFixed(2)}</text>)}
-                      <line x1={pad.left + pw - 120} y1={pad.top + 12} x2={pad.left + pw - 95} y2={pad.top + 12} stroke="#3B5FBD" strokeWidth="1.8" strokeDasharray="7,4" />
-                      <text x={pad.left + pw - 90} y={pad.top + 16} fill="#3B5FBD" fontSize="9">Baseline</text>
-                      <line x1={pad.left + pw - 120} y1={pad.top + 26} x2={pad.left + pw - 95} y2={pad.top + 26} stroke="#D63384" strokeWidth="2.5" />
-                      <text x={pad.left + pw - 90} y={pad.top + 30} fill="#D63384" fontSize="9">After ({cvDuckData.deltaI}%)</text>
+                      {/* Grid */}
+                      {[0.25, 0.5, 0.75].map(f => <line key={`gx${f}`} x1={mg.left + pw * f} y1={mg.top} x2={mg.left + pw * f} y2={mg.top + ph} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                      {yTicks.map(v => <line key={`gy${v}`} x1={mg.left} y1={yS(v)} x2={mg.left + pw} y2={yS(v)} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                      {/* Zero line */}
+                      <line x1={mg.left} y1={zeroY} x2={mg.left + pw} y2={zeroY} stroke="#BBB" strokeWidth="1" strokeDasharray="4,3" />
+                      {/* Axes */}
+                      <line x1={mg.left} y1={mg.top} x2={mg.left} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                      <line x1={mg.left} y1={mg.top + ph} x2={mg.left + pw} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                      {/* Shaded ΔI region between baseline and after */}
+                      <path d={fillPath} fill={EC.purple} opacity="0.08" />
+                      {/* SWV forward/reverse components */}
+                      {echemShowFwdRev && echemTechnique === "SWV" && data[0].base_fwd != null && (
+                        <>
+                          <path d={pathD("base_fwd")} fill="none" stroke={EC.green} strokeWidth="1" opacity="0.4" strokeDasharray="3,2" />
+                          <path d={pathD("base_rev")} fill="none" stroke={EC.green} strokeWidth="1" opacity="0.4" strokeDasharray="1,2" />
+                          <path d={pathD("after_fwd")} fill="none" stroke={EC.purple} strokeWidth="1" opacity="0.4" strokeDasharray="3,2" />
+                          <path d={pathD("after_rev")} fill="none" stroke={EC.purple} strokeWidth="1" opacity="0.4" strokeDasharray="1,2" />
+                        </>
+                      )}
+                      {/* Main curves */}
+                      <path d={pathD("baseline")} fill="none" stroke={EC.green} strokeWidth="2.2" strokeDasharray="7,4" opacity="0.85" />
+                      <path d={pathD("after")} fill="none" stroke={EC.purple} strokeWidth="2.5" />
+                      {/* E° reference */}
+                      <line x1={xS(-0.22)} y1={mg.top} x2={xS(-0.22)} y2={mg.top + ph} stroke="#999" strokeWidth="0.8" strokeDasharray="3,3" />
+                      <text x={xS(-0.22)} y={mg.top - 5} textAnchor="middle" fill="#999" fontSize="8">E{"\u00b0"} = {"\u2212"}0.22 V</text>
+                      {/* Peak annotations with arrows */}
+                      {(() => {
+                        const peakIdx = data.reduce((min, d, i) => d.baseline < data[min].baseline ? i : min, 0);
+                        const peakE = data[peakIdx].E;
+                        const bY = yS(data[peakIdx].baseline);
+                        const aY = yS(data[peakIdx].after);
+                        return (
+                          <>
+                            {/* ΔI bracket */}
+                            <line x1={xS(peakE) + 8} y1={bY} x2={xS(peakE) + 8} y2={aY} stroke={EC.purple} strokeWidth="1.5" />
+                            <line x1={xS(peakE) + 4} y1={bY} x2={xS(peakE) + 12} y2={bY} stroke={EC.purple} strokeWidth="1" />
+                            <line x1={xS(peakE) + 4} y1={aY} x2={xS(peakE) + 12} y2={aY} stroke={EC.purple} strokeWidth="1" />
+                            <text x={xS(peakE) + 16} y={(bY + aY) / 2 + 3} fill={EC.purple} fontSize="9" fontWeight="700">{"\u0394"}I={echemMeta.deltaI}%</text>
+                          </>
+                        );
+                      })()}
+                      {/* X ticks */}
+                      {[-0.05, -0.10, -0.15, -0.20, -0.25, -0.30, -0.35, -0.40].map(e => <text key={e} x={xS(e)} y={mg.top + ph + 14} textAnchor="middle" fill="#666" fontSize="8">{e.toFixed(2)}</text>)}
+                      {/* Y ticks */}
+                      {yTicks.map(v => <text key={v} x={mg.left - 5} y={yS(v) + 3} textAnchor="end" fill="#666" fontSize="8">{v.toFixed(1)}</text>)}
+                      {/* Axis labels */}
+                      <text x={mg.left + pw / 2} y={h - 3} textAnchor="middle" fill="#444" fontSize="10">E (V vs Ag/AgCl)</text>
+                      <text x={14} y={mg.top + ph / 2} textAnchor="middle" fill="#444" fontSize="10" transform={`rotate(-90, 14, ${mg.top + ph / 2})`}>I ({"\u03bc"}A)</text>
+                      {/* Legend */}
+                      <line x1={mg.left + 10} y1={mg.top + 10} x2={mg.left + 30} y2={mg.top + 10} stroke={EC.green} strokeWidth="2" strokeDasharray="5,3" />
+                      <text x={mg.left + 34} y={mg.top + 14} fill={EC.green} fontSize="9" fontWeight="600">Baseline ({"\u0393\u2080"})</text>
+                      <line x1={mg.left + 10} y1={mg.top + 24} x2={mg.left + 30} y2={mg.top + 24} stroke={EC.purple} strokeWidth="2.5" />
+                      <text x={mg.left + 34} y={mg.top + 28} fill={EC.purple} fontSize="9" fontWeight="600">+{echemCandidateData.label} ({echemTime} min)</text>
+                      {echemShowFwdRev && echemTechnique === "SWV" && (
+                        <>
+                          <line x1={mg.left + 10} y1={mg.top + 38} x2={mg.left + 30} y2={mg.top + 38} stroke={EC.gray} strokeWidth="1" strokeDasharray="3,2" />
+                          <text x={mg.left + 34} y={mg.top + 42} fill={EC.gray} fontSize="8">i_fwd / i_rev</text>
+                        </>
+                      )}
+                      {/* FWHM annotation */}
+                      <text x={w - mg.right - 4} y={h - 22} textAnchor="end" fill="#999" fontSize="7">
+                        FWHM {"\u2248"} {echemTechnique === "SWV" ? "62" : "96"} mV ({echemTechnique === "SWV" ? "3.53 RT/nF" : "RT/\u03b1nF"})
+                      </text>
                     </svg>
                   );
-                })() : (
-                <ResponsiveContainer>
-                  <AreaChart data={echemPlotData} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
-                    <CartesianGrid stroke="#E8E8E8" strokeWidth={0.5} />
-                    <XAxis dataKey="E" type="number" domain={[-0.4, -0.05]} fontSize={9} fontFamily="'IBM Plex Mono', monospace"
-                      label={{ value: "E (V vs Ag/AgCl)", position: "bottom", fontSize: 9, offset: -2 }}
-                      tickFormatter={v => v.toFixed(2)} reversed stroke="#444" tickSize={4} />
-                    <YAxis fontSize={9} fontFamily="'IBM Plex Mono', monospace" stroke="#444" tickSize={4}
-                      label={{ value: `I (\u03bcA)`, angle: -90, position: "insideLeft", fontSize: 9 }} />
-                    <Tooltip contentStyle={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}
-                      formatter={(val, name) => [`${(+val).toFixed(3)} \u03bcA`, name === "baseline" ? "Baseline" : `After ${echemTime} min`]}
-                      labelFormatter={v => `E = ${(+v).toFixed(3)} V`} />
-                    <Area dataKey="baseline" stroke="#3B5FBD" strokeDasharray="7 4" fill="none" strokeWidth={1.8} dot={false} name="baseline" opacity={0.65} />
-                    <Area dataKey="after" stroke="#D63384" fill="#D63384" fillOpacity={0.06} strokeWidth={2.5} dot={false} name="after" />
-                    <ReferenceLine x={-0.22} stroke="#999" strokeDasharray="3 3" label={{ value: "E\u00b0", position: "top", fontSize: 8, fill: "#999" }} />
-                  </AreaChart>
-                </ResponsiveContainer>
-                )}
+                })()}
+              </div>
+              {/* Physics equation */}
+              <div style={{ fontSize: "9px", color: T.textTer, marginTop: "4px", fontFamily: MONO, fontStyle: "italic" }}>
+                {echemTechnique === "SWV" ? "i_net = i_fwd \u2212 i_rev ; i \u221d \u0393 \u00b7 sech\u00b2[(nF/2RT)(E\u2212E\u00b0\u00b1E_sw)]"
+                  : echemTechnique === "DPV" ? "i_p = (n\u00b2F\u00b2\u0393A\u0394E) / (4RT) \u00b7 sech\u00b2[(nF/2RT)(E\u2212E\u00b0)]"
+                  : "i_p = (n\u00b2F\u00b2\u0393Av) / (4RT) \u00b7 sech\u00b2[(nF/2RT)(E\u2212E\u00b0)] ; \u0394Ep \u2248 0 mV (ideal)"}
               </div>
             </div>
 
-            {/* ═══ PANEL B: ΔI% Time Course ═══ */}
+            {/* ═══ PANEL B: ΔI% Time Course with lag phase + threshold zones ═══ */}
             <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: "#FAFAFA" }}>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: "4px" }}>
-                Panel B: {"\u0394"}I% Time Course
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+                B {"\u00b7"} {"\u0394"}I% Time Course
               </div>
-              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: "'IBM Plex Mono', monospace" }}>
-                Detection (MUT): <span style={{ fontWeight: 700, color: "#D63384" }}>{echemTimeCourse.timeMut != null ? `~${echemTimeCourse.timeMut} min` : ">60 min"}</span>
-                {" \u00b7 "}Detection (WT): <span style={{ fontWeight: 700, color: "#3B5FBD" }}>{echemTimeCourse.timeWt != null ? `~${echemTimeCourse.timeWt} min` : "never"}</span>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: MONO }}>
+                MUT: <span style={{ fontWeight: 700, color: EC.purple }}>{echemTimeCourse.timeMut != null ? `t_det \u2248 ${echemTimeCourse.timeMut} min` : ">60 min"}</span>
+                {" \u00b7 "}WT: <span style={{ fontWeight: 700, color: EC.pink }}>{echemTimeCourse.timeWt != null ? `~${echemTimeCourse.timeWt} min` : "below threshold"}</span>
                 {echemTimeCourse.timeMut != null && echemTimeCourse.timeWt != null && echemTimeCourse.timeWt > echemTimeCourse.timeMut && (
-                  <span> {"\u00b7"} <span style={{ fontWeight: 700, color: T.success }}>Window: {echemTimeCourse.timeMut}{"\u2013"}{echemTimeCourse.timeWt} min</span></span>
+                  <span> {"\u00b7"} <span style={{ fontWeight: 700, color: EC.green }}>Window: {echemTimeCourse.timeMut}{"\u2013"}{echemTimeCourse.timeWt} min</span></span>
                 )}
               </div>
-              <div style={{ width: "100%", height: 260 }}>
-                <ResponsiveContainer>
-                  <ComposedChart data={echemTimeCourse.points} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
-                    <CartesianGrid stroke="#E8E8E8" strokeWidth={0.5} />
-                    <XAxis dataKey="time" type="number" domain={[0, 60]} fontSize={9} fontFamily="'IBM Plex Mono', monospace" stroke="#444" tickSize={4}
-                      label={{ value: "Time (min)", position: "bottom", fontSize: 9, offset: -2 }} />
-                    <YAxis domain={[0, 100]} fontSize={9} fontFamily="'IBM Plex Mono', monospace" stroke="#444" tickSize={4}
-                      label={{ value: "\u0394I% ", angle: -90, position: "insideLeft", fontSize: 9 }} />
-                    <Tooltip contentStyle={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}
-                      formatter={(val, name) => [`${val}%`, name]} />
-                    {/* Uncertainty band */}
-                    <Area dataKey="MUT_hi" stroke="none" fill="#D63384" fillOpacity={0.06} dot={false} name="MUT (k\u00d72)" />
-                    <Area dataKey="MUT_lo" stroke="none" fill="#fff" fillOpacity={0.9} dot={false} name="MUT (k/2)" />
-                    {/* Main curves */}
-                    <Line dataKey="MUT" stroke="#D63384" strokeWidth={2.5} dot={false} name="MUT" />
-                    <Line dataKey="WT" stroke="#3B5FBD" strokeWidth={2} dot={false} name="WT" />
-                    <Line dataKey="neg" stroke="#C0C0C0" strokeWidth={1} strokeDasharray="6 4" dot={false} name="Neg ctrl" />
-                    {/* Threshold */}
-                    <ReferenceLine y={echemTimeCourse.threshold} stroke="#C0392B" strokeDasharray="6 3"
-                      label={{ value: `3\u03c3 = ${echemTimeCourse.threshold}%`, position: "right", fontSize: 8, fill: "#C0392B" }} />
-                    {/* Current time marker */}
-                    <ReferenceLine x={echemTime} stroke="#666" strokeDasharray="4 2" />
-                  </ComposedChart>
-                </ResponsiveContainer>
+              <div style={{ width: "100%", height: 280 }}>
+                {(() => {
+                  const mg = { top: 20, right: 24, bottom: 38, left: 48 };
+                  const w = 480, h = 280, pw = w - mg.left - mg.right, ph = h - mg.top - mg.bottom;
+                  const pts = echemTimeCourse.points;
+                  const xS = t => mg.left + (t / 60) * pw;
+                  const yS = v => mg.top + ((100 - v) / 100) * ph;
+                  const pathD = (key) => pts.filter(p => p[key] != null).map((p, i) => `${i === 0 ? 'M' : 'L'}${xS(p.time).toFixed(1)} ${yS(p[key]).toFixed(1)}`).join(' ');
+                  // Uncertainty band fill
+                  const bandPath = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xS(p.time).toFixed(1)} ${yS(p.MUT_hi).toFixed(1)}`).join(' ')
+                    + pts.slice().reverse().map(p => `L${xS(p.time).toFixed(1)} ${yS(p.MUT_lo).toFixed(1)}`).join(' ') + ' Z';
+                  const thr = echemTimeCourse.threshold;
+                  return (
+                    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: MONO }}>
+                      <rect width={w} height={h} fill="#FAFAFA" rx="8" />
+                      {/* Threshold zones */}
+                      {/* Positive zone: >30% — green tint */}
+                      <rect x={mg.left} y={yS(100)} width={pw} height={yS(30) - yS(100)} fill={EC.green} opacity="0.04" />
+                      {/* Indeterminate zone: 5-30% — yellow tint */}
+                      <rect x={mg.left} y={yS(30)} width={pw} height={yS(5) - yS(30)} fill="#f59e0b" opacity="0.05" />
+                      {/* Negative zone: <5% — red tint */}
+                      <rect x={mg.left} y={yS(5)} width={pw} height={yS(0) - yS(5)} fill="#ef4444" opacity="0.04" />
+                      {/* Zone labels */}
+                      <text x={w - mg.right - 2} y={yS(65)} textAnchor="end" fill={EC.green} fontSize="7" fontWeight="600" opacity="0.7">POSITIVE</text>
+                      <text x={w - mg.right - 2} y={yS(17)} textAnchor="end" fill="#f59e0b" fontSize="7" fontWeight="600" opacity="0.7">INDETERMINATE</text>
+                      <text x={w - mg.right - 2} y={yS(2)} textAnchor="end" fill="#ef4444" fontSize="7" fontWeight="600" opacity="0.7">NEGATIVE</text>
+                      {/* Grid */}
+                      {[10, 20, 30, 40, 50].map(t => <line key={`gx${t}`} x1={xS(t)} y1={mg.top} x2={xS(t)} y2={mg.top + ph} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                      {[20, 40, 60, 80].map(v => <line key={`gy${v}`} x1={mg.left} y1={yS(v)} x2={mg.left + pw} y2={yS(v)} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                      {/* Axes */}
+                      <line x1={mg.left} y1={mg.top} x2={mg.left} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                      <line x1={mg.left} y1={mg.top + ph} x2={mg.left + pw} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                      {/* Threshold lines */}
+                      <line x1={mg.left} y1={yS(30)} x2={mg.left + pw} y2={yS(30)} stroke={EC.green} strokeWidth="0.8" strokeDasharray="4,3" opacity="0.5" />
+                      <line x1={mg.left} y1={yS(5)} x2={mg.left + pw} y2={yS(5)} stroke="#ef4444" strokeWidth="0.8" strokeDasharray="4,3" opacity="0.5" />
+                      {/* 3σ threshold */}
+                      <line x1={mg.left} y1={yS(thr)} x2={mg.left + pw} y2={yS(thr)} stroke="#C0392B" strokeWidth="1.2" strokeDasharray="6,3" />
+                      <text x={mg.left + 4} y={yS(thr) - 4} fill="#C0392B" fontSize="8" fontWeight="600">3{"\u03c3"} = {thr}%</text>
+                      {/* Lag phase indicator */}
+                      <rect x={mg.left} y={mg.top} width={xS(7) - mg.left} height={ph} fill="#666" opacity="0.03" />
+                      <text x={(mg.left + xS(7)) / 2} y={mg.top + ph - 6} textAnchor="middle" fill="#999" fontSize="7">RNP lag</text>
+                      {/* Uncertainty band */}
+                      <path d={bandPath} fill={EC.purple} opacity="0.1" />
+                      {/* Main curves */}
+                      <path d={pathD("MUT")} fill="none" stroke={EC.purple} strokeWidth="2.5" />
+                      <path d={pathD("WT")} fill="none" stroke={EC.pink} strokeWidth="2" opacity="0.85" />
+                      <path d={pathD("neg")} fill="none" stroke="#C0C0C0" strokeWidth="1" strokeDasharray="6,4" />
+                      {/* Current time marker */}
+                      <line x1={xS(echemTime)} y1={mg.top} x2={xS(echemTime)} y2={mg.top + ph} stroke="#666" strokeWidth="1" strokeDasharray="4,2" />
+                      <text x={xS(echemTime)} y={mg.top - 4} textAnchor="middle" fill="#666" fontSize="8">t={echemTime}</text>
+                      {/* Detection time markers */}
+                      {echemTimeCourse.timeMut != null && (
+                        <circle cx={xS(echemTimeCourse.timeMut)} cy={yS(pts.find(p => p.time === echemTimeCourse.timeMut)?.MUT || thr)} r="4" fill={EC.purple} stroke="#fff" strokeWidth="1.5" />
+                      )}
+                      {echemTimeCourse.timeWt != null && (
+                        <circle cx={xS(echemTimeCourse.timeWt)} cy={yS(pts.find(p => p.time === echemTimeCourse.timeWt)?.WT || thr)} r="3.5" fill={EC.pink} stroke="#fff" strokeWidth="1.5" />
+                      )}
+                      {/* X ticks */}
+                      {[0, 10, 20, 30, 40, 50, 60].map(t => <text key={t} x={xS(t)} y={mg.top + ph + 14} textAnchor="middle" fill="#666" fontSize="8">{t}</text>)}
+                      {/* Y ticks */}
+                      {[0, 20, 40, 60, 80, 100].map(v => <text key={v} x={mg.left - 5} y={yS(v) + 3} textAnchor="end" fill="#666" fontSize="8">{v}</text>)}
+                      {/* Axis labels */}
+                      <text x={mg.left + pw / 2} y={h - 3} textAnchor="middle" fill="#444" fontSize="10">Time (min)</text>
+                      <text x={14} y={mg.top + ph / 2} textAnchor="middle" fill="#444" fontSize="10" transform={`rotate(-90, 14, ${mg.top + ph / 2})`}>{"\u0394"}I%</text>
+                      {/* Legend */}
+                      <rect x={mg.left + pw - 130} y={mg.top + 4} width="126" height="44" rx="4" fill="#fff" stroke="#E8E8E8" strokeWidth="0.5" opacity="0.9" />
+                      <line x1={mg.left + pw - 124} y1={mg.top + 16} x2={mg.left + pw - 108} y2={mg.top + 16} stroke={EC.purple} strokeWidth="2.5" />
+                      <text x={mg.left + pw - 104} y={mg.top + 19} fill={EC.purple} fontSize="8" fontWeight="600">MUT (k_trans={echemKtrans.toFixed(3)})</text>
+                      <line x1={mg.left + pw - 124} y1={mg.top + 28} x2={mg.left + pw - 108} y2={mg.top + 28} stroke={EC.pink} strokeWidth="2" />
+                      <text x={mg.left + pw - 104} y={mg.top + 31} fill={EC.pink} fontSize="8" fontWeight="600">WT (S_eff/D)</text>
+                      <line x1={mg.left + pw - 124} y1={mg.top + 40} x2={mg.left + pw - 108} y2={mg.top + 40} stroke="#C0C0C0" strokeWidth="1" strokeDasharray="4,2" />
+                      <text x={mg.left + pw - 104} y={mg.top + 43} fill="#999" fontSize="8">Neg ctrl</text>
+                    </svg>
+                  );
+                })()}
+              </div>
+              <div style={{ fontSize: "9px", color: T.textTer, marginTop: "4px", fontFamily: MONO, fontStyle: "italic" }}>
+                {"\u0394"}I% = (1 {"\u2212"} {"\u0393"}(t)/{"\u0393\u2080"}) {"\u00d7"} 100 ; {"\u0393"}(t) = {"\u0393\u2080"} exp({"\u2212"}k_trans {"\u00b7"} S_eff {"\u00b7"} {"\u222b"}f_RNP dt) ; lag {"\u2248"} 5{"\u2013"}10 min (in situ RNP formation)
               </div>
             </div>
 
             {/* ═══ PANEL C: MUT vs WT Discrimination Overlay ═══ */}
-            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: "#FAFAFA" }}>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: "4px" }}>
-                Panel C: MUT vs WT Discrimination
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: "#FAFAFA", gridColumn: mobile ? "1" : "1 / -1" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+                C {"\u00b7"} MUT vs WT Allelic Discrimination
               </div>
-              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: "'IBM Plex Mono', monospace" }}>
-                MUT: <span style={{ fontWeight: 700, color: "#D63384" }}>{echemDiscOverlay.peakMut} {"\u03bcA"} ({"\u0394"}I% = {echemDiscOverlay.diMut}%)</span>
-                {" \u00b7 "}WT: <span style={{ fontWeight: 700, color: "#3B5FBD" }}>{echemDiscOverlay.peakWt} {"\u03bcA"} ({"\u0394"}I% = {echemDiscOverlay.diWt}%)</span>
-                {" \u00b7 "}Disc: <span style={{ fontWeight: 700, color: T.primary }}>{echemDiscOverlay.measuredDisc === Infinity ? "\u221e" : `${echemDiscOverlay.measuredDisc}\u00d7`}</span>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: MONO }}>
+                MUT: <span style={{ fontWeight: 700, color: EC.purple }}>{Math.abs(echemDiscOverlay.peakMut).toFixed(3)} {"\u03bcA"} ({"\u0394"}I={echemDiscOverlay.diMut}%)</span>
+                {" \u00b7 "}WT: <span style={{ fontWeight: 700, color: EC.pink }}>{Math.abs(echemDiscOverlay.peakWt).toFixed(3)} {"\u03bcA"} ({"\u0394"}I={echemDiscOverlay.diWt}%)</span>
+                {" \u00b7 "}Disc: <span style={{ fontWeight: 700, color: EC.purple }}>{echemDiscOverlay.measuredDisc === Infinity ? "\u221e" : `${echemDiscOverlay.measuredDisc}\u00d7`}</span>
                 {" (GUARD: "}{echemDiscOverlay.guardDisc >= 900 ? "\u221e" : `${echemDiscOverlay.guardDisc}\u00d7`}{")"}
               </div>
-              <div style={{ width: "100%", height: 260 }}>
-                {echemTechnique === "CV" && cvDuckData ? (() => {
-                  const pad = { top: 20, right: 20, bottom: 35, left: 50 };
-                  const w = 460, h = 260, pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
-                  const allI = [cvDuckData.baseline, cvDuckData.mut, cvDuckData.wt].flatMap(d => [...d.forward, ...d.reverse]).map(p => p.I);
-                  const iMin = Math.min(...allI) * 1.15, iMax = Math.max(...allI) * 1.15;
-                  const xS = e => pad.left + ((e - (-0.05)) / (-0.35)) * pw;
-                  const yS = i => pad.top + ((iMax - i) / (iMax - iMin)) * ph;
+              <div style={{ width: "100%", height: 280 }}>
+                {(() => {
+                  const mg = { top: 24, right: 24, bottom: 38, left: 54 };
+                  const w = mobile ? 480 : 920, h = 280, pw = w - mg.left - mg.right, ph = h - mg.top - mg.bottom;
+
+                  if (echemTechnique === "CV" && cvDuckData) {
+                    const allI = [cvDuckData.baseline, cvDuckData.mut, cvDuckData.wt].flatMap(d => [...d.forward, ...d.reverse]).map(p => p.I);
+                    const iMin = Math.min(...allI) * 1.15, iMax = Math.max(...allI) * 1.15;
+                    const xS = e => mg.left + ((e - (-0.05)) / (-0.40 - (-0.05))) * pw;
+                    const yS = i => mg.top + ((iMax - i) / (iMax - iMin)) * ph;
+                    return (
+                      <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: MONO }}>
+                        <rect width={w} height={h} fill="#FAFAFA" rx="8" />
+                        {[0.25, 0.5, 0.75].map(f => <line key={`g${f}`} x1={mg.left + pw * f} y1={mg.top} x2={mg.left + pw * f} y2={mg.top + ph} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                        <line x1={mg.left} y1={yS(0)} x2={mg.left + pw} y2={yS(0)} stroke="#BBB" strokeWidth="1" strokeDasharray="4,3" />
+                        <line x1={mg.left} y1={mg.top} x2={mg.left} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                        <line x1={mg.left} y1={mg.top + ph} x2={mg.left + pw} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                        <path d={cvSvgPath(cvDuckData.baseline, xS, yS)} fill="none" stroke={EC.green} strokeWidth="2" strokeDasharray="6,4" opacity="0.6" />
+                        <path d={cvSvgPath(cvDuckData.wt, xS, yS)} fill={EC.pinkLight} stroke={EC.pink} strokeWidth="2" opacity="0.85" />
+                        <path d={cvSvgPath(cvDuckData.mut, xS, yS)} fill={EC.purpleLight} stroke={EC.purple} strokeWidth="2.5" />
+                        <line x1={xS(-0.22)} y1={mg.top} x2={xS(-0.22)} y2={mg.top + ph} stroke="#999" strokeWidth="0.8" strokeDasharray="3,3" />
+                        <text x={mg.left + pw / 2} y={h - 3} textAnchor="middle" fill="#444" fontSize="10">E (V vs Ag/AgCl)</text>
+                        <text x={14} y={mg.top + ph / 2} textAnchor="middle" fill="#444" fontSize="10" transform={`rotate(-90, 14, ${mg.top + ph / 2})`}>I ({"\u03bc"}A)</text>
+                        <line x1={mg.left + 10} y1={mg.top + 10} x2={mg.left + 30} y2={mg.top + 10} stroke={EC.green} strokeWidth="2" strokeDasharray="5,3" />
+                        <text x={mg.left + 34} y={mg.top + 14} fill={EC.green} fontSize="9" fontWeight="600">Baseline</text>
+                        <line x1={mg.left + 10} y1={mg.top + 24} x2={mg.left + 30} y2={mg.top + 24} stroke={EC.pink} strokeWidth="2" />
+                        <text x={mg.left + 34} y={mg.top + 28} fill={EC.pink} fontSize="9" fontWeight="600">WT ({"\u0394"}I={echemDiscOverlay.diWt}%)</text>
+                        <line x1={mg.left + 10} y1={mg.top + 38} x2={mg.left + 30} y2={mg.top + 38} stroke={EC.purple} strokeWidth="2.5" />
+                        <text x={mg.left + 34} y={mg.top + 42} fill={EC.purple} fontSize="9" fontWeight="600">MUT ({"\u0394"}I={echemDiscOverlay.diMut}%)</text>
+                      </svg>
+                    );
+                  }
+
+                  // SWV / DPV discrimination overlay
+                  const data = echemDiscOverlay.data;
+                  const allY = data.flatMap(d => [d.baseline, d.MUT, d.WT]);
+                  const yMin = Math.min(...allY) * 1.15;
+                  const yMax = Math.max(0, Math.max(...allY) * 1.1 + 0.05);
+                  const xS = e => mg.left + ((e - (-0.05)) / (-0.40 - (-0.05))) * pw;
+                  const yS = v => mg.top + ((yMax - v) / (yMax - yMin)) * ph;
+                  const pathD = (key) => data.map((d, i) => `${i === 0 ? 'M' : 'L'}${xS(d.E).toFixed(1)} ${yS(d[key]).toFixed(1)}`).join(' ');
+                  // Shaded area between MUT and WT peaks (discrimination region)
+                  const discFill = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${xS(d.E).toFixed(1)} ${yS(d.MUT).toFixed(1)}`).join(' ')
+                    + data.slice().reverse().map(d => `L${xS(d.E).toFixed(1)} ${yS(d.WT).toFixed(1)}`).join(' ') + ' Z';
+                  // Shaded area between baseline and WT
+                  const wtFill = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${xS(d.E).toFixed(1)} ${yS(d.baseline).toFixed(1)}`).join(' ')
+                    + data.slice().reverse().map(d => `L${xS(d.E).toFixed(1)} ${yS(d.WT).toFixed(1)}`).join(' ') + ' Z';
+                  // Y ticks
+                  const yRange = yMax - yMin;
+                  const yTickStep = yRange > 2 ? 1 : yRange > 1 ? 0.5 : yRange > 0.5 ? 0.2 : 0.1;
+                  const yTicks = [];
+                  for (let v = Math.ceil(yMin / yTickStep) * yTickStep; v <= yMax; v += yTickStep) yTicks.push(+v.toFixed(2));
+
                   return (
-                    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: MONO }}>
                       <rect width={w} height={h} fill="#FAFAFA" rx="8" />
-                      {[0.25, 0.5, 0.75].map(f => <line key={`g${f}`} x1={pad.left + pw * f} y1={pad.top} x2={pad.left + pw * f} y2={pad.top + ph} stroke="#E8E8E8" strokeWidth="0.5" />)}
-                      <line x1={pad.left} y1={yS(0)} x2={pad.left + pw} y2={yS(0)} stroke="#BBB" strokeWidth="1" strokeDasharray="4,3" />
-                      <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + ph} stroke="#444" strokeWidth="1.5" />
-                      <line x1={pad.left} y1={pad.top + ph} x2={pad.left + pw} y2={pad.top + ph} stroke="#444" strokeWidth="1.5" />
-                      <path d={cvSvgPath(cvDuckData.baseline, xS, yS)} fill="none" stroke="#999" strokeWidth="1.5" strokeDasharray="6,4" opacity="0.5" />
-                      <path d={cvSvgPath(cvDuckData.wt, xS, yS)} fill="none" stroke="#3B5FBD" strokeWidth="2" opacity="0.85" />
-                      <path d={cvSvgPath(cvDuckData.mut, xS, yS)} fill="rgba(214,51,132,0.06)" stroke="#D63384" strokeWidth="2.5" />
-                      <line x1={xS(-0.22)} y1={pad.top} x2={xS(-0.22)} y2={pad.top + ph} stroke="#999" strokeWidth="0.8" strokeDasharray="3,3" />
-                      <text x={pad.left + pw / 2} y={h - 3} textAnchor="middle" fill="#444" fontSize="11">E (V vs Ag/AgCl)</text>
-                      <text x={12} y={pad.top + ph / 2} textAnchor="middle" fill="#444" fontSize="11" transform={`rotate(-90, 12, ${pad.top + ph / 2})`}>I (μA)</text>
-                      <line x1={pad.left + pw - 100} y1={pad.top + 10} x2={pad.left + pw - 80} y2={pad.top + 10} stroke="#999" strokeWidth="1.5" strokeDasharray="6,4" />
-                      <text x={pad.left + pw - 75} y={pad.top + 14} fill="#999" fontSize="9">Baseline</text>
-                      <line x1={pad.left + pw - 100} y1={pad.top + 24} x2={pad.left + pw - 80} y2={pad.top + 24} stroke="#3B5FBD" strokeWidth="2" />
-                      <text x={pad.left + pw - 75} y={pad.top + 28} fill="#3B5FBD" fontSize="9">WT</text>
-                      <line x1={pad.left + pw - 100} y1={pad.top + 38} x2={pad.left + pw - 80} y2={pad.top + 38} stroke="#D63384" strokeWidth="2.5" />
-                      <text x={pad.left + pw - 75} y={pad.top + 42} fill="#D63384" fontSize="9">MUT</text>
+                      {/* Grid */}
+                      {[0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875].map(f => <line key={`gx${f}`} x1={mg.left + pw * f} y1={mg.top} x2={mg.left + pw * f} y2={mg.top + ph} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                      {yTicks.map(v => <line key={`gy${v}`} x1={mg.left} y1={yS(v)} x2={mg.left + pw} y2={yS(v)} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                      <line x1={mg.left} y1={yS(0)} x2={mg.left + pw} y2={yS(0)} stroke="#BBB" strokeWidth="1" strokeDasharray="4,3" />
+                      {/* Axes */}
+                      <line x1={mg.left} y1={mg.top} x2={mg.left} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                      <line x1={mg.left} y1={mg.top + ph} x2={mg.left + pw} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
+                      {/* Shaded discrimination region between MUT and WT */}
+                      <path d={discFill} fill={EC.purple} opacity="0.1" />
+                      {/* Shaded WT region between baseline and WT */}
+                      <path d={wtFill} fill={EC.pink} opacity="0.06" />
+                      {/* Curves */}
+                      <path d={pathD("baseline")} fill="none" stroke={EC.green} strokeWidth="2" strokeDasharray="6,4" opacity="0.7" />
+                      <path d={pathD("WT")} fill="none" stroke={EC.pink} strokeWidth="2.2" opacity="0.85" />
+                      <path d={pathD("MUT")} fill="none" stroke={EC.purple} strokeWidth="2.5" />
+                      {/* E° reference */}
+                      <line x1={xS(-0.22)} y1={mg.top} x2={xS(-0.22)} y2={mg.top + ph} stroke="#999" strokeWidth="0.8" strokeDasharray="3,3" />
+                      <text x={xS(-0.22)} y={mg.top - 5} textAnchor="middle" fill="#999" fontSize="8">E{"\u00b0"}</text>
+                      {/* Peak annotations */}
+                      {(() => {
+                        const peakIdx = data.reduce((min, d, i) => d.baseline < data[min].baseline ? i : min, 0);
+                        const peakE = data[peakIdx].E;
+                        const bY = yS(data[peakIdx].baseline);
+                        const mY = yS(data[peakIdx].MUT);
+                        const wY = yS(data[peakIdx].WT);
+                        const x = xS(peakE);
+                        return (
+                          <>
+                            {/* Vertical peak lines */}
+                            <line x1={x} y1={bY} x2={x} y2={Math.max(mY, wY)} stroke="#ddd" strokeWidth="0.5" />
+                            {/* MUT ΔI bracket */}
+                            <line x1={x + 10} y1={bY} x2={x + 10} y2={mY} stroke={EC.purple} strokeWidth="1.5" />
+                            <line x1={x + 6} y1={bY} x2={x + 14} y2={bY} stroke={EC.purple} strokeWidth="1" />
+                            <line x1={x + 6} y1={mY} x2={x + 14} y2={mY} stroke={EC.purple} strokeWidth="1" />
+                            <text x={x + 18} y={(bY + mY) / 2 + 3} fill={EC.purple} fontSize="9" fontWeight="700">{"\u0394"}I_MUT={echemDiscOverlay.diMut}%</text>
+                            {/* WT ΔI bracket */}
+                            <line x1={x - 10} y1={bY} x2={x - 10} y2={wY} stroke={EC.pink} strokeWidth="1.5" />
+                            <line x1={x - 14} y1={bY} x2={x - 6} y2={bY} stroke={EC.pink} strokeWidth="1" />
+                            <line x1={x - 14} y1={wY} x2={x - 6} y2={wY} stroke={EC.pink} strokeWidth="1" />
+                            <text x={x - 18} y={(bY + wY) / 2 + 3} textAnchor="end" fill={EC.pink} fontSize="9" fontWeight="700">{"\u0394"}I_WT={echemDiscOverlay.diWt}%</text>
+                            {/* Discrimination ratio */}
+                            <rect x={x - 40} y={Math.min(mY, wY) - 22} width="80" height="16" rx="3" fill={EC.purple} opacity="0.12" />
+                            <text x={x} y={Math.min(mY, wY) - 10} textAnchor="middle" fill={EC.purple} fontSize="9" fontWeight="800">
+                              Disc = {echemDiscOverlay.measuredDisc === Infinity ? "\u221e" : `${echemDiscOverlay.measuredDisc}\u00d7`}
+                            </text>
+                          </>
+                        );
+                      })()}
+                      {/* X ticks */}
+                      {[-0.05, -0.10, -0.15, -0.20, -0.25, -0.30, -0.35, -0.40].map(e => <text key={e} x={xS(e)} y={mg.top + ph + 14} textAnchor="middle" fill="#666" fontSize="8">{e.toFixed(2)}</text>)}
+                      {/* Y ticks */}
+                      {yTicks.map(v => <text key={v} x={mg.left - 5} y={yS(v) + 3} textAnchor="end" fill="#666" fontSize="8">{v.toFixed(1)}</text>)}
+                      {/* Axis labels */}
+                      <text x={mg.left + pw / 2} y={h - 3} textAnchor="middle" fill="#444" fontSize="10">E (V vs Ag/AgCl)</text>
+                      <text x={14} y={mg.top + ph / 2} textAnchor="middle" fill="#444" fontSize="10" transform={`rotate(-90, 14, ${mg.top + ph / 2})`}>I ({"\u03bc"}A)</text>
+                      {/* Legend */}
+                      <rect x={w - mg.right - 170} y={mg.top + 4} width="166" height="46" rx="4" fill="#fff" stroke="#E8E8E8" strokeWidth="0.5" opacity="0.9" />
+                      <line x1={w - mg.right - 164} y1={mg.top + 16} x2={w - mg.right - 148} y2={mg.top + 16} stroke={EC.green} strokeWidth="2" strokeDasharray="5,3" />
+                      <text x={w - mg.right - 144} y={mg.top + 19} fill={EC.green} fontSize="8" fontWeight="600">Baseline (no target)</text>
+                      <line x1={w - mg.right - 164} y1={mg.top + 28} x2={w - mg.right - 148} y2={mg.top + 28} stroke={EC.pink} strokeWidth="2" />
+                      <text x={w - mg.right - 144} y={mg.top + 31} fill={EC.pink} fontSize="8" fontWeight="600">WT allele</text>
+                      <line x1={w - mg.right - 164} y1={mg.top + 40} x2={w - mg.right - 148} y2={mg.top + 40} stroke={EC.purple} strokeWidth="2.5" />
+                      <text x={w - mg.right - 144} y={mg.top + 43} fill={EC.purple} fontSize="8" fontWeight="600">MUT allele ({echemCandidateData.label})</text>
                     </svg>
                   );
-                })() : (
-                <ResponsiveContainer>
-                  <LineChart data={echemDiscOverlay.data} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
-                    <CartesianGrid stroke="#E8E8E8" strokeWidth={0.5} />
-                    <XAxis dataKey="E" type="number" domain={[-0.4, -0.05]} fontSize={9} fontFamily="'IBM Plex Mono', monospace"
-                      label={{ value: "E (V vs Ag/AgCl)", position: "bottom", fontSize: 9, offset: -2 }}
-                      tickFormatter={v => v.toFixed(2)} reversed stroke="#444" tickSize={4} />
-                    <YAxis fontSize={9} fontFamily="'IBM Plex Mono', monospace" stroke="#444" tickSize={4}
-                      label={{ value: `I (\u03bcA)`, angle: -90, position: "insideLeft", fontSize: 9 }} />
-                    <Tooltip contentStyle={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}
-                      formatter={(val, name) => [`${(+val).toFixed(3)} \u03bcA`, name === "baseline" ? "Baseline (no target)" : name]}
-                      labelFormatter={v => `E = ${(+v).toFixed(3)} V`} />
-                    <Line dataKey="baseline" stroke="#999" strokeDasharray="6 4" strokeWidth={1.5} dot={false} name="baseline" opacity={0.5} />
-                    <Line dataKey="WT" stroke="#3B5FBD" strokeWidth={2} dot={false} name="WT target" opacity={0.85} />
-                    <Line dataKey="MUT" stroke="#D63384" strokeWidth={2.5} dot={false} name="MUT target" />
-                    <ReferenceLine x={-0.22} stroke="#999" strokeDasharray="3 3" />
-                  </LineChart>
-                </ResponsiveContainer>
-                )}
+                })()}
               </div>
-              <div style={{ fontSize: "10px", color: T.textTer, fontStyle: "italic", marginTop: "6px", fontFamily: "'IBM Plex Mono', monospace" }}>
-                The discrimination ratio is independent of k_trans and {"\u0393\u2080"} {"\u2014"} it depends only on the mismatch biophysics predicted by GUARD.
-              </div>
-            </div>
-
-            {/* ═══ PANEL D: 15-Pad Heatmap ═══ */}
-            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: "#FAFAFA" }}>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: "4px" }}>
-                Panel D: 15-Pad {"\u0394"}I% Heatmap
-              </div>
-              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: "'IBM Plex Mono', monospace" }}>
-                {echemHeatmap.aboveCount}/15 pads above threshold at {echemBloodTiter} cp/mL, {echemTime} min.
-                {echemHeatmap.drugsMet.length > 0 && (
-                  <span> Drug classes: <strong style={{ color: T.success }}>{echemHeatmap.drugsMet.join(", ")}</strong></span>
-                )}
-              </div>
-              {/* 5×3 grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "6px" }}>
-                {echemHeatmap.pads.map((pad) => {
-                  const bg = echemHeatColor(pad.expected_di);
-                  const t2 = Math.min(pad.expected_di / 100, 1);
-                  const textColor = t2 > 0.45 ? "#fff" : "#1a1a2e";
-                  const abv = pad.above;
-                  return (
-                    <div
-                      key={pad.target}
-                      title={`P(template\u22651) = ${pad.P_template}%\nP(RPA) = 95%\n\u0394I% if positive = ${pad.di_if_present}%\nExpected \u0394I% = ${pad.expected_di}%`}
-                      style={{
-                        borderRadius: "10px",
-                        aspectRatio: "1",
-                        background: `linear-gradient(145deg, ${lighten(bg, 8)}, ${bg})`,
-                        boxShadow: abv
-                          ? `inset 0 1px 3px rgba(0,0,0,0.12), 0 2px 8px ${bg}30`
-                          : "inset 0 1px 3px rgba(0,0,0,0.12)",
-                        border: abv ? `1.5px solid ${darken(bg, 15)}` : "1.5px dashed #d0d0d0",
-                        display: "flex", flexDirection: "column",
-                        alignItems: "center", justifyContent: "center",
-                        padding: "4px",
-                        position: "relative",
-                        transition: "transform 0.2s, box-shadow 0.2s",
-                        cursor: "pointer",
-                        fontFamily: "'IBM Plex Mono', monospace",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-                    >
-                      {abv && (
-                        <div style={{ position: "absolute", top: 3, right: 3, width: 7, height: 7, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 4px #34d399" }} />
-                      )}
-                      <span style={{ fontSize: "10px", fontWeight: 700, color: textColor, lineHeight: 1.1, textAlign: "center" }}>
-                        {pad.target.replace("_", "\n").split("\n").map((part, j) => <span key={j} style={{ display: "block" }}>{part}</span>)}
-                      </span>
-                      <span style={{ fontSize: "8px", fontWeight: 600, marginTop: 1, color: t2 > 0.45 ? "rgba(255,255,255,0.75)" : "#888", letterSpacing: "0.05em" }}>
-                        {pad.drug}
-                      </span>
-                      <span style={{ fontSize: "15px", fontWeight: 800, color: textColor, marginTop: 2, textShadow: t2 > 0.45 ? "0 1px 2px rgba(0,0,0,0.2)" : "none" }}>
-                        {Math.round(pad.expected_di)}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Gradient legend */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 10, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}>
-                <span style={{ color: "#888" }}>0%</span>
-                <div style={{ width: 180, height: 8, borderRadius: 4, background: "linear-gradient(to right, #E6E9EE, #CDE4D8, #A0D4BE, #66C2A5, #4198AF, #2D649E)", border: "1px solid #ddd" }} />
-                <span style={{ color: "#888" }}>100%</span>
-                <div style={{ width: 1, height: 14, background: "#ddd", margin: "0 4px" }} />
-                <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399", display: "inline-block" }} />detected
-                </span>
-                <span style={{ color: "#bbb" }}>? below threshold</span>
+              <div style={{ fontSize: "9px", color: T.textTer, fontStyle: "italic", marginTop: "4px", fontFamily: MONO }}>
+                Discrimination ratio = {"\u0394"}I%_MUT / {"\u0394"}I%_WT {"\u2014"} independent of k_trans and {"\u0393\u2080"}, depends only on mismatch biophysics predicted by GUARD.
               </div>
             </div>
           </div>
+            );
+          })()}
         </div>
       </CollapsibleSection>
 
