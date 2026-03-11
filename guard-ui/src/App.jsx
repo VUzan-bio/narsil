@@ -3455,32 +3455,29 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
   const mlColLabel = hasGuardNet ? "GN" : "CNN";
 
   const hasReadiness = filtered.some(r => r.readinessScore != null);
+  // Reduced column set: #, Target, Drug, Spacer, Activity, Disc, Readiness
   const cols = [
     ...(hasReadiness ? [{ key: "experimentalPriority", label: "#", w: 36 }] : []),
-    { key: "label", label: "Target", w: 140 },
-    { key: "drug", label: "Drug", w: 70 },
-    { key: "strategy", label: "Strategy", w: 80 },
-    ...(hasReadiness ? [{ key: "readinessScore", label: "Readiness", w: 75 }] : []),
-    ...(hasReadiness ? [{ key: "riskOverall", label: "Risk", w: 45 }] : []),
-    { key: "spacer", label: "Spacer", w: 200 },
-    { key: "ensembleScore", label: hasML ? "Ensemble" : "Score", w: 70 },
-    ...(hasML ? [{ key: "score", label: "Heuristic", w: 75 }] : []),
-    ...(hasML ? [{ key: "cnnCalibrated", label: mlColLabel, w: 65 }] : []),
-    { key: "disc", label: "Disc", w: 80 },
-    { key: "gc", label: "GC%", w: 55 },
-    { key: "ot", label: "OT", w: 40 },
+    { key: "label", label: "Target", w: 150 },
+    { key: "drug", label: "Drug", w: 60 },
+    { key: "spacer", label: "Spacer", w: 220 },
+    { key: "ensembleScore", label: "Activity", w: 70 },
+    { key: "disc", label: "Disc", w: 70 },
+    ...(hasReadiness ? [{ key: "readinessScore", label: "Readiness", w: 90 }] : []),
   ];
+
+  // Hover state for spacer color reveal
+  const [hoveredRow, setHoveredRow] = useState(null);
 
   return (
     <div>
-      {/* Explainer box — neutral */}
-      <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "10px", padding: mobile ? "14px" : "18px 22px", marginBottom: "16px" }}>
-        <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "6px" }}>Reading the table</div>
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : hasML ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr", gap: "6px 20px", fontSize: "12px", color: T.textSec, lineHeight: 1.5 }}>
-          <div><strong>Score</strong> — predicted trans-cleavage activity (0–1). Higher = stronger SWV signal decrease. {hasML ? `Ensemble of heuristic + ${hasGuardNet ? "GUARD-Net" : "CNN"}.` : "Heuristic composite."}</div>
-          <div><strong>Disc</strong> — fold-difference in cleavage between MUT and WT templates. ≥ 3× = diagnostic-grade discrimination (specificity proxy: ~1-1/disc).</div>
-          {hasML && <div><strong>{mlColLabel}</strong> — {hasGuardNet ? "GUARD-Net neural network" : "ML calibrated"} activity prediction (before ensemble).</div>}
-          <div><strong>Expand</strong> — click any row for full interpretation, crRNA architecture, primers, and alternatives.</div>
+      {/* Explainer box — minimal */}
+      <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "10px", padding: mobile ? "14px" : "14px 22px", marginBottom: "16px" }}>
+        <div style={{ display: "flex", gap: "20px", fontSize: "11px", color: T.textSec, lineHeight: 1.5, flexWrap: "wrap" }}>
+          <div><strong style={{ color: T.text }}>Activity</strong> — predicted Cas12a trans-cleavage (0–1). {hasML ? "Ensemble score." : "Heuristic."}</div>
+          <div><strong style={{ color: T.text }}>Disc</strong> — MUT/WT fold-difference. <span style={{ color: T.success }}>≥3×</span> diagnostic-grade. <span style={{ color: T.danger }}>&lt;2×</span> insufficient.</div>
+          <div><strong style={{ color: T.text }}>Readiness</strong> — multi-axis composite (disc 40%, activity 20%, primers 15%, off-target 15%, GC 10%).</div>
+          <div style={{ color: T.textTer }}>Click any row to expand full details, scored sequence, primers, and alternatives.</div>
         </div>
       </div>
 
@@ -3493,9 +3490,9 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
         <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
           {drugs.map((d) => (
             <button key={d} onClick={() => setDrugFilter(d)} style={{
-              padding: "6px 12px", borderRadius: "6px", border: `1px solid ${drugFilter === d ? T.primary : T.border}`,
-              background: drugFilter === d ? T.primaryLight : T.bg, color: drugFilter === d ? T.primaryDark : T.textSec,
-              fontSize: "11px", fontWeight: 600, cursor: "pointer", fontFamily: FONT,
+              padding: "6px 12px", borderRadius: "6px", border: `1px solid ${drugFilter === d ? T.text : T.border}`,
+              background: drugFilter === d ? T.text : T.bg, color: drugFilter === d ? "#fff" : T.textSec,
+              fontSize: "11px", fontWeight: 600, cursor: "pointer", fontFamily: MONO,
             }}>{d}</button>
           ))}
         </div>
@@ -3504,29 +3501,29 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
       {/* Candidates — cards on mobile, table on desktop */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", overflow: "hidden" }}>
        {mobile ? (
-        /* ── Mobile card layout ── */
+        /* ── Mobile card layout — monochrome ── */
         <div>
           {filtered.map((r) => {
             const isExpanded = expanded === r.label;
             const scoreVal = r.ensembleScore || r.score;
-            const discColor = r.strategy === "Proximity" ? T.purple : r.disc >= 3 ? T.success : r.disc >= 1.5 ? T.warning : T.danger;
+            const discColor = r.gene === "IS6110" ? T.textTer : r.strategy === "Proximity" ? T.textSec : r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger;
+            const riskLevel = r.riskProfile?.overall;
+            const riskBorderColor = riskLevel === "red" ? T.danger : riskLevel === "amber" ? T.warning : "transparent";
             return (
               <div key={r.label}>
-                <div onClick={() => setExpanded(isExpanded ? null : r.label)} style={{ padding: "14px 16px", cursor: "pointer", borderBottom: isExpanded ? "none" : `1px solid ${T.borderLight}`, background: isExpanded ? T.primaryLight + "30" : "transparent" }}>
+                <div onClick={() => setExpanded(isExpanded ? null : r.label)} style={{ padding: "14px 16px", cursor: "pointer", borderBottom: isExpanded ? "none" : `1px solid ${T.borderLight}`, borderLeft: `3px solid ${riskBorderColor}`, background: isExpanded ? T.bgSub : "transparent" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      {isExpanded ? <ChevronDown size={14} color={T.primary} /> : <ChevronRight size={14} color={T.textTer} />}
+                      {isExpanded ? <ChevronDown size={14} color={T.text} /> : <ChevronRight size={14} color={T.textTer} />}
                       <span style={{ fontWeight: 700, fontFamily: MONO, fontSize: "12px", color: T.text }}>{r.label}</span>
+                      <span style={{ fontSize: "10px", color: T.textTer, fontFamily: MONO }}>{r.strategy === "Proximity" ? "P" : "D"}</span>
                     </div>
-                    <div style={{ display: "flex", gap: "4px" }}>
-                      <DrugBadge drug={r.drug} />
-                      <Badge variant={r.strategy === "Direct" ? "success" : "purple"}>{r.strategy}</Badge>
-                    </div>
+                    <span style={{ fontSize: "11px", color: T.textSec, fontFamily: MONO }}>{r.drug}</span>
                   </div>
                   <div style={{ display: "flex", gap: "16px", fontSize: "11px" }}>
                     <div>
-                      <span style={{ color: T.textTer }}>{hasML ? "Ensemble" : "Score"} </span>
-                      <span style={{ fontFamily: MONO, fontWeight: 700, color: scoreVal > 0.8 ? T.primary : scoreVal > 0.65 ? T.warning : T.danger }}>{scoreVal.toFixed(3)}</span>
+                      <span style={{ color: T.textTer }}>Activity </span>
+                      <span style={{ fontFamily: MONO, fontWeight: 700, color: T.text }}>{scoreVal.toFixed(3)}</span>
                     </div>
                     <div>
                       <span style={{ color: T.textTer }}>Disc </span>
@@ -3534,14 +3531,12 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                         {r.strategy === "Proximity" ? "AS-RPA" : r.gene === "IS6110" ? "N/A" : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×`}
                       </span>
                     </div>
-                    <div>
-                      <span style={{ color: T.textTer }}>GC </span>
-                      <span style={{ fontFamily: MONO, fontWeight: 600 }}>{(r.gc * 100).toFixed(0)}%</span>
-                    </div>
-                    <div>
-                      <span style={{ color: T.textTer }}>OT </span>
-                      <span style={{ fontFamily: MONO, fontWeight: 600 }}>{r.ot}</span>
-                    </div>
+                    {r.readinessScore != null && (
+                      <div>
+                        <span style={{ color: T.textTer }}>Ready </span>
+                        <span style={{ fontFamily: MONO, fontWeight: 700, color: r.readinessScore >= 0.7 ? T.success : r.readinessScore >= 0.4 ? T.warning : T.danger }}>{(r.readinessScore * 100).toFixed(0)}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {isExpanded && (
@@ -3571,14 +3566,14 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
           })}
         </div>
        ) : (
-        /* ── Desktop table layout ── */
+        /* ── Desktop table layout — monochrome by default, color encodes meaning ── */
         <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
           <thead>
             <tr style={{ background: T.bgSub }}>
               <th style={{ padding: "10px 8px", borderBottom: `1px solid ${T.border}`, width: 28 }} />
               {cols.map((c) => (
-                <th key={c.key} onClick={() => toggleSort(c.key)} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: T.textSec, borderBottom: `1px solid ${T.border}`, cursor: "pointer", width: c.w, userSelect: "none" }}>
+                <th key={c.key} onClick={() => toggleSort(c.key)} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.border}`, cursor: "pointer", width: c.w, userSelect: "none" }}>
                   {c.label} {sortKey === c.key ? (sortDir > 0 ? "↑" : "↓") : ""}
                 </th>
               ))}
@@ -3587,37 +3582,83 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
           <tbody>
             {filtered.map((r) => {
               const isExpanded = expanded === r.label;
+              const isHov = hoveredRow === r.label;
+              const riskLevel = r.riskProfile?.overall;
+              const riskBorderColor = riskLevel === "red" ? T.danger : riskLevel === "amber" ? T.warning : "transparent";
+              const discColor = r.gene === "IS6110" ? T.textTer : r.strategy === "Proximity" ? T.textSec : r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger;
+              const activityVal = r.ensembleScore || r.score;
+              const stratIcon = r.strategy === "Proximity" ? "P" : "D";
               return (
                 <React.Fragment key={r.label}>
-                  <tr onClick={() => setExpanded(isExpanded ? null : r.label)} style={{ cursor: "pointer", borderBottom: isExpanded ? "none" : `1px solid ${T.borderLight}`, background: isExpanded ? T.primaryLight + "30" : "transparent" }} onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.background = T.bgHover; }} onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.background = "transparent"; }}>
+                  <tr
+                    onClick={() => setExpanded(isExpanded ? null : r.label)}
+                    onMouseEnter={() => setHoveredRow(r.label)}
+                    onMouseLeave={() => setHoveredRow(null)}
+                    style={{
+                      cursor: "pointer",
+                      borderBottom: `1px solid ${isExpanded ? "transparent" : T.borderLight}`,
+                      borderLeft: `3px solid ${riskBorderColor}`,
+                      background: isExpanded ? T.bgSub : isHov ? T.bgHover : "transparent",
+                      transition: "background 0.15s, transform 0.15s",
+                      ...(isHov && !isExpanded ? { boxShadow: "0 1px 4px rgba(0,0,0,0.04)" } : {}),
+                    }}>
                     <td style={{ padding: "10px 8px", textAlign: "center" }}>
-                      {isExpanded ? <ChevronDown size={14} color={T.primary} /> : <ChevronRight size={14} color={T.textTer} />}
+                      {isExpanded ? <ChevronDown size={14} color={T.text} /> : <ChevronRight size={14} color={T.textTer} />}
                     </td>
+                    {/* # (priority) */}
                     {hasReadiness && <td style={{ padding: "10px 6px", textAlign: "center" }}>{r.experimentalPriority != null && <PriorityBadge rank={r.experimentalPriority} />}</td>}
-                    <td style={{ padding: "10px 12px", fontWeight: 600, fontFamily: MONO, fontSize: "11px" }}>{r.label}</td>
-                    <td style={{ padding: "10px 12px" }}><DrugBadge drug={r.drug} /></td>
-                    <td style={{ padding: "10px 12px" }}><Badge variant={r.strategy === "Direct" ? "success" : "purple"}>{r.strategy}</Badge></td>
-                    {hasReadiness && <td style={{ padding: "10px 6px", textAlign: "center" }}>{r.readinessScore != null ? <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 6, fontFamily: MONO, fontWeight: 700, fontSize: "12px", backgroundColor: gradientColor(r.readinessScore), color: r.readinessScore < 0.3 ? "#333" : "#fff" }}>{r.readinessScore.toFixed(2)}</span> : "—"}</td>}
-                    {hasReadiness && <td style={{ padding: "10px 6px", textAlign: "center" }}>{r.riskProfile && <RiskHeatCell level={r.riskProfile.overall} />}</td>}
-                    <td style={{ padding: "10px 12px" }}><Seq s={r.spacer?.slice(0, 24)} /></td>
-                    <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 700, color: (r.ensembleScore || r.score) > 0.8 ? T.primary : (r.ensembleScore || r.score) > 0.65 ? T.warning : T.danger }}>{(r.ensembleScore || r.score).toFixed(3)}</td>
-                    {hasML && <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 600, color: r.score > 0.8 ? T.primary : r.score > 0.65 ? T.warning : T.danger }}>{r.score.toFixed(3)}</td>}
-                    {hasML && <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 600, color: r.cnnCalibrated != null ? (r.cnnCalibrated > 0.7 ? T.primary : r.cnnCalibrated > 0.5 ? T.warning : T.danger) : T.textTer }}>{r.cnnCalibrated != null ? r.cnnCalibrated.toFixed(3) : "—"}</td>}
-                    <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 600, color: r.gene === "IS6110" ? T.textTer : r.strategy === "Proximity" ? T.purple : r.disc >= 3 ? T.success : r.disc >= 1.5 ? T.warning : T.danger }}>
-                      {r.gene === "IS6110" ? <span style={{ fontSize: "10px", color: T.textTer }}>N/A</span> : r.strategy === "Proximity" ? <span style={{ fontSize: "10px" }}>AS-RPA</span> : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×`}
+                    {/* Target — includes strategy icon */}
+                    <td style={{ padding: "10px 12px" }}>
+                      <span style={{ fontWeight: 600, fontFamily: MONO, fontSize: "11px", color: T.text }}>{r.label}</span>
+                      <span style={{ fontSize: "9px", color: T.textTer, marginLeft: "6px", fontFamily: MONO, fontWeight: 500 }}>{stratIcon}</span>
                     </td>
-                    <td style={{ padding: "10px 12px", fontFamily: MONO }}>{(r.gc * 100).toFixed(0)}%</td>
-                    <td style={{ padding: "10px 12px", fontFamily: MONO }}>{r.ot}</td>
+                    {/* Drug — plain text, monochrome */}
+                    <td style={{ padding: "10px 12px", fontFamily: MONO, fontSize: "11px", color: T.textSec, fontWeight: 500 }}>{r.drug}</td>
+                    {/* Spacer — muted monospace, colored nucleotides on hover only */}
+                    <td style={{ padding: "10px 12px" }}>
+                      {isHov ? (
+                        <span style={{ fontFamily: MONO, fontSize: "11px", letterSpacing: "1px" }}>
+                          {r.spacer?.slice(0, 24).split("").map((c, i) => (
+                            <span key={i} style={{ color: c === "A" ? "#16A34A" : c === "T" ? "#DC2626" : c === "G" ? "#D97706" : "#6366F1", fontWeight: 500 }}>{c}</span>
+                          ))}
+                        </span>
+                      ) : (
+                        <span style={{ fontFamily: MONO, fontSize: "11px", letterSpacing: "1px", color: T.textTer }}>{r.spacer?.slice(0, 24)}</span>
+                      )}
+                    </td>
+                    {/* Activity — single ensemble score, plain ink */}
+                    <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 600, fontSize: "11px", color: T.text }}>{activityVal.toFixed(3)}</td>
+                    {/* Disc — colored by threshold (the one meaningful color) */}
+                    <td style={{ padding: "10px 12px", fontFamily: MONO, fontWeight: 600, fontSize: "11px", color: discColor }}>
+                      {r.gene === "IS6110" ? <span style={{ fontSize: "10px" }}>N/A</span> : r.strategy === "Proximity" ? <span style={{ fontSize: "10px" }}>AS-RPA</span> : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×`}
+                    </td>
+                    {/* Readiness — gradient fill (keep strongest visual element) */}
+                    {hasReadiness && (
+                      <td style={{ padding: "10px 8px" }}>
+                        {r.readinessScore != null ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <div style={{ flex: 1, height: "6px", borderRadius: "3px", background: T.borderLight, overflow: "hidden", minWidth: "40px" }}>
+                              <div style={{ height: "100%", width: `${r.readinessScore * 100}%`, borderRadius: "3px",
+                                background: r.readinessScore >= 0.7 ? `linear-gradient(90deg, ${T.success}88, ${T.success})` : r.readinessScore >= 0.4 ? `linear-gradient(90deg, ${T.warning}88, ${T.warning})` : `linear-gradient(90deg, ${T.danger}88, ${T.danger})`,
+                              }} />
+                            </div>
+                            <span style={{ fontFamily: MONO, fontWeight: 700, fontSize: "11px", minWidth: "24px", color: r.readinessScore >= 0.7 ? T.success : r.readinessScore >= 0.4 ? T.warning : T.danger }}>
+                              {(r.readinessScore * 100).toFixed(0)}
+                            </span>
+                          </div>
+                        ) : "—"}
+                      </td>
+                    )}
                   </tr>
                   {isExpanded && (
                     <tr>
-                      <td colSpan={cols.length + 1} style={{ padding: 0 }}>
+                      <td colSpan={cols.length + 1} style={{ padding: 0, borderLeft: `3px solid ${riskBorderColor}` }}>
                         <CandidateAccordion r={r} onShowAlternatives={() => loadTopK(r.label)} />
                         {/* Top-K Alternatives inline */}
                         {topKLoading[r.label] && <div style={{ padding: "8px 24px", fontSize: "11px", color: T.textTer, background: T.bgSub }}><Loader2 size={12} style={{ animation: "spin 1s linear infinite", display: "inline-block", verticalAlign: "middle", marginRight: "4px" }} />Loading alternatives…</div>}
                         {topKData[r.label]?.alternatives && (
                           <div style={{ margin: "0 24px 16px", border: `1px solid ${T.border}`, borderRadius: "8px", overflow: "hidden", background: T.bg }}>
-                            <div style={{ padding: "10px 14px", background: T.primaryLight, fontSize: "11px", fontWeight: 700, color: T.primaryDark, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: "6px" }}>
+                            <div style={{ padding: "10px 14px", background: T.bgSub, fontSize: "11px", fontWeight: 700, color: T.text, borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: "6px" }}>
                               <Layers size={12} /> Top-K Alternatives for {r.label}
                             </div>
                             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
@@ -3632,10 +3673,10 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                                 {topKData[r.label].alternatives.map((alt, ai) => (
                                   <tr key={ai} style={{ borderBottom: ai < topKData[r.label].alternatives.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
                                     <td style={{ padding: "7px 12px", fontFamily: MONO, fontWeight: 700, color: T.textSec }}>#{alt.rank}</td>
-                                    <td style={{ padding: "7px 12px" }}><Seq s={alt.spacer_seq?.slice(0, 20)} /></td>
-                                    <td style={{ padding: "7px 12px", fontFamily: MONO, fontWeight: 600 }}>{alt.score}</td>
-                                    <td style={{ padding: "7px 12px", fontFamily: MONO, fontWeight: 600 }}>{r.strategy === "Proximity" ? <span style={{ fontSize: "10px", color: T.purple }}>AS-RPA</span> : `${alt.discrimination}×`}</td>
-                                    <td style={{ padding: "7px 12px" }}>{alt.has_primers ? <Badge variant="success">Yes</Badge> : <Badge variant="danger">No</Badge>}</td>
+                                    <td style={{ padding: "7px 12px", fontFamily: MONO, fontSize: "11px", color: T.textTer }}>{alt.spacer_seq?.slice(0, 20)}</td>
+                                    <td style={{ padding: "7px 12px", fontFamily: MONO, fontWeight: 600, color: T.text }}>{alt.score}</td>
+                                    <td style={{ padding: "7px 12px", fontFamily: MONO, fontWeight: 600, color: r.strategy === "Proximity" ? T.textSec : alt.discrimination >= 3 ? T.success : alt.discrimination >= 2 ? T.warning : T.danger }}>{r.strategy === "Proximity" ? <span style={{ fontSize: "10px" }}>AS-RPA</span> : `${alt.discrimination}×`}</td>
+                                    <td style={{ padding: "7px 12px", fontFamily: MONO, fontSize: "10px", color: alt.has_primers ? T.success : T.textTer }}>{alt.has_primers ? "Yes" : "—"}</td>
                                     <td style={{ padding: "7px 12px", fontSize: "10px", color: T.textSec }}>{alt.tradeoff || "—"}</td>
                                   </tr>
                                 ))}
