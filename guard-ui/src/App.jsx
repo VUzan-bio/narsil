@@ -4083,6 +4083,29 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     });
   }, [echemAeff]);
 
+  // CV duck-shape: forward (cathodic) + reverse (anodic) scan with capacitive baseline
+  const computeCVDuck = useCallback((Gamma) => {
+    const { n, F, R, Temp, E0, scan_rate } = ECHEM;
+    const prefactor = (n * n * F * F * echemAeff * Gamma * scan_rate) / (4 * R * Temp);
+    const deltaEp = 0.045;
+    const E_pc = E0 - deltaEp / 2, E_pa = E0 + deltaEp / 2;
+    const sigma = (R * Temp) / (n * F) * 1.5;
+    const i_cap = 20e-6 * echemAeff * scan_rate * 1e6;
+    const N = 200;
+    const forward = [], reverse = [];
+    for (let i = 0; i <= N; i++) {
+      const E = -0.05 + (-0.35) * (i / N);
+      const xi = (E - E_pc) / sigma;
+      forward.push({ E, I: (-prefactor / (Math.cosh(xi) ** 2)) * 1e6 - i_cap });
+    }
+    for (let i = 0; i <= N; i++) {
+      const E = -0.40 + 0.35 * (i / N);
+      const xi = (E - E_pa) / sigma;
+      reverse.push({ E, I: (prefactor / (Math.cosh(xi) ** 2)) * 1e6 + i_cap });
+    }
+    return { forward, reverse };
+  }, [echemAeff]);
+
   // Potential array for voltammograms: -0.05 to -0.40 V
   const echemE = useMemo(() => Array.from({ length: 351 }, (_, i) => -0.05 - i * 0.001), []);
 
@@ -4198,6 +4221,26 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     return { data, peakBase: +peakBase.toFixed(3), peakMut: +peakMut.toFixed(3), peakWt: +peakWt.toFixed(3), diMut: +diMut.toFixed(1), diWt: +diWt.toFixed(1), measuredDisc: +measuredDisc.toFixed(1), guardDisc: cd.discrimination };
   }, [echemCandidateData, echemTime, echemKtrans, echemTechnique, echemGamma0_mol, echemE, computeGamma, computeGammaWT, computeSWV, computeDPV, computeCV]);
 
+  // CV duck-shape data for Panels A & C when technique=CV
+  const cvDuckData = useMemo(() => {
+    if (echemTechnique !== "CV") return null;
+    const cd = echemCandidateData;
+    const t_s = echemTime * 60;
+    const G_base = echemGamma0_mol;
+    const G_mut = computeGamma(t_s, cd.efficiency, echemKtrans);
+    const G_wt = computeGammaWT(t_s, cd.efficiency, cd.discrimination, echemKtrans, cd.isProximity);
+    return {
+      baseline: computeCVDuck(G_base), mut: computeCVDuck(G_mut), wt: computeCVDuck(G_wt),
+      deltaI: +((1 - G_mut / G_base) * 100).toFixed(1),
+    };
+  }, [echemTechnique, echemCandidateData, echemTime, echemKtrans, echemGamma0_mol, computeGamma, computeGammaWT, computeCVDuck]);
+
+  // SVG path builder for CV duck loops
+  const cvSvgPath = (duck, xS, yS) => {
+    const pts = [...duck.forward, ...duck.reverse];
+    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xS(p.E).toFixed(1)} ${yS(p.I).toFixed(1)}`).join(' ') + ' Z';
+  };
+
   // Panel D: 15-pad heatmap data
   const echemHeatmap = useMemo(() => {
     const t_s = echemTime * 60;
@@ -4231,21 +4274,22 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     return { pads, aboveCount, drugsMet, threshold };
   }, [echemTime, echemBloodTiter, echemKtrans, echemGamma0_mol, results, computeGamma]);
 
-  // Heatmap color interpolation
+  // Heatmap color interpolation — green-blue gradient
   const echemHeatColor = (di) => {
     const stops = [
-      [0, [180, 185, 195]], [15, [171, 221, 164]], [35, [102, 194, 165]],
-      [60, [50, 136, 189]], [100, [94, 79, 162]],
+      [0, 230, 233, 238], [15, 205, 228, 216], [35, 160, 212, 190],
+      [55, 102, 194, 165], [75, 65, 152, 175], [100, 45, 100, 158],
     ];
-    const clamped = Math.max(0, Math.min(100, di));
+    const c = Math.max(0, Math.min(100, di));
     let lo = stops[0], hi = stops[stops.length - 1];
     for (let i = 0; i < stops.length - 1; i++) {
-      if (clamped >= stops[i][0] && clamped <= stops[i + 1][0]) { lo = stops[i]; hi = stops[i + 1]; break; }
+      if (c >= stops[i][0] && c <= stops[i + 1][0]) { lo = stops[i]; hi = stops[i + 1]; break; }
     }
-    const t2 = hi[0] === lo[0] ? 0 : (clamped - lo[0]) / (hi[0] - lo[0]);
-    const rgb = lo[1].map((c, j) => Math.round(c + (hi[1][j] - c) * t2));
-    return `rgb(${rgb.join(",")})`;
+    const f = lo[0] === hi[0] ? 0 : (c - lo[0]) / (hi[0] - lo[0]);
+    return `rgb(${Math.round(lo[1] + (hi[1] - lo[1]) * f)},${Math.round(lo[2] + (hi[2] - lo[2]) * f)},${Math.round(lo[3] + (hi[3] - lo[3]) * f)})`;
   };
+  const lighten = (rgb, pct) => { const m = rgb.match(/\d+/g).map(Number); return `rgb(${m.map(v => Math.min(255, v + Math.round(255 * pct / 100))).join(',')})`; };
+  const darken = (rgb, pct) => { const m = rgb.match(/\d+/g).map(Number); return `rgb(${m.map(v => Math.max(0, v - Math.round(255 * pct / 100))).join(',')})`; };
 
   return (
     <div>
@@ -4437,42 +4481,73 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
 
             {/* ═══ PANEL A: Voltammogram ═══ */}
-            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: T.bgSub }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: "#FAFAFA" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: "4px" }}>
                 Panel A: {echemTechnique} Voltammogram
               </div>
-              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px" }}>
-                {echemCandidateData.label} {"\u00b7"} {"\u0394"}I% = <span style={{ fontWeight: 700, color: T.primary }}>{echemMeta.deltaI}%</span>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: "'IBM Plex Mono', monospace" }}>
+                {echemCandidateData.label} {"\u00b7"} {"\u0394"}I% = <span style={{ fontWeight: 700, color: "#D63384" }}>{echemMeta.deltaI}%</span>
                 {" \u00b7 "}I{"\u2080"} = {echemMeta.peakBase} {"\u03bcA"} {"\u2192"} I_after = {echemMeta.peakAfter} {"\u03bcA"}
               </div>
               <div style={{ width: "100%", height: 260 }}>
+                {echemTechnique === "CV" && cvDuckData ? (() => {
+                  const pad = { top: 20, right: 20, bottom: 35, left: 50 };
+                  const w = 460, h = 260, pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
+                  const allI = [...cvDuckData.baseline.forward, ...cvDuckData.baseline.reverse, ...cvDuckData.mut.forward, ...cvDuckData.mut.reverse].map(p => p.I);
+                  const iMin = Math.min(...allI) * 1.15, iMax = Math.max(...allI) * 1.15;
+                  const xS = e => pad.left + ((e - (-0.05)) / (-0.40 - (-0.05))) * pw;
+                  const yS = i => pad.top + ((iMax - i) / (iMax - iMin)) * ph;
+                  const zeroY = yS(0);
+                  return (
+                    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                      <rect width={w} height={h} fill="#FAFAFA" rx="8" />
+                      {[0.25, 0.5, 0.75].map(f => <line key={`gx${f}`} x1={pad.left + pw * f} y1={pad.top} x2={pad.left + pw * f} y2={pad.top + ph} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                      {[0.25, 0.5, 0.75].map(f => <line key={`gy${f}`} x1={pad.left} y1={pad.top + ph * f} x2={pad.left + pw} y2={pad.top + ph * f} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                      <line x1={pad.left} y1={zeroY} x2={pad.left + pw} y2={zeroY} stroke="#BBB" strokeWidth="1" strokeDasharray="4,3" />
+                      <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + ph} stroke="#444" strokeWidth="1.5" />
+                      <line x1={pad.left} y1={pad.top + ph} x2={pad.left + pw} y2={pad.top + ph} stroke="#444" strokeWidth="1.5" />
+                      <path d={cvSvgPath(cvDuckData.baseline, xS, yS)} fill="none" stroke="#3B5FBD" strokeWidth="1.8" strokeDasharray="7,4" opacity="0.65" />
+                      <path d={cvSvgPath(cvDuckData.mut, xS, yS)} fill="rgba(214,51,132,0.06)" stroke="#D63384" strokeWidth="2.5" />
+                      <line x1={xS(-0.22)} y1={pad.top} x2={xS(-0.22)} y2={pad.top + ph} stroke="#999" strokeWidth="0.8" strokeDasharray="3,3" />
+                      <text x={xS(-0.22)} y={pad.top - 5} textAnchor="middle" fill="#999" fontSize="9">E° = −0.22 V</text>
+                      <text x={pad.left + pw / 2} y={h - 3} textAnchor="middle" fill="#444" fontSize="11">E (V vs Ag/AgCl)</text>
+                      <text x={12} y={pad.top + ph / 2} textAnchor="middle" fill="#444" fontSize="11" transform={`rotate(-90, 12, ${pad.top + ph / 2})`}>I (μA)</text>
+                      {[-0.05, -0.10, -0.15, -0.20, -0.25, -0.30, -0.35, -0.40].map(e => <text key={e} x={xS(e)} y={pad.top + ph + 14} textAnchor="middle" fill="#666" fontSize="8">{e.toFixed(2)}</text>)}
+                      <line x1={pad.left + pw - 120} y1={pad.top + 12} x2={pad.left + pw - 95} y2={pad.top + 12} stroke="#3B5FBD" strokeWidth="1.8" strokeDasharray="7,4" />
+                      <text x={pad.left + pw - 90} y={pad.top + 16} fill="#3B5FBD" fontSize="9">Baseline</text>
+                      <line x1={pad.left + pw - 120} y1={pad.top + 26} x2={pad.left + pw - 95} y2={pad.top + 26} stroke="#D63384" strokeWidth="2.5" />
+                      <text x={pad.left + pw - 90} y={pad.top + 30} fill="#D63384" fontSize="9">After ({cvDuckData.deltaI}%)</text>
+                    </svg>
+                  );
+                })() : (
                 <ResponsiveContainer>
                   <AreaChart data={echemPlotData} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="E" type="number" domain={[-0.4, -0.05]} fontSize={9} fontFamily={MONO}
+                    <CartesianGrid stroke="#E8E8E8" strokeWidth={0.5} />
+                    <XAxis dataKey="E" type="number" domain={[-0.4, -0.05]} fontSize={9} fontFamily="'IBM Plex Mono', monospace"
                       label={{ value: "E (V vs Ag/AgCl)", position: "bottom", fontSize: 9, offset: -2 }}
-                      tickFormatter={v => v.toFixed(2)} reversed />
-                    <YAxis fontSize={9} fontFamily={MONO}
+                      tickFormatter={v => v.toFixed(2)} reversed stroke="#444" tickSize={4} />
+                    <YAxis fontSize={9} fontFamily="'IBM Plex Mono', monospace" stroke="#444" tickSize={4}
                       label={{ value: `I (\u03bcA)`, angle: -90, position: "insideLeft", fontSize: 9 }} />
-                    <Tooltip contentStyle={{ fontFamily: MONO, fontSize: 10 }}
+                    <Tooltip contentStyle={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}
                       formatter={(val, name) => [`${(+val).toFixed(3)} \u03bcA`, name === "baseline" ? "Baseline" : `After ${echemTime} min`]}
                       labelFormatter={v => `E = ${(+v).toFixed(3)} V`} />
-                    <Area dataKey="baseline" stroke="#999" strokeDasharray="5 3" fill="none" strokeWidth={1.5} dot={false} name="baseline" />
-                    <Area dataKey="after" stroke="#3288bd" fill="#3288bd" fillOpacity={0.12} strokeWidth={2} dot={false} name="after" />
+                    <Area dataKey="baseline" stroke="#3B5FBD" strokeDasharray="7 4" fill="none" strokeWidth={1.8} dot={false} name="baseline" opacity={0.65} />
+                    <Area dataKey="after" stroke="#D63384" fill="#D63384" fillOpacity={0.06} strokeWidth={2.5} dot={false} name="after" />
                     <ReferenceLine x={-0.22} stroke="#999" strokeDasharray="3 3" label={{ value: "E\u00b0", position: "top", fontSize: 8, fill: "#999" }} />
                   </AreaChart>
                 </ResponsiveContainer>
+                )}
               </div>
             </div>
 
             {/* ═══ PANEL B: ΔI% Time Course ═══ */}
-            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: T.bgSub }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: "#FAFAFA" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: "4px" }}>
                 Panel B: {"\u0394"}I% Time Course
               </div>
-              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px" }}>
-                Detection (MUT): <span style={{ fontWeight: 700, color: "#3288bd" }}>{echemTimeCourse.timeMut != null ? `~${echemTimeCourse.timeMut} min` : ">60 min"}</span>
-                {" \u00b7 "}Detection (WT): <span style={{ fontWeight: 700, color: "#e6550d" }}>{echemTimeCourse.timeWt != null ? `~${echemTimeCourse.timeWt} min` : "never"}</span>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: "'IBM Plex Mono', monospace" }}>
+                Detection (MUT): <span style={{ fontWeight: 700, color: "#D63384" }}>{echemTimeCourse.timeMut != null ? `~${echemTimeCourse.timeMut} min` : ">60 min"}</span>
+                {" \u00b7 "}Detection (WT): <span style={{ fontWeight: 700, color: "#3B5FBD" }}>{echemTimeCourse.timeWt != null ? `~${echemTimeCourse.timeWt} min` : "never"}</span>
                 {echemTimeCourse.timeMut != null && echemTimeCourse.timeWt != null && echemTimeCourse.timeWt > echemTimeCourse.timeMut && (
                   <span> {"\u00b7"} <span style={{ fontWeight: 700, color: T.success }}>Window: {echemTimeCourse.timeMut}{"\u2013"}{echemTimeCourse.timeWt} min</span></span>
                 )}
@@ -4480,23 +4555,23 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
               <div style={{ width: "100%", height: 260 }}>
                 <ResponsiveContainer>
                   <ComposedChart data={echemTimeCourse.points} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="time" type="number" domain={[0, 60]} fontSize={9} fontFamily={MONO}
+                    <CartesianGrid stroke="#E8E8E8" strokeWidth={0.5} />
+                    <XAxis dataKey="time" type="number" domain={[0, 60]} fontSize={9} fontFamily="'IBM Plex Mono', monospace" stroke="#444" tickSize={4}
                       label={{ value: "Time (min)", position: "bottom", fontSize: 9, offset: -2 }} />
-                    <YAxis domain={[0, 100]} fontSize={9} fontFamily={MONO}
+                    <YAxis domain={[0, 100]} fontSize={9} fontFamily="'IBM Plex Mono', monospace" stroke="#444" tickSize={4}
                       label={{ value: "\u0394I% ", angle: -90, position: "insideLeft", fontSize: 9 }} />
-                    <Tooltip contentStyle={{ fontFamily: MONO, fontSize: 10 }}
+                    <Tooltip contentStyle={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}
                       formatter={(val, name) => [`${val}%`, name]} />
                     {/* Uncertainty band */}
-                    <Area dataKey="MUT_hi" stroke="none" fill="#3288bd" fillOpacity={0.08} dot={false} name="MUT (k\u00d72)" />
+                    <Area dataKey="MUT_hi" stroke="none" fill="#D63384" fillOpacity={0.06} dot={false} name="MUT (k\u00d72)" />
                     <Area dataKey="MUT_lo" stroke="none" fill="#fff" fillOpacity={0.9} dot={false} name="MUT (k/2)" />
                     {/* Main curves */}
-                    <Line dataKey="MUT" stroke="#3288bd" strokeWidth={2.5} dot={false} name="MUT" />
-                    <Line dataKey="WT" stroke="#e6550d" strokeWidth={2} strokeDasharray="6 3" dot={false} name="WT" />
-                    <Line dataKey="neg" stroke="#ccc" strokeWidth={1} strokeDasharray="3 3" dot={false} name="Neg ctrl" />
+                    <Line dataKey="MUT" stroke="#D63384" strokeWidth={2.5} dot={false} name="MUT" />
+                    <Line dataKey="WT" stroke="#3B5FBD" strokeWidth={2} dot={false} name="WT" />
+                    <Line dataKey="neg" stroke="#C0C0C0" strokeWidth={1} strokeDasharray="6 4" dot={false} name="Neg ctrl" />
                     {/* Threshold */}
-                    <ReferenceLine y={echemTimeCourse.threshold} stroke="#c0392b" strokeDasharray="6 3"
-                      label={{ value: `3\u03c3 = ${echemTimeCourse.threshold}%`, position: "right", fontSize: 8, fill: "#c0392b" }} />
+                    <ReferenceLine y={echemTimeCourse.threshold} stroke="#C0392B" strokeDasharray="6 3"
+                      label={{ value: `3\u03c3 = ${echemTimeCourse.threshold}%`, position: "right", fontSize: 8, fill: "#C0392B" }} />
                     {/* Current time marker */}
                     <ReferenceLine x={echemTime} stroke="#666" strokeDasharray="4 2" />
                   </ComposedChart>
@@ -4505,46 +4580,76 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             </div>
 
             {/* ═══ PANEL C: MUT vs WT Discrimination Overlay ═══ */}
-            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: T.bgSub }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: "#FAFAFA" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: "4px" }}>
                 Panel C: MUT vs WT Discrimination
               </div>
-              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px" }}>
-                MUT: <span style={{ fontWeight: 700, color: "#3288bd" }}>{echemDiscOverlay.peakMut} {"\u03bcA"} ({"\u0394"}I% = {echemDiscOverlay.diMut}%)</span>
-                {" \u00b7 "}WT: <span style={{ fontWeight: 700, color: "#e6550d" }}>{echemDiscOverlay.peakWt} {"\u03bcA"} ({"\u0394"}I% = {echemDiscOverlay.diWt}%)</span>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: "'IBM Plex Mono', monospace" }}>
+                MUT: <span style={{ fontWeight: 700, color: "#D63384" }}>{echemDiscOverlay.peakMut} {"\u03bcA"} ({"\u0394"}I% = {echemDiscOverlay.diMut}%)</span>
+                {" \u00b7 "}WT: <span style={{ fontWeight: 700, color: "#3B5FBD" }}>{echemDiscOverlay.peakWt} {"\u03bcA"} ({"\u0394"}I% = {echemDiscOverlay.diWt}%)</span>
                 {" \u00b7 "}Disc: <span style={{ fontWeight: 700, color: T.primary }}>{echemDiscOverlay.measuredDisc === Infinity ? "\u221e" : `${echemDiscOverlay.measuredDisc}\u00d7`}</span>
                 {" (GUARD: "}{echemDiscOverlay.guardDisc >= 900 ? "\u221e" : `${echemDiscOverlay.guardDisc}\u00d7`}{")"}
               </div>
               <div style={{ width: "100%", height: 260 }}>
+                {echemTechnique === "CV" && cvDuckData ? (() => {
+                  const pad = { top: 20, right: 20, bottom: 35, left: 50 };
+                  const w = 460, h = 260, pw = w - pad.left - pad.right, ph = h - pad.top - pad.bottom;
+                  const allI = [cvDuckData.baseline, cvDuckData.mut, cvDuckData.wt].flatMap(d => [...d.forward, ...d.reverse]).map(p => p.I);
+                  const iMin = Math.min(...allI) * 1.15, iMax = Math.max(...allI) * 1.15;
+                  const xS = e => pad.left + ((e - (-0.05)) / (-0.35)) * pw;
+                  const yS = i => pad.top + ((iMax - i) / (iMax - iMin)) * ph;
+                  return (
+                    <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: "'IBM Plex Mono', monospace" }}>
+                      <rect width={w} height={h} fill="#FAFAFA" rx="8" />
+                      {[0.25, 0.5, 0.75].map(f => <line key={`g${f}`} x1={pad.left + pw * f} y1={pad.top} x2={pad.left + pw * f} y2={pad.top + ph} stroke="#E8E8E8" strokeWidth="0.5" />)}
+                      <line x1={pad.left} y1={yS(0)} x2={pad.left + pw} y2={yS(0)} stroke="#BBB" strokeWidth="1" strokeDasharray="4,3" />
+                      <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + ph} stroke="#444" strokeWidth="1.5" />
+                      <line x1={pad.left} y1={pad.top + ph} x2={pad.left + pw} y2={pad.top + ph} stroke="#444" strokeWidth="1.5" />
+                      <path d={cvSvgPath(cvDuckData.baseline, xS, yS)} fill="none" stroke="#999" strokeWidth="1.5" strokeDasharray="6,4" opacity="0.5" />
+                      <path d={cvSvgPath(cvDuckData.wt, xS, yS)} fill="none" stroke="#3B5FBD" strokeWidth="2" opacity="0.85" />
+                      <path d={cvSvgPath(cvDuckData.mut, xS, yS)} fill="rgba(214,51,132,0.06)" stroke="#D63384" strokeWidth="2.5" />
+                      <line x1={xS(-0.22)} y1={pad.top} x2={xS(-0.22)} y2={pad.top + ph} stroke="#999" strokeWidth="0.8" strokeDasharray="3,3" />
+                      <text x={pad.left + pw / 2} y={h - 3} textAnchor="middle" fill="#444" fontSize="11">E (V vs Ag/AgCl)</text>
+                      <text x={12} y={pad.top + ph / 2} textAnchor="middle" fill="#444" fontSize="11" transform={`rotate(-90, 12, ${pad.top + ph / 2})`}>I (μA)</text>
+                      <line x1={pad.left + pw - 100} y1={pad.top + 10} x2={pad.left + pw - 80} y2={pad.top + 10} stroke="#999" strokeWidth="1.5" strokeDasharray="6,4" />
+                      <text x={pad.left + pw - 75} y={pad.top + 14} fill="#999" fontSize="9">Baseline</text>
+                      <line x1={pad.left + pw - 100} y1={pad.top + 24} x2={pad.left + pw - 80} y2={pad.top + 24} stroke="#3B5FBD" strokeWidth="2" />
+                      <text x={pad.left + pw - 75} y={pad.top + 28} fill="#3B5FBD" fontSize="9">WT</text>
+                      <line x1={pad.left + pw - 100} y1={pad.top + 38} x2={pad.left + pw - 80} y2={pad.top + 38} stroke="#D63384" strokeWidth="2.5" />
+                      <text x={pad.left + pw - 75} y={pad.top + 42} fill="#D63384" fontSize="9">MUT</text>
+                    </svg>
+                  );
+                })() : (
                 <ResponsiveContainer>
                   <LineChart data={echemDiscOverlay.data} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis dataKey="E" type="number" domain={[-0.4, -0.05]} fontSize={9} fontFamily={MONO}
+                    <CartesianGrid stroke="#E8E8E8" strokeWidth={0.5} />
+                    <XAxis dataKey="E" type="number" domain={[-0.4, -0.05]} fontSize={9} fontFamily="'IBM Plex Mono', monospace"
                       label={{ value: "E (V vs Ag/AgCl)", position: "bottom", fontSize: 9, offset: -2 }}
-                      tickFormatter={v => v.toFixed(2)} reversed />
-                    <YAxis fontSize={9} fontFamily={MONO}
+                      tickFormatter={v => v.toFixed(2)} reversed stroke="#444" tickSize={4} />
+                    <YAxis fontSize={9} fontFamily="'IBM Plex Mono', monospace" stroke="#444" tickSize={4}
                       label={{ value: `I (\u03bcA)`, angle: -90, position: "insideLeft", fontSize: 9 }} />
-                    <Tooltip contentStyle={{ fontFamily: MONO, fontSize: 10 }}
+                    <Tooltip contentStyle={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}
                       formatter={(val, name) => [`${(+val).toFixed(3)} \u03bcA`, name === "baseline" ? "Baseline (no target)" : name]}
                       labelFormatter={v => `E = ${(+v).toFixed(3)} V`} />
-                    <Line dataKey="baseline" stroke="#999" strokeDasharray="5 3" strokeWidth={1.5} dot={false} name="baseline" />
-                    <Line dataKey="MUT" stroke="#3288bd" strokeWidth={2.5} dot={false} name="MUT target" />
-                    <Line dataKey="WT" stroke="#e6550d" strokeWidth={2} dot={false} name="WT target" />
+                    <Line dataKey="baseline" stroke="#999" strokeDasharray="6 4" strokeWidth={1.5} dot={false} name="baseline" opacity={0.5} />
+                    <Line dataKey="WT" stroke="#3B5FBD" strokeWidth={2} dot={false} name="WT target" opacity={0.85} />
+                    <Line dataKey="MUT" stroke="#D63384" strokeWidth={2.5} dot={false} name="MUT target" />
                     <ReferenceLine x={-0.22} stroke="#999" strokeDasharray="3 3" />
                   </LineChart>
                 </ResponsiveContainer>
+                )}
               </div>
-              <div style={{ fontSize: "10px", color: T.textTer, fontStyle: "italic", marginTop: "6px" }}>
+              <div style={{ fontSize: "10px", color: T.textTer, fontStyle: "italic", marginTop: "6px", fontFamily: "'IBM Plex Mono', monospace" }}>
                 The discrimination ratio is independent of k_trans and {"\u0393\u2080"} {"\u2014"} it depends only on the mismatch biophysics predicted by GUARD.
               </div>
             </div>
 
             {/* ═══ PANEL D: 15-Pad Heatmap ═══ */}
-            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: T.bgSub }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: "#FAFAFA" }}>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: "'IBM Plex Sans', sans-serif", marginBottom: "4px" }}>
                 Panel D: 15-Pad {"\u0394"}I% Heatmap
               </div>
-              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px" }}>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: "'IBM Plex Mono', monospace" }}>
                 {echemHeatmap.aboveCount}/15 pads above threshold at {echemBloodTiter} cp/mL, {echemTime} min.
                 {echemHeatmap.drugsMet.length > 0 && (
                   <span> Drug classes: <strong style={{ color: T.success }}>{echemHeatmap.drugsMet.join(", ")}</strong></span>
@@ -4552,52 +4657,60 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
               </div>
               {/* 5×3 grid */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "6px" }}>
-                {echemHeatmap.pads.map((pad, idx) => {
-                  const bgColor = echemHeatColor(pad.expected_di);
-                  const textColor = pad.expected_di > 40 ? "#fff" : T.text;
-                  const dimmed = !pad.above;
+                {echemHeatmap.pads.map((pad) => {
+                  const bg = echemHeatColor(pad.expected_di);
+                  const t2 = Math.min(pad.expected_di / 100, 1);
+                  const textColor = t2 > 0.45 ? "#fff" : "#1a1a2e";
+                  const abv = pad.above;
                   return (
                     <div
                       key={pad.target}
                       title={`P(template\u22651) = ${pad.P_template}%\nP(RPA) = 95%\n\u0394I% if positive = ${pad.di_if_present}%\nExpected \u0394I% = ${pad.expected_di}%`}
                       style={{
-                        background: dimmed ? "#f3f4f6" : bgColor,
-                        borderRadius: "8px",
-                        padding: "8px 4px",
-                        textAlign: "center",
-                        border: pad.above ? "2px solid #16A34A" : "2px dashed #d1d5db",
-                        opacity: dimmed ? 0.6 : 1,
-                        minHeight: "60px",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "center",
+                        borderRadius: "10px",
+                        aspectRatio: "1",
+                        background: `linear-gradient(145deg, ${lighten(bg, 8)}, ${bg})`,
+                        boxShadow: abv
+                          ? `inset 0 1px 3px rgba(0,0,0,0.12), 0 2px 8px ${bg}30`
+                          : "inset 0 1px 3px rgba(0,0,0,0.12)",
+                        border: abv ? `1.5px solid ${darken(bg, 15)}` : "1.5px dashed #d0d0d0",
+                        display: "flex", flexDirection: "column",
+                        alignItems: "center", justifyContent: "center",
+                        padding: "4px",
                         position: "relative",
+                        transition: "transform 0.2s, box-shadow 0.2s",
+                        cursor: "pointer",
+                        fontFamily: "'IBM Plex Mono', monospace",
                       }}
+                      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
                     >
-                      {dimmed && (
-                        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: "20px", color: "#9ca3af", fontWeight: 800, opacity: 0.4 }}>?</div>
+                      {abv && (
+                        <div style={{ position: "absolute", top: 3, right: 3, width: 7, height: 7, borderRadius: "50%", background: "#34d399", boxShadow: "0 0 4px #34d399" }} />
                       )}
-                      <div style={{ fontSize: "8px", fontWeight: 700, fontFamily: MONO, color: dimmed ? T.textTer : textColor, lineHeight: 1.2, wordBreak: "break-all" }}>
-                        {pad.target.replace("_", "\n").split("\n").map((part, j) => <div key={j}>{part}</div>)}
-                      </div>
-                      <div style={{ fontSize: "11px", fontWeight: 800, fontFamily: MONO, color: dimmed ? T.textTer : textColor, marginTop: "2px" }}>
-                        {pad.expected_di.toFixed(0)}%
-                      </div>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: textColor, lineHeight: 1.1, textAlign: "center" }}>
+                        {pad.target.replace("_", "\n").split("\n").map((part, j) => <span key={j} style={{ display: "block" }}>{part}</span>)}
+                      </span>
+                      <span style={{ fontSize: "8px", fontWeight: 600, marginTop: 1, color: t2 > 0.45 ? "rgba(255,255,255,0.75)" : "#888", letterSpacing: "0.05em" }}>
+                        {pad.drug}
+                      </span>
+                      <span style={{ fontSize: "15px", fontWeight: 800, color: textColor, marginTop: 2, textShadow: t2 > 0.45 ? "0 1px 2px rgba(0,0,0,0.2)" : "none" }}>
+                        {Math.round(pad.expected_di)}%
+                      </span>
                     </div>
                   );
                 })}
               </div>
-              {/* Color legend */}
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "10px", justifyContent: "center" }}>
-                <span style={{ fontSize: "9px", color: T.textTer }}>0%</span>
-                <div style={{ width: "120px", height: "10px", borderRadius: "5px", background: "linear-gradient(to right, rgb(180,185,195), rgb(171,221,164), rgb(102,194,165), rgb(50,136,189), rgb(94,79,162))" }} />
-                <span style={{ fontSize: "9px", color: T.textTer }}>100%</span>
-                <span style={{ fontSize: "9px", color: T.textTer, marginLeft: "8px" }}>
-                  <span style={{ display: "inline-block", width: 8, height: 8, border: "2px solid #16A34A", borderRadius: 3, marginRight: 3 }} />above threshold
+              {/* Gradient legend */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 10, fontFamily: "'IBM Plex Mono', monospace", fontSize: 10 }}>
+                <span style={{ color: "#888" }}>0%</span>
+                <div style={{ width: 180, height: 8, borderRadius: 4, background: "linear-gradient(to right, #E6E9EE, #CDE4D8, #A0D4BE, #66C2A5, #4198AF, #2D649E)", border: "1px solid #ddd" }} />
+                <span style={{ color: "#888" }}>100%</span>
+                <div style={{ width: 1, height: 14, background: "#ddd", margin: "0 4px" }} />
+                <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#34d399", display: "inline-block" }} />detected
                 </span>
-                <span style={{ fontSize: "9px", color: T.textTer }}>
-                  <span style={{ display: "inline-block", width: 8, height: 8, border: "2px dashed #d1d5db", borderRadius: 3, marginRight: 3 }} />below
-                </span>
+                <span style={{ color: "#bbb" }}>? below threshold</span>
               </div>
             </div>
           </div>
