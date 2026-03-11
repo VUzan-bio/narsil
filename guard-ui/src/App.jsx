@@ -3805,49 +3805,19 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   const directCount = results.filter(r => r.strategy === "Direct").length;
   const proximityCount = results.filter(r => r.strategy === "Proximity").length;
   const withPrimers = results.filter(r => r.hasPrimers && !(r.asrpaDiscrimination?.block_class === "none")).length;
-  const dimerMatrix = panelData?.primer_dimer_matrix || null;
-  const dimerLabels = panelData?.primer_dimer_labels || null;
-  const dimerReport = panelData?.primer_dimer_report || null;
-
-  // Pool data from API
-  const [poolData, setPoolData] = useState(null);
-  const [poolLoading, setPoolLoading] = useState(false);
 
   // Electrode grid color-by mode
   const [colorBy, setColorBy] = useState("drug");
-
   // Hover state for electrode pads
   const [hoveredPad, setHoveredPad] = useState(null);
 
-  // Fetch pool data
+  // Kinetics data from API or fallback
+  const [poolData, setPoolData] = useState(null);
   useEffect(() => {
     if (connected && jobId) {
-      setPoolLoading(true);
-      getPoolData(jobId).then(({ data }) => {
-        if (data) setPoolData(data);
-        setPoolLoading(false);
-      }).catch(() => setPoolLoading(false));
+      getPoolData(jobId).then(({ data }) => { if (data) setPoolData(data); }).catch(() => {});
     }
   }, [connected, jobId]);
-
-  // Fallback pool data (client-side defaults)
-  const pooling = poolData?.pooling || {
-    pools: { A: ["rpoB_H445Y","rpoB_H445D","rpoB_D435V","rpoB_S450L","rpoB_S450W"], B: ["katG_S315T","katG_S315N","embB_M306V","embB_M306I","inhA_C-15T","pncA_H57D"], C: ["gyrA_D94G","gyrA_A90V","rrs_A1401G","IS6110_NON"] },
-    pool_stats: {
-      A: { pool_id: "A", targets: ["rpoB_H445Y","rpoB_H445D","rpoB_D435V","rpoB_S450L","rpoB_S450W"], n_targets: 5, n_primers: 10, high_risk_dimers: 2, worst_dg: -7.2 },
-      B: { pool_id: "B", targets: ["katG_S315T","katG_S315N","embB_M306V","embB_M306I","inhA_C-15T","pncA_H57D"], n_targets: 6, n_primers: 12, high_risk_dimers: 1, worst_dg: -6.4 },
-      C: { pool_id: "C", targets: ["gyrA_D94G","gyrA_A90V","rrs_A1401G","IS6110_NON"], n_targets: 4, n_primers: 8, high_risk_dimers: 0, worst_dg: -3.1 },
-    },
-    total_high_risk_single_tube: dimerReport?.high_risk_pairs?.length || 30,
-    total_high_risk_after_pooling: 3,
-    reduction_pct: 90.0,
-    electrode_layout: [
-      ["IS6110_NON","rpoB_S450L","rpoB_H445Y","rpoB_H445D","rpoB_D435V"],
-      ["rpoB_S450W","katG_S315T","katG_S315N","inhA_C-15T","embB_M306V"],
-      ["embB_M306I","pncA_H57D","gyrA_D94G","gyrA_A90V","rrs_A1401G"],
-    ],
-    target_to_pool: { "rpoB_H445Y":"A","rpoB_H445D":"A","rpoB_D435V":"A","rpoB_S450L":"A","rpoB_S450W":"A","katG_S315T":"B","katG_S315N":"B","embB_M306V":"B","embB_M306I":"B","inhA_C-15T":"B","pncA_H57D":"B","gyrA_D94G":"C","gyrA_A90V":"C","rrs_A1401G":"C","IS6110_NON":"C" },
-  };
 
   const kinetics = poolData?.kinetics || {
     phases: [
@@ -3862,25 +3832,19 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       who_tpp_target: "< 120 min", who_tpp_pass: true,
     },
     parameters: [
-      { param: "k_form (RNP association)", value: "1.75 \u00d7 10\u2075 M\u207b\u00b9s\u207b\u00b9", source: "Lesinski et al. 2024", source_detail: "SPR measurement, Cas12a + HPV16 sgRNA, 25\u00b0C", note: "Solution-phase. On-electrode rate may differ due to crRNA rehydration." },
-      { param: "k_off (RNP dissociation)", value: "1.87 \u00d7 10\u207b\u2074 s\u207b\u00b9", source: "Lesinski et al. 2024", source_detail: "SPR measurement, K_D = 1.07 nM", note: null },
-      { param: "k_cis (cis-cleavage)", value: "0.03 s\u207b\u00b9", source: "Lesinski et al. 2024", source_detail: "First-order fit of dsDNA fluorescence reporter cleavage", note: null },
-      { param: "k_trans (solution, free ssDNA)", value: "~2.0 s\u207b\u00b9", source: "Nalefski et al. 2021", source_detail: "LbCas12a k_cat for C10 polycytidine, low-salt buffer", note: "Free ssDNA in solution. NOT applicable to surface-tethered reporters." },
-      { param: "k_trans (surface, estimated)", value: "0.01\u20130.1 s\u207b\u00b9", source: "Estimated", source_detail: "10\u2013100\u00d7 slower than solution due to tethered MB-ssDNA steric effects", note: "No direct measurement exists. Key experimental unknown." },
-      { param: "[Cas12a]", value: "50 nM", source: "Design parameter", source_detail: "Typical E-CRISPR range: 10\u2013200 nM. Lesinski 2024 used 2 \u00b5M for characterization.", note: null },
-      { param: "[crRNA] on pad", value: "~200 nM equivalent", source: "Design parameter", source_detail: "Pre-dried on LIG. Effective concentration after rehydration unknown.", note: "Bezinge 2023 demonstrated crRNA-on-LIG but did not report concentration." },
-      { param: "MB-ssDNA probe density", value: "~10\u00b9\u2070\u201310\u00b9\u00b9 molecules/cm\u00b2", source: "Estimated for LIG", source_detail: "\u03c0-stacking attachment. Gold SAM ref: 10\u00b9\u00b2/cm\u00b2 (Steel 1998). LIG 10\u2013100\u00d7 lower.", note: "Probe density directly affects signal magnitude and time-to-detection." },
+      { param: "k_form (RNP association)", value: "1.75 \u00d7 10\u2075 M\u207b\u00b9s\u207b\u00b9", source: "Lesinski et al. 2024", note: "SPR measurement — analogous to on-pad scenario but different surface than LIG" },
+      { param: "k_off (RNP dissociation)", value: "1.87 \u00d7 10\u207b\u2074 s\u207b\u00b9", source: "Lesinski et al. 2024", note: null },
+      { param: "k_cis (cis-cleavage)", value: "0.03 s\u207b\u00b9", source: "Lesinski et al. 2024", note: null },
+      { param: "k_trans (solution, free ssDNA)", value: "~2.0 s\u207b\u00b9", source: "Nalefski et al. 2021", note: "Free ssDNA in solution. NOT applicable to surface-tethered reporters." },
+      { param: "k_trans (surface, estimated)", value: "0.01\u20130.1 s\u207b\u00b9", source: "Estimated", note: "Key experimental unknown." },
+      { param: "[Cas12a]", value: "50 nM", source: "Design parameter", note: null },
+      { param: "[crRNA] on pad", value: "~200 nM equivalent", source: "Design parameter", note: "Effective concentration after rehydration unknown." },
+      { param: "MB-ssDNA probe density", value: "~10\u2079\u2070\u201310\u00b9\u00b9 molecules/cm\u00b2", source: "Estimated for LIG", note: "Probe density directly affects signal magnitude and time-to-detection." },
     ],
     insights: [
-      { title: "Rate-limiting step", text: "Surface trans-cleavage of tethered MB-ssDNA reporters dominates detection time \u2014 not RNP formation or target recognition. Optimizing probe density and electrode surface chemistry is the primary experimental lever for reducing time-to-result." },
-      { title: "In situ complexation", text: "Lesinski et al. 2024: reduces effective [RNP] during the first ~5 minutes by ~10-fold vs pre-complexed format. This is a feature \u2014 it prevents Cas12a from destroying target amplicons before detection begins." },
-      { title: "Experimental unknowns", text: "k_trans on LIG-tethered MB-ssDNA and crRNA rehydration kinetics have not been measured. These are key characterization priorities that directly inform chip design parameters." },
-    ],
-    year1_priorities: [
-      "k_trans on MB-ssDNA/LIG \u2014 determines detection time",
-      "crRNA rehydration kinetics \u2014 determines pad preparation protocol",
-      "Optimal [Cas12a] for in situ format \u2014 balance sensitivity vs background",
-      "Probe density optimization \u2014 balance signal intensity vs steric access",
+      { title: "Rate-limiting step", text: "Surface trans-cleavage of tethered MB-ssDNA reporters dominates detection time \u2014 not RNP formation or target recognition." },
+      { title: "In situ complexation", text: "Lesinski et al. 2024: reduces effective [RNP] during the first ~5 minutes by ~10-fold vs pre-complexed format. This prevents Cas12a from destroying target amplicons before detection begins." },
+      { title: "Experimental unknowns", text: "k_trans on LIG-tethered MB-ssDNA and crRNA rehydration kinetics have not been measured. These are key characterisation priorities." },
     ],
     target_ranking: [
       { target: "IS6110_NON", efficiency: 0.95, is_weak: false },
@@ -3888,7 +3852,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       { target: "gyrA_D94G", efficiency: 0.83, is_weak: false },
       { target: "rpoB_S450L", efficiency: 0.82, is_weak: false },
       { target: "rrs_A1401G", efficiency: 0.81, is_weak: false },
-      { target: "inhA_C-15T", efficiency: 0.80, is_weak: false },
+      { target: "inhA_C-15T", efficiency: 0.898, is_weak: false },
       { target: "gyrA_A90V", efficiency: 0.79, is_weak: false },
       { target: "rpoB_H445Y", efficiency: 0.78, is_weak: false },
       { target: "embB_M306V", efficiency: 0.76, is_weak: false },
@@ -3901,17 +3865,17 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     ],
   };
 
-  const specificity = poolData?.specificity || null;
+  // Electrode layout — 5×3 grid, per-pad one-pot
+  const electrodeLayout = [
+    ["IS6110_NON","rpoB_S450L","rpoB_H445Y","rpoB_H445D","rpoB_D435V"],
+    ["rpoB_S450W","katG_S315T","katG_S315N","inhA_C-15T","embB_M306V"],
+    ["embB_M306I","pncA_H57D","gyrA_D94G","gyrA_A90V","rrs_A1401G"],
+  ];
 
-  // Pool colors — greenBlue gradient palette
-  const POOL_COLORS = { A: "#2563EB", B: "#3288bd", C: "#66c2a5" };
-  const POOL_BG = { A: "#EFF6FF", B: "#e8f4fa", C: "#ecf8f4" };
-
-  // Drug colors — greenBlue-derived palette
+  // Drug colors for pads
   const PAD_DRUG_COLORS = { RIF: "#2563EB", INH: "#3288bd", EMB: "#66c2a5", PZA: "#abdda4", FQ: "#60A5FA", AG: "#4ba3cc", CTRL: "#9ca3af" };
   const PAD_DRUG_BG = { RIF: "#EFF6FF", INH: "#e8f4fa", EMB: "#ecf8f4", PZA: "#f2f9ee", FQ: "#EFF6FF", AG: "#eaf6fc", CTRL: "#f3f4f6" };
 
-  // Target metadata helpers
   const targetDrug = (t) => {
     const r = results.find(x => x.label === t);
     if (r) return r.drug || "OTHER";
@@ -3924,476 +3888,949 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     if (t.startsWith("rrs")) return "AG";
     return "OTHER";
   };
-
-  const targetStrategy = (t) => {
-    const r = results.find(x => x.label === t);
-    return r ? r.strategy : "Direct";
-  };
-
-  const targetScore = (t) => {
-    const r = results.find(x => x.label === t);
-    return r ? (r.ensembleScore || r.score || 0) : 0;
-  };
-
+  const targetStrategy = (t) => { const r = results.find(x => x.label === t); return r ? r.strategy : "Direct"; };
+  const targetScore = (t) => { const r = results.find(x => x.label === t); return r ? (r.ensembleScore || r.score || 0) : 0; };
   const coAmpliconGroups = [["rpoB_H445Y","rpoB_H445D"],["rpoB_S450L","rpoB_S450W"],["katG_S315T","katG_S315N"],["embB_M306V","embB_M306I"]];
   const isCoAmplicon = (t) => coAmpliconGroups.some(g => g.includes(t));
   const coAmpliconPartner = (t) => { const g = coAmpliconGroups.find(g => g.includes(t)); return g ? g.filter(x => x !== t)[0] : null; };
 
+  // Efficiency lookup from kinetics data or results
+  const getEfficiency = (target) => {
+    const kr = (kinetics.target_ranking || []).find(x => x.target === target);
+    if (kr) return kr.efficiency;
+    const r = results.find(x => x.label === target);
+    return r ? (r.ensembleScore || r.score || 0.75) : 0.75;
+  };
+
+  // pncA_H57D status check
+  const pncAResult = results.find(r => r.label === "pncA_H57D");
+  const pncAResolved = pncAResult?.asrpaDiscrimination?.block_class === "strong" ||
+    (pncAResult?.asrpaDiscrimination?.terminal_mismatch && pncAResult.asrpaDiscrimination.terminal_mismatch.includes("C:C"));
+
+  // === ELECTROCHEMICAL SIMULATION COMPUTATIONS ===
+  const V_blood_mL = 1.0;
+  const extraction_yield = 0.6;
+  const V_eluate_uL = 50;
+  const V_pad_uL = 50 / 15;
+  const P_rpa = 0.95;
+  const P_signal = 1.0;
+  const IS6110_copy_number = 10;
+
+  const drug_targets = {
+    RIF: ["rpoB_S450L","rpoB_S450W","rpoB_H445Y","rpoB_H445D","rpoB_D435V"],
+    INH: ["katG_S315T","katG_S315N","inhA_C-15T"],
+    EMB: ["embB_M306V","embB_M306I"],
+    PZA: ["pncA_H57D"],
+    FQ: ["gyrA_D94G","gyrA_A90V"],
+    AG: ["rrs_A1401G"],
+  };
+
+  const WHO_thresholds = { RIF: 0.95, INH: 0.90, FQ: 0.90, EMB: 0.80, PZA: 0.80, AG: 0.80 };
+  const DRUG_LINE_COLORS = { RIF: "#2563EB", INH: "#D97706", EMB: "#0D9488", PZA: "#16A34A", FQ: "#E11D48", AG: "#F97316", IS6110: "#6B7280" };
+
+  const titers = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+
+  const sensitivityData = useMemo(() => {
+    return titers.map(c => {
+      const N_total = c * V_blood_mL * extraction_yield;
+      const lambda = N_total * (V_pad_uL / V_eluate_uL);
+      const lambda_IS = lambda * IS6110_copy_number;
+      const pDetectSingle = (1 - Math.exp(-lambda)) * P_rpa * P_signal;
+      const pDetectIS = (1 - Math.exp(-lambda_IS)) * P_rpa * P_signal;
+
+      const row = { titer: c, IS6110: Math.min(pDetectIS, 1) * 100 };
+      Object.entries(drug_targets).forEach(([drug, targets]) => {
+        const pDrugMiss = targets.reduce((acc, _t) => acc * (1 - pDetectSingle), 1);
+        row[drug] = (1 - pDrugMiss) * 100;
+      });
+      return row;
+    });
+  }, [results]);
+
+  // ΔI% prediction per candidate
+  const scenarios = [
+    { label: "Conservative", k: 0.01, factor: 25, color: "#bfdbfe" },
+    { label: "Expected", k: 0.05, factor: 55, color: "#2563EB" },
+    { label: "Optimised", k: 0.1, factor: 80, color: "#1e3a5f" },
+  ];
+
+  const diPredictions = useMemo(() => {
+    const allTargets = electrodeLayout.flat().filter(t => t !== "IS6110_NON");
+    return allTargets.map(t => {
+      const eff = getEfficiency(t);
+      return {
+        target: t,
+        drug: targetDrug(t),
+        efficiency: eff,
+        conservative: 25 * eff,
+        expected: 55 * eff,
+        optimised: 80 * eff,
+      };
+    }).sort((a, b) => b.expected - a.expected);
+  }, [results, kinetics]);
+
+  // Discrimination ratio data for direct candidates
+  const discData = useMemo(() => {
+    return results.filter(r => r.strategy === "Direct" && r.disc > 0 && r.disc < 900).map(r => ({
+      target: r.label,
+      guardDisc: r.disc,
+      echemDisc: r.disc,
+      minWtDi: r.disc > 0 ? +(55 * getEfficiency(r.label) / r.disc).toFixed(1) : 0,
+      grade: r.disc >= 5 ? "Yes" : r.disc >= 3 ? "Borderline" : "No",
+    })).sort((a, b) => b.guardDisc - a.guardDisc);
+  }, [results, kinetics]);
+
+  // Time-to-detection estimates
+  const timeEstimates = useMemo(() => {
+    const allTargets = electrodeLayout.flat().filter(t => t !== "IS6110_NON");
+    return allTargets.map(t => {
+      const eff = getEfficiency(t);
+      const rpaMin = 15, rpaMax = 20;
+      const rnpMin = 5, rnpMax = 10;
+      const mbMin = Math.max(5, Math.round(20 * (1 - eff)));
+      const mbMax = Math.max(10, Math.round(35 * (1 - eff) + 10));
+      return { target: t, efficiency: eff, rpaMin, rpaMax, rnpMin, rnpMax, mbMin, mbMax, totalMin: rpaMin + rnpMin + mbMin, totalMax: rpaMax + rnpMax + mbMax };
+    }).sort((a, b) => a.totalMin - b.totalMin);
+  }, [results, kinetics]);
+
+  // Poisson table data
+  const poissonTable = [
+    { titer: 1, context: "Paucibacillary / HIV+", total: 0.6, perPad: 0.04, pSingle: 0.04, pIS: 0.33 },
+    { titer: 10, context: "Smear-negative TB", total: 6, perPad: 0.4, pSingle: 0.33, pIS: 0.98 },
+    { titer: 50, context: "Low-moderate", total: 30, perPad: 2.0, pSingle: 0.86, pIS: 1.0 },
+    { titer: 100, context: "Moderate bacteremia", total: 60, perPad: 4.0, pSingle: 0.98, pIS: 1.0 },
+    { titer: 1000, context: "Disseminated TB", total: 600, perPad: 40, pSingle: 1.0, pIS: 1.0 },
+  ];
+
+  const poissonColor = (p) => p < 0.33 ? T.danger : p < 0.90 ? T.warning : T.success;
+  const poissonBg = (p) => p < 0.33 ? "#FEE2E2" : p < 0.90 ? "#FEF3C7" : "#DCFCE7";
+
   return (
     <div>
-      <CollapsibleSection title="Spatially-Addressed Electrode Array" defaultOpen={true}>
-      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "10px", padding: mobile ? "16px" : "20px 24px", marginBottom: "24px", display: "flex", gap: "14px", alignItems: "flex-start" }}>
-        <Grid3x3 size={20} color={T.primaryDark} style={{ flexShrink: 0, marginTop: 2 }} />
-        <div>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: T.primaryDark, fontFamily: HEADING, marginBottom: "6px" }}>Spatially-Addressed Electrode Array</div>
-          <p style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6, margin: 0, opacity: 0.85 }}>
-            Detection is spatially multiplexed — each crRNA occupies a dedicated LIG electrode pad, physically isolated by
-            wax-printed hydrophobic barriers. Amplification (RPA) and detection (CRISPR-Cas12a) are separated into distinct
-            stages, connected by capillary-driven flow. This eliminates crRNA-crRNA cross-reactivity and allows each target
-            to be read independently via square-wave voltammetry (SWV).
-          </p>
+      {/* ═══════════ SECTION 1: Integrated PoC Chip ═══════════ */}
+      <CollapsibleSection title="Integrated PoC Chip" defaultOpen={true} badge={{ text: "per-pad one-pot", bg: T.primaryLight, color: T.primary }}>
+        <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "10px", padding: mobile ? "16px" : "20px 24px", marginBottom: "24px", display: "flex", gap: "14px", alignItems: "flex-start" }}>
+          <Grid3x3 size={20} color={T.primaryDark} style={{ flexShrink: 0, marginTop: 2 }} />
+          <div>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: T.primaryDark, fontFamily: HEADING, marginBottom: "6px" }}>E-CRISPR Per-Pad One-Pot Architecture</div>
+            <p style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6, margin: 0, opacity: 0.85 }}>
+              Each of the 15 LIG electrode pads is an independent reaction chamber containing all reagents for target-specific
+              amplification (RPA) and CRISPR-Cas12a detection. Sample application rehydrates lyophilized reagents and initiates
+              the one-pot assay. No separate amplification pools — each pad is self-contained.
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Integrated PoC chip diagram — single device */}
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
-        <div style={{ display: "flex", justifyContent: "center", width: "100%", overflowX: "auto" }}>
-          <svg viewBox="0 0 720 400" style={{ width: "100%", maxWidth: 720, display: "block" }} fontFamily={FONT}>
-            {/* Chip shadow */}
-            <defs>
-              <filter id="chipShadow" x="-2%" y="-2%" width="104%" height="104%">
-                <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.08" />
-              </filter>
-              <marker id="arrowGray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-                <path d="M0,0 L8,3 L0,6" fill="none" stroke="#9CA3AF" strokeWidth="1" />
-              </marker>
-            </defs>
+        {/* Per-pad one-pot chip diagram */}
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
+          <div style={{ display: "flex", justifyContent: "center", width: "100%", overflowX: "auto" }}>
+            <svg viewBox="0 0 720 420" style={{ width: "100%", maxWidth: 720, display: "block" }} fontFamily={FONT}>
+              <defs>
+                <filter id="chipShadow" x="-2%" y="-2%" width="104%" height="104%">
+                  <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity="0.08" />
+                </filter>
+                <marker id="arrowDown" markerWidth="8" markerHeight="6" refX="4" refY="6" orient="auto">
+                  <path d="M0,0 L4,6 L8,0" fill="none" stroke="#9CA3AF" strokeWidth="1" />
+                </marker>
+              </defs>
 
-            {/* Chip body */}
-            <rect x="10" y="10" width="700" height="380" rx="16" ry="16" fill="#fafafa" stroke="#e0e0e0" strokeWidth="1.5" filter="url(#chipShadow)" />
-            <text x="30" y="36" fontSize="10" fill="#999" fontWeight="600" letterSpacing="0.5">GUARD MDR-TB DIAGNOSTIC CHIP</text>
+              {/* Chip body */}
+              <rect x="10" y="10" width="700" height="400" rx="16" ry="16" fill="#fafafa" stroke="#e0e0e0" strokeWidth="1.5" filter="url(#chipShadow)" />
+              <text x="30" y="36" fontSize="10" fill="#999" fontWeight="600" letterSpacing="0.5">GUARD MDR-TB DIAGNOSTIC CHIP</text>
 
-            {/* Sample input port */}
-            <rect x="30" y="58" width="80" height="28" rx="6" fill="#fff" stroke="#ccc" strokeWidth="1" />
-            <text x="70" y="76" textAnchor="middle" fontSize="9" fill="#666" fontWeight="600">SAMPLE IN</text>
-            <line x1="70" y1="86" x2="70" y2="105" stroke="#ccc" strokeWidth="1" markerEnd="url(#arrowGray)" />
+              {/* Sample prep box */}
+              <rect x="30" y="52" width="170" height="115" rx="10" fill="#FEF3C7" stroke="#F59E0B" strokeWidth="1.2" />
+              <text x="115" y="70" textAnchor="middle" fontSize="10" fontWeight="700" fill="#92400E">SAMPLE PREP</text>
+              <text x="115" y="86" textAnchor="middle" fontSize="8" fill="#92400E">Blood lysis +</text>
+              <text x="115" y="98" textAnchor="middle" fontSize="8" fill="#92400E">magnetic bead</text>
+              <text x="115" y="110" textAnchor="middle" fontSize="8" fill="#92400E">cfDNA capture</text>
+              <text x="115" y="126" textAnchor="middle" fontSize="9" fontWeight="600" fill="#92400E">{"\u2192"} 50 \u00b5L eluate</text>
+              <text x="115" y="142" textAnchor="middle" fontSize="8" fill="#B45309">+ Cas12a (50 nM)</text>
+              <text x="115" y="156" textAnchor="middle" fontSize="8" fill="#B45309">+ MgOAc (14 mM)</text>
 
-            {/* RPA chambers — left side */}
+              {/* Arrow to central pad */}
+              <line x1="200" y1="110" x2="230" y2="110" stroke="#F59E0B" strokeWidth="1.5" markerEnd="url(#arrowDown)" />
+
+              {/* Central application pad */}
+              <rect x="235" y="62" width="110" height="60" rx="8" fill="#fff" stroke="#9CA3AF" strokeWidth="1.2" />
+              <text x="290" y="82" textAnchor="middle" fontSize="9" fontWeight="700" fill="#374151">CENTRAL</text>
+              <text x="290" y="94" textAnchor="middle" fontSize="9" fontWeight="700" fill="#374151">APPLICATION PAD</text>
+              <text x="290" y="108" textAnchor="middle" fontSize="7" fill="#9CA3AF">capillary distribution</text>
+
+              {/* Arrow to detection array */}
+              <line x1="345" y1="92" x2="375" y2="92" stroke="#9CA3AF" strokeWidth="1" strokeDasharray="4 3" />
+              <text x="360" y="85" textAnchor="middle" fontSize="6" fill="#bbb">{"\u2192"}</text>
+
+              {/* Detection array label */}
+              <text x="520" y="55" textAnchor="middle" fontSize="9" fill="#999" fontWeight="600" letterSpacing="0.3">DETECTION ARRAY</text>
+
+              {/* Detection array frame */}
+              <rect x="380" y="62" width={5 * 56 + 30} height={3 * 50 + 40} rx="12" ry="12" fill="#fff" stroke="#e0e0e0" strokeWidth="1" />
+
+              {/* Electrode pads — 5×3 grid */}
+              {electrodeLayout.map((row, ri) =>
+                row.map((target, ci) => {
+                  const px = 395 + ci * 56;
+                  const py = 78 + ri * 50;
+                  const drug = targetDrug(target);
+                  const isCtrl = target === "IS6110_NON";
+                  const isPncA = target === "pncA_H57D";
+                  const strategy = targetStrategy(target);
+                  const parts = target.split("_");
+                  const padColor = isCtrl ? "#9CA3AF" : (PAD_DRUG_COLORS[drug] || "#6B7280");
+                  return (
+                    <g key={`pad-${ri}-${ci}`}>
+                      <rect x={px} y={py} width="48" height="40" rx="7" ry="7"
+                        fill={isCtrl ? "#f5f5f5" : (PAD_DRUG_BG[drug] || "#F3F4F6")}
+                        stroke={isPncA && !pncAResolved ? "#ef4444" : padColor}
+                        strokeWidth={isPncA && !pncAResolved ? 1.5 : 1}
+                        strokeDasharray={isPncA && !pncAResolved ? "4 3" : "none"} />
+                      <text x={px + 24} y={py + 17} textAnchor="middle" fontSize="7" fontWeight="700" fill={padColor}>{parts[0]}</text>
+                      <text x={px + 24} y={py + 28} textAnchor="middle" fontSize="6.5" fontWeight="500" fill={padColor}>{parts[1] || ""}</text>
+                      {isCtrl && <text x={px + 24} y={py + 36} textAnchor="middle" fontSize="5.5" fill="#9CA3AF">CTRL</text>}
+                      {!isCtrl && (
+                        <circle cx={px + 40} cy={py + 34} r="2.5"
+                          fill={strategy === "Direct" ? padColor : "none"}
+                          stroke={padColor} strokeWidth="0.8" />
+                      )}
+                    </g>
+                  );
+                })
+              )}
+
+              {/* Per-pad label */}
+              <text x="520" y={78 + 3 * 50 + 12} textAnchor="middle" fontSize="7" fill="#bbb">15 E-CRISPR pads {"\u00b7"} per-pad one-pot {"\u00b7"} in situ RNP {"\u00b7"} SWV readout</text>
+
+              {/* SWV readout contacts */}
+              {[...Array(15)].map((_, i) => (
+                <rect key={`ct-${i}`} x={398 + i * 18} y={78 + 3 * 50 + 22} width="12" height="4" rx="1.5" fill="#d0d0d0" />
+              ))}
+              <text x="520" y={78 + 3 * 50 + 42} textAnchor="middle" fontSize="7" fill="#aaa">SWV readout contacts</text>
+
+              {/* Bottom info */}
+              <text x="360" y="335" textAnchor="middle" fontSize="8" fill="#666">Each pad: LIG + AuNP + thiol-ssDNA-MB + MCH</text>
+              <text x="360" y="350" textAnchor="middle" fontSize="8" fill="#666">Lyophilized: [RPA primers + crRNA + RPA enzyme mix]</text>
+              <text x="360" y="365" textAnchor="middle" fontSize="8" fill="#666">Sample delivers: [cfDNA + Cas12a + MgOAc]</text>
+
+              {/* Legend */}
+              <g>
+                <circle cx={60} cy={390} r="3.5" fill="#2563EB" />
+                <text x={68} y={394} fontSize="8" fill="#888">Direct</text>
+              </g>
+              <g>
+                <circle cx={120} cy={390} r="3.5" fill="none" stroke="#2563EB" strokeWidth="1" />
+                <text x={128} y={394} fontSize="8" fill="#888">Proximity</text>
+              </g>
+              {!pncAResolved && (
+                <g>
+                  <rect x={195} y={386} width="10" height="8" rx="2" fill="none" stroke="#ef4444" strokeWidth="1" strokeDasharray="3 2" />
+                  <text x={210} y={394} fontSize="8" fill="#888">Gap (pncA)</text>
+                </g>
+              )}
+              {Object.entries({ RIF: PAD_DRUG_COLORS.RIF, INH: PAD_DRUG_COLORS.INH, EMB: PAD_DRUG_COLORS.EMB, FQ: PAD_DRUG_COLORS.FQ, PZA: PAD_DRUG_COLORS.PZA, AG: PAD_DRUG_COLORS.AG }).map(([d, col], i) => (
+                <g key={d}>
+                  <rect x={300 + i * 60} y={386} width="10" height="8" rx="2" fill={col + "30"} stroke={col} strokeWidth="0.8" />
+                  <text x={314 + i * 60} y={394} fontSize="7" fill="#888">{d}</text>
+                </g>
+              ))}
+            </svg>
+          </div>
+
+          {/* Key stats row */}
+          <div style={{ display: "flex", gap: "8px", marginTop: "16px", flexWrap: "wrap", justifyContent: "center" }}>
             {[
-              { pool: "Pool A", y: 110, color: "#2563EB", bg: "#EFF6FF" },
-              { pool: "Pool B", y: 175, color: "#3288bd", bg: "#e8f4fa" },
-              { pool: "Pool C", y: 240, color: "#66c2a5", bg: "#ecf8f4" },
-            ].map(p => (
-              <g key={p.pool}>
-                <rect x="25" y={p.y} width="110" height="50" rx="8" fill={p.bg} stroke={p.color} strokeWidth="1.5" />
-                <text x="80" y={p.y + 22} textAnchor="middle" fontSize="10" fontWeight="600" fill={p.color}>RPA {p.pool}</text>
-                <text x="80" y={p.y + 36} textAnchor="middle" fontSize="8" fill="#888">
-                  {p.pool === "Pool A" ? "8 primers" : "10 primers"}
-                </text>
-                {/* Capillary channel */}
-                <line x1="135" y1={p.y + 25} x2="255" y2={p.y + 25} stroke={p.color} strokeWidth="1" strokeDasharray="4 3" opacity="0.4" />
-              </g>
+              { label: "Integrated", desc: "Single paper-based device" },
+              { label: "15 pads", desc: "Independent one-pot chambers" },
+              { label: "One-pot", desc: "RPA + CRISPR per pad" },
+              { label: "In situ", desc: "RNP complexation on-pad" },
+              { label: "E-CRISPR", desc: "MB-ssDNA electrochemical" },
+            ].map(s => (
+              <div key={s.label} style={{ padding: "8px 16px", background: T.bgSub, borderRadius: "8px", border: `1px solid ${T.borderLight}`, textAlign: "center", minWidth: 100 }}>
+                <div style={{ fontSize: "14px", fontWeight: 800, fontFamily: MONO, color: T.primary }}>{s.label}</div>
+                <div style={{ fontSize: "9px", color: T.textTer }}>{s.desc}</div>
+              </div>
             ))}
-            <text x="80" y="310" textAnchor="middle" fontSize="8" fill="#aaa">37 °C · 15–20 min</text>
-            <text x="195" y="150" textAnchor="middle" fontSize="7" fill="#aaa" fontStyle="italic">+ Cas12a</text>
-            <text x="195" y="162" textAnchor="middle" fontSize="7" fill="#bbb" fontStyle="italic">capillary flow</text>
-
-            {/* Detection array frame — right side */}
-            <rect x="260" y="55" width={5 * 58 + 6 * 8 + 30} height={3 * 50 + 4 * 8 + 55} rx="12" ry="12" fill="#fff" stroke="#e0e0e0" strokeWidth="1" />
-            <text x="275" y="76" fontSize="9" fill="#999" fontWeight="600" letterSpacing="0.3">DETECTION ARRAY</text>
-
-            {/* Electrode pads — 5×3 grid */}
-            {pooling.electrode_layout.map((row, ri) =>
-              row.map((target, ci) => {
-                const px = 275 + ci * 66;
-                const py = 88 + ri * 58;
-                const drug = targetDrug(target);
-                const pool = pooling.target_to_pool[target] || "?";
-                const isCtrl = target === "IS6110_NON";
-                const isPncA = target === "pncA_H57D";
-                const parts = target.split("_");
-                const padColor = isCtrl ? "#9CA3AF" : (PAD_DRUG_COLORS[drug] || "#6B7280");
-                return (
-                  <g key={`pad-${ri}-${ci}`}>
-                    <rect x={px} y={py} width="54" height="46" rx="8" ry="8"
-                      fill={isCtrl ? "#f5f5f5" : (PAD_DRUG_BG[drug] || "#F3F4F6")}
-                      stroke={isPncA ? "#ef4444" : padColor}
-                      strokeWidth={isPncA ? 1.5 : 1}
-                      strokeDasharray={isPncA ? "4 3" : "none"} />
-                    {/* Inner circle — electrode well */}
-                    <circle cx={px + 27} cy={py + 18} r="10" fill={isCtrl ? "#eee" : padColor + "20"} stroke={padColor + "40"} strokeWidth="0.5" />
-                    <text x={px + 27} y={py + 21} textAnchor="middle" fontSize="7" fontWeight="700" fill={padColor}>{parts[0]}</text>
-                    <text x={px + 27} y={py + 33} textAnchor="middle" fontSize="6.5" fontWeight="500" fill={padColor}>{parts[1] || ""}</text>
-                    {isCtrl && <text x={px + 27} y={py + 42} textAnchor="middle" fontSize="6" fill="#9CA3AF">CTRL</text>}
-                    {!isCtrl && <circle cx={px + 46} cy={py + 40} r="3" fill={POOL_COLORS[pool] || "#999"} />}
-                  </g>
-                );
-              })
-            )}
-
-            <text x={275 + 5 * 66 / 2} y={88 + 3 * 58 + 15} textAnchor="middle" fontSize="7" fill="#bbb">15 LIG electrode pads · pre-dried crRNA + MB-ssDNA</text>
-
-            {/* SWV readout contacts at bottom */}
-            {[...Array(15)].map((_, i) => (
-              <rect key={`ct-${i}`} x={280 + i * 22} y={88 + 3 * 58 + 25} width="14" height="5" rx="1.5" fill="#d0d0d0" />
-            ))}
-            <text x={275 + 5 * 66 / 2} y={88 + 3 * 58 + 48} textAnchor="middle" fontSize="8" fill="#aaa">SWV readout contacts</text>
-
-            {/* Legend at bottom of chip */}
-            {Object.entries(POOL_COLORS).map(([id, col], i) => (
-              <g key={`pl-${id}`}>
-                <circle cx={30 + i * 80} cy={365} r="4" fill={col} />
-                <text x={38 + i * 80} y={369} fontSize="8" fill="#888">Pool {id}</text>
-              </g>
-            ))}
-            <g>
-              <circle cx={280} cy={365} r="3.5" fill="#3288bd" />
-              <text x={288} y={369} fontSize="8" fill="#888">Direct</text>
-            </g>
-            <g>
-              <circle cx={340} cy={365} r="3.5" fill="none" stroke="#3288bd" strokeWidth="1" />
-              <text x={348} y={369} fontSize="8" fill="#888">Proximity</text>
-            </g>
-            <g>
-              <rect x={410} y={361} width="10" height="8" rx="2" fill="none" stroke="#ef4444" strokeWidth="1" strokeDasharray="3 2" />
-              <text x={424} y={369} fontSize="8" fill="#888">Gap</text>
-            </g>
-          </svg>
+          </div>
         </div>
 
-        {/* Key stats row */}
-        <div style={{ display: "flex", gap: "8px", marginTop: "16px", flexWrap: "wrap", justifyContent: "center" }}>
-          {[
-            { label: "Integrated", desc: "Single paper-based device" },
-            { label: `${Object.keys(pooling.pools).length} pools`, desc: "Amplification sub-pools" },
-            { label: "15 pads", desc: "LIG electrode array" },
-            { label: "In situ", desc: "RNP complexation on-pad" },
-            { label: "SWV", desc: "Square-wave voltammetry" },
-          ].map(s => (
-            <div key={s.label} style={{ padding: "8px 16px", background: T.bgSub, borderRadius: "8px", border: `1px solid ${T.borderLight}`, textAlign: "center", minWidth: 100 }}>
-              <div style={{ fontSize: "14px", fontWeight: 800, fontFamily: MONO, color: T.primary }}>{s.label}</div>
-              <div style={{ fontSize: "9px", color: T.textTer }}>{s.desc}</div>
-            </div>
-          ))}
+        {/* Cross-reactivity note */}
+        <div style={{ padding: "10px 16px", background: "#22c55e08", borderLeft: `3px solid ${T.success}`, borderRadius: 4, fontSize: "12px", color: T.textSec, lineHeight: 1.6 }}>
+          <strong style={{ color: T.text }}>Cross-reactivity:</strong> Each pad is a physically isolated reaction chamber — crRNA cross-reactivity is eliminated by design. Amplicon cross-activation between pads is prevented by wax-printed hydrophobic barriers.
+          <span style={{ display: "block", marginTop: "6px", fontSize: "11px", color: T.textTer, fontStyle: "italic" }}>
+            Co-amplicon pairs (rpoB_H445Y/H445D, katG_S315T/S315N, embB_M306V/M306I, rpoB_S450L/S450W) share amplicons but have distinct crRNAs targeting different SNP positions within each pad.
+          </span>
         </div>
-      </div>
-
-      {/* Cross-reactivity summary */}
-      <div style={{ padding: "10px 16px", background: "#22c55e08", borderLeft: `3px solid ${T.success}`, borderRadius: 4, fontSize: "12px", color: T.textSec, lineHeight: 1.6, marginBottom: "4px" }}>
-        <strong style={{ color: T.text }}>Cross-reactivity:</strong> Amplicon-to-pad specificity validated by Bowtie2 alignment — no off-target activation predicted above 3× background. Co-amplicon pairs (rpoB_H445Y/H445D, katG_S315T/S315N, embB_M306V/M306I, rpoB_S450L/S450W) share amplicons but have distinct crRNAs targeting different SNP positions.
-      </div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Amplification Sub-Pools" defaultOpen={true} badge={{ text: `${Object.keys(pooling.pools).length} pools`, bg: "#ecf8f4", color: "#66c2a5" }}>
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>Amplification Sub-Pools</div>
-        <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
-          RPA primers are partitioned into amplification sub-pools to minimize within-pool primer dimer risk.
-          Primers for the same target must share a pool. Targets sharing an amplicon (e.g., rpoB_H445Y and rpoB_H445D)
-          must share a pool. Cross-pool dimers are irrelevant — primers in different chambers never meet.
-        </p>
+      {/* ═══════════ SECTION 2: Electrode Architecture ═══════════ */}
+      <CollapsibleSection title="Electrode Architecture" defaultOpen={false} badge={{ text: "E-CRISPR", bg: "#EFF6FF", color: "#2563EB" }}>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>E-CRISPR Electrode Stack</div>
+          <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "20px", lineHeight: 1.6 }}>
+            MB-ssDNA reporters thiol-bonded to AuNP-modified LIG electrodes. Signal-OFF mechanism: Cas12a trans-cleavage severs ssDNA
+            tethers, MB diffuses away from electrode surface, SWV peak at −0.22 V decreases proportionally to target abundance.
+          </p>
 
-        {/* Three pool cards */}
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3, 1fr)", gap: "12px", marginBottom: "16px" }}>
-          {Object.entries(pooling.pools).map(([poolId, targets]) => {
-            const stats = pooling.pool_stats[poolId] || {};
-            const color = POOL_COLORS[poolId] || "#6B7280";
-            const bgColor = POOL_BG[poolId] || T.bgSub;
-            return (
-              <div key={poolId} style={{ border: `2px solid ${color}`, borderRadius: "10px", overflow: "hidden" }}>
-                <div style={{ background: color, padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 800, color: "#fff", fontFamily: HEADING }}>POOL {poolId}</span>
-                  <span style={{ fontSize: "10px", color: "rgba(255,255,255,0.8)" }}>{stats.n_primers || targets.length * 2} primers</span>
+          {/* Before / After diagrams */}
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+            {[
+              { title: "BEFORE Cas12a activation", desc: "SWV: large MB peak · \u0394I% = 0 (baseline)", color: T.primary, items: ["MB probes intact", "ssDNA tethers connected", "Full electron transfer"] },
+              { title: "AFTER Cas12a activation", desc: "SWV: MB peak decreased · \u0394I% = 40\u201370%", color: T.success, items: ["MB diffused away", "ssDNA tethers cleaved", "Reduced electron transfer"] },
+            ].map(panel => (
+              <div key={panel.title} style={{ border: `2px solid ${panel.color}`, borderRadius: "10px", overflow: "hidden" }}>
+                <div style={{ background: panel.color, padding: "10px 16px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff", fontFamily: HEADING }}>{panel.title}</span>
                 </div>
-                <div style={{ padding: "14px 16px", background: bgColor }}>
-                  {targets.map(t => {
-                    const partner = coAmpliconPartner(t);
-                    const isFirst = partner ? t < partner : true;
-                    if (partner && !isFirst) return null; // show group only once
+                <div style={{ padding: "14px 16px", background: panel.color + "08" }}>
+                  {panel.items.map(item => (
+                    <div key={item} style={{ fontSize: "11px", color: T.textSec, padding: "2px 0", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ width: 5, height: 5, borderRadius: "50%", background: panel.color, flexShrink: 0 }} />
+                      {item}
+                    </div>
+                  ))}
+                  <div style={{ marginTop: "8px", fontSize: "10px", fontFamily: MONO, color: panel.color, fontWeight: 600 }}>{panel.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Layer stack */}
+          <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "12px" }}>
+            Electrode Cross-Section (6 layers)
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+            {[
+              { name: "Lyophilized reagents", color: "#f59e0b", textColor: "#78350f", desc: "RPA primers + crRNA + RPA enzyme mix (dried on SAM)", why: "Target-specific amplification and CRISPR detection reagents. Lyophilization preserves enzyme activity. Rehydration on sample application initiates one-pot reaction.", specs: "480 nM each primer, ~200 nM crRNA, 1\u00d7 RPA enzyme" },
+              { name: "MB (methylene blue)", color: "#2563EB", textColor: "#fff", desc: "Redox label, E\u00b0 \u2248 \u22120.22 V vs Ag/AgCl", why: "Electrochemically reversible redox indicator. MB works at negative potentials where O\u2082 interference is minimal. 2e\u207b transfer. Cleavage releases MB \u2192 signal decrease.", specs: "E\u00b0 = \u22120.22 V, 2e\u207b" },
+              { name: "ssDNA reporter", color: "#67e8f9", textColor: "#164e63", desc: "12\u201320 nt, poly-T preferred \u2014 sacrificial tether", why: "Trans-cleavage substrate for activated Cas12a. Poly-T preferred: highest trans-cleavage activity (Nalefski 2021). NOT dsDNA \u2014 Cas12a trans-cleavage is ssDNA-specific.", specs: "3\u2032-SH-C6-ssDNA(12\u201320nt)-MB-5\u2032" },
+              { name: "MCH backfill", color: "#86efac", textColor: "#14532d", desc: "6-Mercapto-1-hexanol (1 mM, 1 hr)", why: "Forces ssDNA reporters upright; blocks exposed Au from non-specific adsorption. Without MCH: reporters lie flat \u2192 MB always in contact \u2192 saturated signal \u2192 no dynamic range.", specs: "Dense SAM in gaps" },
+              { name: "AuNP", color: "#fbbf24", textColor: "#78350f", desc: "Electrodeposited from HAuCl\u2084 (\u22120.2 V, 30\u2013120 s)", why: "Provides thiol-Au anchor points (170 kJ/mol bond). Required for SAM formation on carbon. 20\u201350 nm particles; coverage verified by ECSA + CV in H\u2082SO\u2084.", specs: "20\u201350 nm, ECSA verified" },
+              { name: "LIG", color: "#9ca3af", textColor: "#fff", desc: "Laser-induced graphene (CO\u2082 laser, 4.8 W, 16 cm/s)", why: "Conductive porous carbon electrode. Sheet resistance 23 \u03a9/sq. Direct conversion from substrate, <$0.02/sensor, <2s fabrication. Porosity factor \u03b7 = 5.7.", specs: "23 \u03a9/sq, k\u2080 \u2248 0.01 cm/s" },
+              { name: "Substrate", color: "#e5e7eb", textColor: "#374151", desc: "Kapton HN (125 \u00b5m) or cellulose paper (CF3, Cytiva)", why: "Kapton: mechanical stability, commercial LIG substrate. Paper: capillary wicking for sample distribution. Substrate choice constrains fluidic architecture.", specs: "10\u00b9\u2077 \u03a9\u00b7cm resistivity" },
+            ].map((layer, i, arr) => (
+              <div key={layer.name}>
+                <div style={{ display: "flex", alignItems: "stretch" }}>
+                  <div style={{
+                    width: mobile ? "100%" : "55%", padding: "10px 16px", background: layer.color,
+                    borderRadius: i === 0 ? "8px 8px 0 0" : i === arr.length - 1 ? "0 0 8px 8px" : "0",
+                    display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: "44px",
+                  }}>
+                    <div>
+                      <div style={{ fontSize: "12px", fontWeight: 800, color: layer.textColor, fontFamily: HEADING }}>{layer.name}</div>
+                      <div style={{ fontSize: "10px", color: layer.textColor, opacity: 0.85 }}>{layer.desc}</div>
+                    </div>
+                    {!mobile && <div style={{ fontSize: "9px", color: layer.textColor, opacity: 0.7, fontFamily: MONO }}>{layer.specs}</div>}
+                  </div>
+                  {!mobile && (
+                    <details style={{ width: "45%", background: "#f9fafb", borderBottom: `1px solid ${T.borderLight}`, fontSize: "10px", color: T.textTer }}>
+                      <summary style={{ padding: "6px 12px", cursor: "pointer", fontWeight: 600, color: T.textSec, fontSize: "10px" }}>Why?</summary>
+                      <div style={{ padding: "4px 12px 8px", fontSize: "11px", color: T.textSec, lineHeight: 1.6 }}>{layer.why}</div>
+                    </details>
+                  )}
+                </div>
+                {mobile && (
+                  <details style={{ background: "#f9fafb", borderLeft: `3px solid ${layer.color}`, fontSize: "10px" }}>
+                    <summary style={{ padding: "4px 12px", cursor: "pointer", fontWeight: 600, color: T.textSec }}>Why {layer.name}?</summary>
+                    <div style={{ padding: "4px 12px 8px", fontSize: "11px", color: T.textSec, lineHeight: 1.6 }}>{layer.why}</div>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Signal transduction chain */}
+          <div style={{ marginTop: "24px", padding: "16px 18px", background: T.bgSub, borderRadius: "10px", border: `1px solid ${T.borderLight}` }}>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "10px" }}>Signal Transduction Chain</div>
+            {[
+              "Target DNA present in patient blood",
+              "RPA amplifies target using pad-specific primers (37\u00b0C, ~15 min)",
+              "Cas12a + crRNA form RNP in situ (Lesinski 2024; k_form ~ 10\u00b3\u201310\u2075 M\u207b\u00b9s\u207b\u00b9)",
+              "RNP recognizes amplified target \u2192 R-loop formation \u2192 cis-cleavage",
+              "RuvC domain unlocks \u2192 non-specific trans-cleavage activated",
+              "Trans-cleavage severs ssDNA tethers holding MB to electrode surface",
+              "MB-ssDNA fragments diffuse into bulk solution (beyond tunneling distance)",
+              "\u0394I% = (I\u2080 \u2212 I_after) / I\u2080 \u00d7 100 \u2014 measured by SWV at \u22120.22 V",
+              "\u0394I% > threshold (est. ~15%) \u2192 POSITIVE for this target",
+            ].map((step, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "6px" }}>
+                <span style={{ fontFamily: MONO, fontSize: "10px", color: T.primary, fontWeight: 700, minWidth: 18 }}>{i + 1}.</span>
+                <span style={{ fontSize: "11px", color: T.textSec, lineHeight: 1.5 }}>{step}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Two-electrode note */}
+          <div style={{ marginTop: "16px", padding: "14px 18px", background: "#EFF6FF", borderLeft: `3px solid #2563EB`, borderRadius: "0 8px 8px 0", fontSize: "12px", color: T.textSec, lineHeight: 1.7 }}>
+            <div style={{ fontWeight: 700, color: "#1e40af", fontFamily: HEADING, marginBottom: "6px", fontSize: "13px" }}>Two-Electrode Option</div>
+            <p style={{ margin: "0 0 6px 0" }}>
+              Bezinge et al. (2023, <em>ACS Sensors</em>) demonstrated two-electrode detection (WE + CE, no reference) on paper-based LIG
+              with a $3 reader. For the 15-pad array: 15 WE pads + 1 shared CE, chronoamperometry at fixed potential.
+            </p>
+            <p style={{ margin: 0, fontStyle: "italic", fontSize: "11px", color: T.textTer }}>
+              Trade-off: simpler electronics but less precise peak positioning than SWV with pseudo-reference. Both configurations to be evaluated during electrode characterisation.
+            </p>
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* ═══════════ SECTION 3: Detection Array Layout ═══════════ */}
+      <CollapsibleSection title="Detection Array Layout" defaultOpen={true} badge={{ text: "15 pads", bg: "#e8f4fa", color: "#3288bd" }}>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px", flexWrap: "wrap", gap: "8px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Detection Array Layout</div>
+            <div style={{ display: "flex", gap: "4px" }}>
+              {["drug", "strategy", "readiness"].map(mode => (
+                <button key={mode} onClick={() => setColorBy(mode)} style={{
+                  padding: "4px 12px", borderRadius: "6px", fontSize: "10px", fontWeight: 600, cursor: "pointer",
+                  border: `1px solid ${colorBy === mode ? T.primary : T.border}`,
+                  background: colorBy === mode ? T.primaryLight : T.bg,
+                  color: colorBy === mode ? T.primaryDark : T.textSec, fontFamily: FONT, textTransform: "capitalize",
+                }}>{mode}</button>
+              ))}
+            </div>
+          </div>
+          <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
+            Each E-CRISPR electrode pad (AuNP + thiol-ssDNA-MB) is pre-loaded with lyophilized RPA primers + crRNA + RPA enzyme mix.
+            Pads are physically isolated by wax-printed hydrophobic barriers. Layout optimized for capillary flow uniformity and
+            spatial separation of shared-amplicon targets.
+          </p>
+
+          {/* 5×3 Grid */}
+          <div style={{ border: "2px solid #d1d5db", borderRadius: "16px", padding: mobile ? "16px 12px" : "24px 20px", background: "#fafbfc", position: "relative", marginBottom: "16px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
+              {electrodeLayout.map((row, ri) => (
+                <div key={ri} style={{ display: "flex", gap: "6px" }}>
+                  {row.map((target, ci) => {
+                    const drug = targetDrug(target);
+                    const strategy = targetStrategy(target);
+                    const score = targetScore(target);
+                    const isCtrl = target === "IS6110_NON";
+                    const isPncA = target === "pncA_H57D";
+                    const parts = target.split("_");
+
+                    let borderCol, bgCol;
+                    if (colorBy === "readiness") {
+                      const gc = gradientColor(score);
+                      borderCol = gc; bgCol = gc + "22";
+                    } else if (colorBy === "drug") {
+                      borderCol = PAD_DRUG_COLORS[drug] || "#6B7280";
+                      bgCol = PAD_DRUG_BG[drug] || "#F3F4F6";
+                    } else {
+                      borderCol = strategy === "Direct" ? T.success : T.purple;
+                      bgCol = strategy === "Direct" ? "#DCFCE7" : "#DBEAFE";
+                    }
+
                     return (
-                      <div key={t} style={{ fontSize: "12px", fontWeight: 500, color: T.text, padding: "3px 0", fontFamily: MONO, display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: targetStrategy(t) === "Direct" ? T.success : T.purple, flexShrink: 0 }} />
-                        {partner ? (
-                          <span>{t.split("_")[0]}_{t.split("_")[1]}<span style={{ color: T.textTer }}>/</span>{partner.split("_")[1]} <span style={{ fontSize: "9px", color: T.textTer, fontFamily: FONT }}>(shared amp)</span></span>
-                        ) : (
-                          <span>{t}</span>
+                      <div key={`${ri}-${ci}`}
+                        onMouseEnter={() => setHoveredPad(target)}
+                        onMouseLeave={() => setHoveredPad(null)}
+                        style={{
+                          width: mobile ? 60 : 90, height: mobile ? 55 : 72, borderRadius: "10px",
+                          border: `2px solid ${(isPncA && !pncAResolved) ? T.danger : borderCol}`,
+                          borderStyle: (isPncA && !pncAResolved) ? "dashed" : "solid",
+                          background: bgCol, opacity: colorBy === "readiness" ? 1 : (0.6 + score * 0.4),
+                          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                          cursor: "pointer", position: "relative", transition: "all 0.15s",
+                          boxShadow: hoveredPad === target ? "0 4px 16px rgba(0,0,0,0.15)" : "inset 0 1px 3px rgba(0,0,0,0.05)",
+                          transform: hoveredPad === target ? "scale(1.06)" : "scale(1)",
+                        }}>
+                        <div style={{ fontSize: mobile ? "8px" : "10px", fontWeight: 700, fontFamily: MONO, color: colorBy === "readiness" ? T.text : borderCol, textAlign: "center", lineHeight: 1.2 }}>{parts[0]}</div>
+                        <div style={{ fontSize: mobile ? "7px" : "9px", fontWeight: 500, fontFamily: MONO, color: colorBy === "readiness" ? T.textSec : borderCol, textAlign: "center" }}>{parts[1] || ""}</div>
+                        <div style={{ fontSize: "7px", marginTop: "2px", display: "flex", alignItems: "center", gap: "2px" }}>
+                          <span style={{ color: T.textTer }}>{strategy === "Direct" ? "\u25cf" : "\u25d0"}</span>
+                          {isCtrl && <span style={{ fontSize: "6px", color: "#9CA3AF", fontWeight: 700 }}>CTRL</span>}
+                        </div>
+
+                        {hoveredPad === target && (
+                          <div style={{
+                            position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
+                            background: "#fff", border: `1px solid ${T.border}`, borderRadius: "8px", padding: "10px 14px",
+                            boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 100, whiteSpace: "nowrap", fontSize: "10px", minWidth: 160,
+                          }}>
+                            <div style={{ fontWeight: 700, fontSize: "11px", marginBottom: "4px", color: T.text }}>{target}</div>
+                            <div style={{ color: T.textSec }}>Drug: <strong>{drug}</strong></div>
+                            <div style={{ color: T.textSec }}>Strategy: <strong>{strategy}</strong></div>
+                            <div style={{ color: T.textSec }}>Score: <strong style={{ fontFamily: MONO }}>{score.toFixed(2)}</strong></div>
+                            <div style={{ color: T.textSec }}>Chamber: <strong>Independent one-pot</strong></div>
+                            {isCoAmplicon(target) && <div style={{ color: T.warning, fontSize: "9px", marginTop: "2px" }}>Shared amplicon with {coAmpliconPartner(target)}</div>}
+                            {isPncA && !pncAResolved && <div style={{ color: T.danger, fontSize: "9px", marginTop: "2px" }}>Panel gap \u2014 limited PAM availability</div>}
+                          </div>
                         )}
                       </div>
                     );
                   })}
-                  <div style={{ marginTop: "10px", paddingTop: "8px", borderTop: `1px solid ${color}33`, fontSize: "10px", color: T.textSec, display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                    <span>{stats.n_primers || targets.length * 2} primers</span>
-                    <span style={{ color: (stats.high_risk_dimers || 0) > 0 ? T.danger : T.success, fontWeight: 700 }}>{stats.high_risk_dimers || 0} HIGH dimers</span>
-                    {stats.worst_dg != null && stats.worst_dg < -4 && (
-                      <span style={{ fontFamily: MONO }}>worst: {stats.worst_dg} kcal/mol</span>
-                    )}
-                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              ))}
+            </div>
 
-        {/* Comparison stat */}
-        <div style={{ background: T.bgSub, borderRadius: "8px", padding: "14px 18px", border: `1px solid ${T.borderLight}`, fontSize: "12px", color: T.textSec, lineHeight: 1.6 }}>
-          <strong style={{ color: T.text }}>Original single-tube:</strong> {pooling.total_high_risk_single_tube} HIGH-risk dimers.{" "}
-          <strong style={{ color: T.text }}>After pooling:</strong>{" "}
-          {Object.entries(pooling.pool_stats).map(([id, s]) => `Pool ${id}: ${s.high_risk_dimers || 0}`).join(", ")}{" "}
-          (total: {pooling.total_high_risk_after_pooling}).{" "}
-          <strong style={{ color: T.success }}>Reduction: {pooling.reduction_pct}%</strong>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: 14, gap: 8, fontSize: "11px", color: T.textTer }}>
+              <span>SWV readout per pad</span>
+              <svg width="40" height="2"><line x1="0" y1="1" x2="40" y2="1" stroke="#aaa" strokeWidth="1" /></svg>
+              <span style={{ fontWeight: 600, color: T.textSec }}>Multiplexed potentiostat</span>
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap", fontSize: "10px", color: T.textSec }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ fontSize: "12px" }}>{"\u25cf"}</span> Direct detection</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ fontSize: "12px" }}>{"\u25d0"}</span> Proximity detection</span>
+            {!pncAResolved && <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: 16, height: 10, border: `2px dashed ${T.danger}`, borderRadius: 3, display: "inline-block" }} /> Panel gap</span>}
+            {colorBy === "readiness" && (
+              <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                <div style={{ width: 60, height: 8, borderRadius: 4, background: gradientCSS }} />
+                <span>Readiness</span>
+              </span>
+            )}
+          </div>
         </div>
-      </div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Detection Array Layout" defaultOpen={true} badge={{ text: "15 pads", bg: "#e8f4fa", color: "#3288bd" }}>
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px", flexWrap: "wrap", gap: "8px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Detection Array Layout</div>
-          <div style={{ display: "flex", gap: "4px" }}>
-            {["drug", "pool", "strategy", "readiness"].map(mode => (
-              <button key={mode} onClick={() => setColorBy(mode)} style={{
-                padding: "4px 12px", borderRadius: "6px", fontSize: "10px", fontWeight: 600, cursor: "pointer", border: `1px solid ${colorBy === mode ? T.primary : T.border}`,
-                background: colorBy === mode ? T.primaryLight : T.bg, color: colorBy === mode ? T.primaryDark : T.textSec, fontFamily: FONT, textTransform: "capitalize",
-              }}>{mode}</button>
+      {/* ═══════════ SECTION 4: Per-Pad Reagent Composition ═══════════ */}
+      <CollapsibleSection title="Per-Pad Reagent Composition" defaultOpen={false} badge={{ text: "one-pot", bg: "#FEF3C7", color: "#92400E" }}>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>Per-Pad Reagent Composition</div>
+          <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
+            Each pad is an independent one-pot reaction chamber. Lyophilized reagents are pre-deposited during manufacturing.
+            Sample buffer delivers the remaining components upon application.
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
+            {/* Lyophilized on pad */}
+            <div style={{ border: `2px solid #F59E0B`, borderRadius: "10px", overflow: "hidden" }}>
+              <div style={{ background: "#F59E0B", padding: "10px 16px" }}>
+                <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff", fontFamily: HEADING }}>Lyophilized on Pad</span>
+              </div>
+              <div style={{ padding: "14px 16px", background: "#FEF3C7", fontSize: "11px", color: T.textSec, lineHeight: 1.8 }}>
+                {[
+                  { reagent: "RPA primers (F + R)", conc: "480 nM each", note: "Target-specific" },
+                  { reagent: "crRNA", conc: "~200 nM", note: "Target-specific" },
+                  { reagent: "RPA enzyme mix", conc: "1\u00d7", note: "Bsu polymerase, UvsX, UvsY, Gp32" },
+                  { reagent: "dNTPs", conc: "Standard", note: "For RPA extension" },
+                ].map(r => (
+                  <div key={r.reagent} style={{ marginBottom: "4px" }}>
+                    <strong style={{ color: "#92400E" }}>{r.reagent}</strong>
+                    <span style={{ fontFamily: MONO, marginLeft: "6px" }}>{r.conc}</span>
+                    <span style={{ color: T.textTer, marginLeft: "6px", fontSize: "10px" }}>{r.note}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Arrives in sample buffer */}
+            <div style={{ border: `2px solid ${T.primary}`, borderRadius: "10px", overflow: "hidden" }}>
+              <div style={{ background: T.primary, padding: "10px 16px" }}>
+                <span style={{ fontSize: "12px", fontWeight: 800, color: "#fff", fontFamily: HEADING }}>Arrives in Sample Buffer</span>
+              </div>
+              <div style={{ padding: "14px 16px", background: "#EFF6FF", fontSize: "11px", color: T.textSec, lineHeight: 1.8 }}>
+                {[
+                  { reagent: "cfDNA template", conc: "Variable", note: "Extracted from blood" },
+                  { reagent: "Cas12a protein", conc: "50 nM", note: "Shared across all pads" },
+                  { reagent: "MgOAc", conc: "14 mM", note: "RPA + Cas12a cofactor" },
+                  { reagent: "Buffer components", conc: "1\u00d7", note: "Tris, KOAc, DTT" },
+                ].map(r => (
+                  <div key={r.reagent} style={{ marginBottom: "4px" }}>
+                    <strong style={{ color: "#1e40af" }}>{r.reagent}</strong>
+                    <span style={{ fontFamily: MONO, marginLeft: "6px" }}>{r.conc}</span>
+                    <span style={{ color: T.textTer, marginLeft: "6px", fontSize: "10px" }}>{r.note}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ marginTop: "12px", fontSize: "11px", color: T.textTer, fontStyle: "italic", lineHeight: 1.5 }}>
+            Each pad receives ~3.3 \u00b5L (50 \u00b5L eluate \u00f7 15 pads) via capillary distribution from the central application pad.
+            Rehydration of lyophilized reagents initiates the one-pot RPA + CRISPR reaction simultaneously on all 15 pads.
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* ═══════════ SECTION 5: Sample Preparation — Blood cfDNA ═══════════ */}
+      <CollapsibleSection title="Sample Preparation: Blood cfDNA" defaultOpen={false} badge={{ text: "blood cfDNA", bg: "#FEF3C7", color: "#92400E" }}>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>Sample Preparation: Blood cfDNA</div>
+          <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
+            Blood-based detection addresses the over-reliance on sputum samples. MTB circulating cell-free DNA (cfDNA) in blood
+            is present at 1\u2013100 copies/mL for active TB, 10\u2013100\u00d7 lower than sputum. Pre-concentration from 1\u20132 mL blood is required.
+          </p>
+
+          {/* Extraction protocol */}
+          <div style={{ padding: "16px 18px", background: "#FEF3C720", borderRadius: "10px", border: `1px solid #F59E0B30`, marginBottom: "20px" }}>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "#92400E", fontFamily: HEADING, marginBottom: "10px" }}>Extraction Protocol</div>
+            {[
+              "Blood (1\u20132 mL, venipuncture or finger-prick)",
+              "Chemical lysis (chaotropic salts + proteinase K, 10 min, 56\u00b0C)",
+              "cfDNA capture on silica magnetic beads (5 min, RT)",
+              "Magnetic separation + 2\u00d7 ethanol wash",
+              "Elution in 50 \u00b5L buffer containing Cas12a (50 nM) + MgOAc (14 mM)",
+              "Apply to cartridge central pad \u2192 capillary distribution to 15 pads",
+              "Each pad receives ~3.3 \u00b5L (50 \u00b5L \u00f7 15)",
+            ].map((step, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "5px" }}>
+                <span style={{ fontFamily: MONO, fontSize: "10px", color: "#B45309", fontWeight: 700, minWidth: 18 }}>{i + 1}.</span>
+                <span style={{ fontSize: "11px", color: T.textSec }}>{step}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Poisson table */}
+          <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "10px" }}>Template Distribution: Poisson Statistics</div>
+          <div style={{ overflowX: "auto", marginBottom: "16px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${T.border}` }}>
+                  {["Blood titer (cp/mL)", "Clinical context", "Total copies (60% yield)", "Copies/pad", "P(\u22651) single-copy", "P(\u22651) IS6110 (\u00d710)"].map(h => (
+                    <th key={h} style={{ textAlign: "center", padding: "8px 10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING, fontSize: "10px" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {poissonTable.map(row => (
+                  <tr key={row.titer} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                    <td style={{ textAlign: "center", padding: "8px 10px", fontWeight: 700, fontFamily: MONO }}>{row.titer}</td>
+                    <td style={{ textAlign: "center", padding: "8px 10px", fontSize: "10px", color: T.textSec }}>{row.context}</td>
+                    <td style={{ textAlign: "center", padding: "8px 10px", fontFamily: MONO }}>{row.total}</td>
+                    <td style={{ textAlign: "center", padding: "8px 10px", fontFamily: MONO }}>{row.perPad}</td>
+                    <td style={{ textAlign: "center", padding: "8px 10px" }}>
+                      <span style={{ padding: "2px 8px", borderRadius: "4px", fontWeight: 700, fontSize: "10px", fontFamily: MONO, background: poissonBg(row.pSingle), color: poissonColor(row.pSingle) }}>
+                        {(row.pSingle * 100).toFixed(0)}%
+                      </span>
+                    </td>
+                    <td style={{ textAlign: "center", padding: "8px 10px" }}>
+                      <span style={{ padding: "2px 8px", borderRadius: "4px", fontWeight: 700, fontSize: "10px", fontFamily: MONO, background: poissonBg(row.pIS), color: poissonColor(row.pIS) }}>
+                        {row.pIS >= 1 ? "~100%" : `${(row.pIS * 100).toFixed(0)}%`}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Key insight */}
+          <div style={{ padding: "12px 16px", background: "#EFF6FF", borderLeft: `3px solid ${T.primary}`, borderRadius: "0 8px 8px 0", fontSize: "12px", color: T.textSec, lineHeight: 1.6 }}>
+            <strong style={{ color: T.text }}>Key Insight:</strong> At low blood titers (&lt;10 cp/mL), the IS6110 multi-copy species control
+            (6\u201316 copies per genome) reliably confirms MTB presence while individual single-copy resistance genes have ~33% per-pad
+            detection probability. At moderate titers (&gt;50 cp/mL), all 14 targets exceed 86% detection probability.
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* ═══════════ SECTION 6: In Situ RNP Formation Kinetics ═══════════ */}
+      <CollapsibleSection title="In Situ RNP Formation Kinetics" defaultOpen={false} badge={{ text: kinetics.totals?.total_electrode || "30\u201350 min", bg: "#22c55e20", color: "#22c55e" }}>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>In Situ RNP Formation Kinetics</div>
+          <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
+            In situ RNP formation is integral to the per-pad one-pot architecture. Cas12a protein arrives in the sample buffer
+            and encounters pad-specific lyophilized crRNA upon rehydration. Gradual RNP formation (Lesinski et al. 2024, <em>Anal. Chem.</em>)
+            limits early cis-cleavage competition with RPA — critical at the low template concentrations expected from blood cfDNA.
+          </p>
+
+          <div style={{ overflowX: "auto", marginBottom: "16px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${T.border}` }}>
+                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>Phase</th>
+                  <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>Solution (lower bound)</th>
+                  <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>On-electrode (estimated)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(kinetics.phases || []).map((phase, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}`, background: phase.is_bottleneck ? "#2563EB08" : "transparent" }}>
+                    <td style={{ padding: "8px 12px", fontWeight: phase.is_bottleneck ? 600 : 400 }}>
+                      {phase.phase}
+                      {phase.is_bottleneck && <span style={{ fontSize: "9px", fontWeight: 700, color: "#2563EB", marginLeft: "8px", padding: "1px 6px", background: "#2563EB15", borderRadius: "4px" }}>RATE-LIMITING</span>}
+                    </td>
+                    <td style={{ textAlign: "center", padding: "8px 12px", color: T.textSec, fontFamily: MONO }}>{phase.solution_bound}</td>
+                    <td style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600, fontFamily: MONO }}>{phase.on_electrode}</td>
+                  </tr>
+                ))}
+                <tr style={{ borderTop: `2px solid ${T.border}`, fontWeight: 700 }}>
+                  <td style={{ padding: "8px 12px" }}>Detection total</td>
+                  <td style={{ textAlign: "center", padding: "8px 12px", fontFamily: MONO }}>{kinetics.totals?.detection_solution || "~6\u20138 min"}</td>
+                  <td style={{ textAlign: "center", padding: "8px 12px", fontFamily: MONO }}>{kinetics.totals?.detection_electrode || "15\u201330 min"}</td>
+                </tr>
+                <tr style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                  <td style={{ padding: "8px 12px", color: T.textSec }}>+ RPA amplification</td>
+                  <td style={{ textAlign: "center", padding: "8px 12px", color: T.textTer, fontFamily: MONO }}>{kinetics.totals?.rpa_time || "15\u201320 min"}</td>
+                  <td style={{ textAlign: "center", padding: "8px 12px", color: T.textTer, fontFamily: MONO }}>{kinetics.totals?.rpa_time || "15\u201320 min"}</td>
+                </tr>
+                <tr style={{ borderTop: `2px solid ${T.border}`, fontWeight: 700, fontSize: "14px" }}>
+                  <td style={{ padding: "10px 12px" }}>Assay total</td>
+                  <td style={{ textAlign: "center", padding: "10px 12px", fontFamily: MONO }}>{kinetics.totals?.total_solution || "~23\u201328 min"}</td>
+                  <td style={{ textAlign: "center", padding: "10px 12px", fontFamily: MONO }}>{kinetics.totals?.total_electrode || "30\u201350 min"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div style={{ marginBottom: "16px", padding: "8px 14px", borderRadius: "6px", background: "#22c55e12", borderLeft: `3px solid ${T.success}`, fontSize: "12px", color: T.textSec }}>
+            WHO TPP target: {kinetics.totals?.who_tpp_target || "< 120 min"}. Estimated total: {kinetics.totals?.total_electrode || "30\u201350 min"} — <strong style={{ color: T.success }}>within target</strong> with 2-4\u00d7 margin.
+          </div>
+
+          <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "8px", padding: "14px 18px" }}>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "#2563EB", fontFamily: HEADING, marginBottom: "8px" }}>Key Insights</div>
+            {(kinetics.insights || []).map((ins, i) => (
+              <div key={i} style={{ marginBottom: i < (kinetics.insights || []).length - 1 ? "8px" : 0 }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#2563EB", opacity: 0.9 }}>{i + 1}. {ins.title}</div>
+                <p style={{ fontSize: "11px", color: "#4a3d8f", lineHeight: 1.6, margin: "2px 0 0", opacity: 0.8 }}>{ins.text}</p>
+              </div>
             ))}
           </div>
         </div>
-        <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
-          Each LIG electrode pad is pre-loaded with a lyophilized crRNA and MB-ssDNA reporter. Pads are physically isolated
-          by wax-printed hydrophobic barriers. Layout is optimized for: (1) capillary flow uniformity, (2) spatial separation
-          of shared-amplicon targets, (3) IS6110 control positioned for earliest readout.
-        </p>
+      </CollapsibleSection>
 
-        {/* 5×3 Grid of electrode pads — chip frame */}
-        <div style={{ border: "2px solid #d1d5db", borderRadius: "16px", padding: mobile ? "16px 12px" : "24px 20px", background: "#fafbfc", position: "relative", marginBottom: "16px" }}>
-          {/* Flow input indicators */}
-          {!mobile && <div style={{ position: "absolute", left: -32, top: "50%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", gap: 14 }}>
-            {Object.entries(POOL_COLORS).map(([id, col]) => (
-              <div key={id} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{ width: 20, height: 3, background: col, borderRadius: 2 }} />
-                <span style={{ fontSize: "7px", color: col, fontWeight: 700 }}>{id}</span>
+      {/* ═══════════ SECTION 7: GUARD Electrochemical Predictions ═══════════ */}
+      <CollapsibleSection title="Predicted Electrochemical Performance" defaultOpen={true} badge={{ text: "simulated", bg: "#DBEAFE", color: "#2563EB" }}>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
+
+          {/* 7A: ΔI% Prediction Envelope */}
+          <div style={{ marginBottom: "32px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "6px" }}>
+              7A. Per-Candidate \u0394I% Prediction Envelope
+            </div>
+            <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "12px", lineHeight: 1.6 }}>
+              GUARD predicts trans-cleavage efficiency as S_eff \u2208 [0, 1]. Since k_trans_surface is unmeasured, three scenarios
+              bracket the expected electrochemical signal. Even in the conservative scenario, all candidates exceed the 3\u03c3 detection threshold.
+            </p>
+
+            {/* Scenario legend */}
+            <div style={{ display: "flex", gap: "12px", marginBottom: "12px", flexWrap: "wrap" }}>
+              {scenarios.map(s => (
+                <div key={s.label} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", color: T.textSec }}>
+                  <div style={{ width: 14, height: 10, borderRadius: 2, background: s.color }} />
+                  <span><strong>{s.label}</strong> (k={s.k} s\u207b\u00b9, \u0394I% = {s.factor} \u00d7 S_eff)</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Bar chart */}
+            <div style={{ width: "100%", height: 320 }}>
+              <ResponsiveContainer>
+                <BarChart data={diPredictions} margin={{ top: 10, right: 20, left: 10, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="target" angle={-45} textAnchor="end" fontSize={9} fontFamily={MONO} interval={0} height={60} />
+                  <YAxis label={{ value: "\u0394I% (predicted)", angle: -90, position: "insideLeft", fontSize: 10 }} fontSize={10} />
+                  <Tooltip
+                    contentStyle={{ fontFamily: MONO, fontSize: 11 }}
+                    formatter={(val, name) => [`${val.toFixed(1)}%`, name]}
+                  />
+                  <ReferenceLine y={15} stroke="#ef4444" strokeDasharray="6 3" label={{ value: "3\u03c3 threshold (15%)", position: "right", fontSize: 9, fill: "#ef4444" }} />
+                  <Bar dataKey="conservative" fill="#bfdbfe" name="Conservative" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="expected" fill="#2563EB" name="Expected" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="optimised" fill="#1e3a5f" name="Optimised" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div style={{ fontSize: "11px", color: T.textTer, fontStyle: "italic", marginTop: "6px" }}>
+              Expected scenario matches published E-CRISPR results on gold (Dai 2019: 40\u201370% \u0394I%). Conservative scenario assumes poor surface chemistry; optimised assumes dense SAM + long incubation.
+            </div>
+          </div>
+
+          {/* 7B: Discrimination Ratio Transfer */}
+          <div style={{ marginBottom: "32px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "6px" }}>
+              7B. Discrimination Ratio Transfer
+            </div>
+            <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "8px", lineHeight: 1.6 }}>
+              The MUT/WT discrimination ratio transfers directly from GUARD predictions to electrochemical measurements
+              because the transfer function cancels in the ratio:
+            </p>
+            <div style={{ padding: "10px 16px", background: T.bgSub, borderRadius: "8px", fontFamily: MONO, fontSize: "12px", color: T.text, marginBottom: "12px", textAlign: "center" }}>
+              D_echem = \u0394I%_MUT / \u0394I%_WT = (f \u00d7 S_MUT) / (f \u00d7 S_WT) = S_MUT / S_WT = D_GUARD
+            </div>
+
+            {discData.length > 0 && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                  <thead>
+                    <tr style={{ borderBottom: `2px solid ${T.border}` }}>
+                      {["Target", "GUARD Disc (\u00d7)", "Echem Disc (\u00d7)", "Min \u0394I%_WT (expected)", "Diagnostic grade?"].map(h => (
+                        <th key={h} style={{ textAlign: "center", padding: "8px 10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING, fontSize: "10px" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {discData.map(d => (
+                      <tr key={d.target} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                        <td style={{ padding: "8px 10px", fontWeight: 600, fontFamily: MONO }}>{d.target}</td>
+                        <td style={{ textAlign: "center", padding: "8px 10px", fontFamily: MONO, fontWeight: 700, color: d.guardDisc >= 5 ? T.success : d.guardDisc >= 3 ? T.warning : T.danger }}>{d.guardDisc.toFixed(1)}\u00d7</td>
+                        <td style={{ textAlign: "center", padding: "8px 10px", fontFamily: MONO }}>~{d.echemDisc.toFixed(1)}\u00d7</td>
+                        <td style={{ textAlign: "center", padding: "8px 10px", fontFamily: MONO }}>{d.minWtDi}%</td>
+                        <td style={{ textAlign: "center", padding: "8px 10px" }}>
+                          <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: d.grade === "Yes" ? "#DCFCE7" : d.grade === "Borderline" ? "#FEF3C7" : "#FEE2E2", color: d.grade === "Yes" ? T.success : d.grade === "Borderline" ? T.warning : T.danger }}>{d.grade}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </div>}
+            )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "center" }}>
-          {pooling.electrode_layout.map((row, ri) => (
-            <div key={ri} style={{ display: "flex", gap: "6px" }}>
-              {row.map((target, ci) => {
-                const drug = targetDrug(target);
-                const pool = pooling.target_to_pool[target] || "?";
-                const strategy = targetStrategy(target);
-                const score = targetScore(target);
-                const isCtrl = target === "IS6110_NON";
-                const isPncA = target === "pncA_H57D";
-                const parts = target.split("_");
+            {discData.some(d => d.guardDisc < 4) && (
+              <div style={{ marginTop: "10px", padding: "10px 14px", background: "#FEF3C7", borderLeft: `3px solid ${T.warning}`, borderRadius: "0 6px 6px 0", fontSize: "11px", color: T.textSec, lineHeight: 1.5 }}>
+                <strong style={{ color: "#92400E" }}>Note:</strong> Candidates with discrimination &lt;4\u00d7 have WT signal above the 15% detection threshold.
+                A simple threshold-based binary call cannot distinguish MUT from WT — requires quantitative \u0394I% measurement with \u22645% CV.
+              </div>
+            )}
+          </div>
 
-                let borderCol, bgCol;
-                if (colorBy === "readiness") {
-                  const gc = gradientColor(score);
-                  borderCol = gc;
-                  bgCol = gc + "22";
-                } else if (colorBy === "drug") {
-                  borderCol = PAD_DRUG_COLORS[drug] || "#6B7280";
-                  bgCol = PAD_DRUG_BG[drug] || "#F3F4F6";
-                } else if (colorBy === "pool") {
-                  borderCol = POOL_COLORS[pool] || "#6B7280";
-                  bgCol = POOL_BG[pool] || "#F3F4F6";
-                } else {
-                  borderCol = strategy === "Direct" ? T.success : T.purple;
-                  bgCol = strategy === "Direct" ? "#DCFCE7" : "#DBEAFE";
-                }
+          {/* 7C: Panel-Level Sensitivity vs Blood Titer */}
+          <div style={{ marginBottom: "32px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "6px" }}>
+              7C. Panel-Level Sensitivity vs Blood Titer
+            </div>
+            <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "12px", lineHeight: 1.6 }}>
+              At what blood cfDNA concentration can we reliably detect resistance to each drug class?
+              P(detect) = P(template\u22651) \u00d7 P(RPA) \u00d7 P(\u0394I%&gt;threshold) per target, chained across all targets in a drug class.
+            </p>
 
+            <div style={{ width: "100%", height: 360 }}>
+              <ResponsiveContainer>
+                <LineChart data={sensitivityData} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="titer" scale="log" domain={[1, 1000]} type="number" fontSize={10} fontFamily={MONO}
+                    label={{ value: "Blood cfDNA (cp/mL)", position: "bottom", fontSize: 10 }}
+                    tickFormatter={v => v} ticks={[1, 5, 10, 50, 100, 500, 1000]} />
+                  <YAxis domain={[0, 100]} fontSize={10} label={{ value: "Detection probability (%)", angle: -90, position: "insideLeft", fontSize: 10 }} />
+                  <Tooltip contentStyle={{ fontFamily: MONO, fontSize: 10 }} formatter={(val) => [`${val.toFixed(1)}%`]} />
+                  <Legend verticalAlign="top" height={36} iconType="line" />
+
+                  {/* WHO TPP threshold lines */}
+                  <ReferenceLine y={95} stroke="#ef4444" strokeDasharray="6 3" strokeOpacity={0.5} />
+                  <ReferenceLine y={90} stroke="#f59e0b" strokeDasharray="6 3" strokeOpacity={0.5} />
+                  <ReferenceLine y={80} stroke="#6b7280" strokeDasharray="6 3" strokeOpacity={0.5} />
+
+                  <Line type="monotone" dataKey="IS6110" stroke={DRUG_LINE_COLORS.IS6110} strokeWidth={2.5} dot={false} strokeDasharray="6 3" name="IS6110 (ctrl)" />
+                  <Line type="monotone" dataKey="RIF" stroke={DRUG_LINE_COLORS.RIF} strokeWidth={2} dot={false} name="RIF (5 targets)" />
+                  <Line type="monotone" dataKey="INH" stroke={DRUG_LINE_COLORS.INH} strokeWidth={2} dot={false} name="INH (3 targets)" />
+                  <Line type="monotone" dataKey="FQ" stroke={DRUG_LINE_COLORS.FQ} strokeWidth={2} dot={false} name="FQ (2 targets)" />
+                  <Line type="monotone" dataKey="EMB" stroke={DRUG_LINE_COLORS.EMB} strokeWidth={2} dot={false} name="EMB (2 targets)" />
+                  <Line type="monotone" dataKey="PZA" stroke={DRUG_LINE_COLORS.PZA} strokeWidth={1.5} dot={false} name="PZA (1 target)" />
+                  <Line type="monotone" dataKey="AG" stroke={DRUG_LINE_COLORS.AG} strokeWidth={1.5} dot={false} name="AG (1 target)" />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap", marginTop: "8px", fontSize: "9px", color: T.textTer }}>
+              <span>\u2014\u2014\u2014 95%: RIF WHO TPP</span>
+              <span>\u2014\u2014\u2014 90%: INH/FQ WHO TPP</span>
+              <span>\u2014\u2014\u2014 80%: EMB/PZA/AG WHO TPP</span>
+            </div>
+
+            <div style={{ marginTop: "12px", padding: "12px 16px", background: "#EFF6FF", borderLeft: `3px solid ${T.primary}`, borderRadius: "0 8px 8px 0", fontSize: "12px", color: T.textSec, lineHeight: 1.6 }}>
+              <strong style={{ color: T.text }}>Key Insight:</strong> Drug classes with multiple targets (RIF: 5, INH: 3) achieve WHO TPP
+              sensitivity thresholds at lower blood titers than single-target classes (AG, PZA) due to target redundancy.
+              RIF sensitivity exceeds 95% at ~15 cp/mL because <em>any</em> of the 5 rpoB mutations being detected is sufficient.
+            </div>
+          </div>
+
+          {/* 7D: Time-to-Detection */}
+          <div style={{ marginBottom: "32px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "6px" }}>
+              7D. Time-to-Detection Estimate Per Pad
+            </div>
+            <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "12px", lineHeight: 1.6 }}>
+              Three phases run sequentially on each pad. All 15 pads run in parallel — total assay time equals the slowest pad (~30\u201350 min).
+            </p>
+
+            <div style={{ overflowX: "auto" }}>
+              {timeEstimates.slice(0, 6).map(te => {
+                const totalRange = te.totalMax - te.totalMin;
+                const maxTime = 55;
                 return (
-                  <div key={`${ri}-${ci}`}
-                    onMouseEnter={() => setHoveredPad(target)}
-                    onMouseLeave={() => setHoveredPad(null)}
-                    style={{
-                      width: mobile ? 60 : 90, height: mobile ? 55 : 72, borderRadius: "10px",
-                      border: `2px solid ${isPncA ? T.danger : borderCol}`,
-                      borderStyle: isPncA ? "dashed" : "solid",
-                      background: bgCol, opacity: colorBy === "readiness" ? 1 : (0.6 + score * 0.4),
-                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                      cursor: "pointer", position: "relative", transition: "all 0.15s",
-                      boxShadow: hoveredPad === target ? "0 4px 16px rgba(0,0,0,0.15)" : "inset 0 1px 3px rgba(0,0,0,0.05)",
-                      transform: hoveredPad === target ? "scale(1.06)" : "scale(1)",
-                    }}>
-                    <div style={{ fontSize: mobile ? "8px" : "10px", fontWeight: 700, fontFamily: MONO, color: colorBy === "readiness" ? T.text : borderCol, textAlign: "center", lineHeight: 1.2 }}>
-                      {parts[0]}
-                    </div>
-                    <div style={{ fontSize: mobile ? "7px" : "9px", fontWeight: 500, fontFamily: MONO, color: colorBy === "readiness" ? T.textSec : borderCol, textAlign: "center" }}>
-                      {parts[1] || ""}
-                    </div>
-                    <div style={{ fontSize: "7px", marginTop: "2px", display: "flex", alignItems: "center", gap: "2px" }}>
-                      <span style={{ color: T.textTer }}>{strategy === "Direct" ? "●" : "◐"}</span>
-                      {isCtrl && <span style={{ fontSize: "6px", color: "#9CA3AF", fontWeight: 700 }}>CTRL</span>}
-                    </div>
-
-                    {/* Hover tooltip */}
-                    {hoveredPad === target && (
-                      <div style={{
-                        position: "absolute", bottom: "calc(100% + 8px)", left: "50%", transform: "translateX(-50%)",
-                        background: "#fff", border: `1px solid ${T.border}`, borderRadius: "8px", padding: "10px 14px",
-                        boxShadow: "0 4px 16px rgba(0,0,0,0.1)", zIndex: 100, whiteSpace: "nowrap", fontSize: "10px", minWidth: 160,
-                      }}>
-                        <div style={{ fontWeight: 700, fontSize: "11px", marginBottom: "4px", color: T.text }}>{target}</div>
-                        <div style={{ color: T.textSec }}>Drug: <strong>{drug}</strong></div>
-                        <div style={{ color: T.textSec }}>Pool: <strong style={{ color: POOL_COLORS[pool] }}>Pool {pool}</strong></div>
-                        <div style={{ color: T.textSec }}>Strategy: <strong>{strategy}</strong></div>
-                        <div style={{ color: T.textSec }}>Score: <strong style={{ fontFamily: MONO }}>{score.toFixed(2)}</strong></div>
-                        {isCoAmplicon(target) && <div style={{ color: T.warning, fontSize: "9px", marginTop: "2px" }}>Shared amplicon with {coAmpliconPartner(target)}</div>}
-                        {isPncA && <div style={{ color: T.danger, fontSize: "9px", marginTop: "2px" }}>Panel gap — limited PAM availability</div>}
+                  <div key={te.target} style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                    <div style={{ width: 100, fontSize: "10px", fontFamily: MONO, fontWeight: 600, textAlign: "right", flexShrink: 0 }}>{te.target.length > 14 ? te.target.replace("_", "\n") : te.target}</div>
+                    <div style={{ flex: 1, display: "flex", height: 20, borderRadius: 4, overflow: "hidden", background: "#f3f4f6" }}>
+                      <div style={{ width: `${(te.rpaMax / maxTime) * 100}%`, background: "#93c5fd", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: "8px", color: "#1e40af", fontWeight: 600 }}>{te.rpaMin}\u2013{te.rpaMax}</span>
                       </div>
-                    )}
+                      <div style={{ width: `${(te.rnpMax / maxTime) * 100}%`, background: "#c4b5fd", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: "8px", color: "#5b21b6", fontWeight: 600 }}>{te.rnpMin}\u2013{te.rnpMax}</span>
+                      </div>
+                      <div style={{ width: `${(te.mbMax / maxTime) * 100}%`, background: "#86efac", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <span style={{ fontSize: "8px", color: "#166534", fontWeight: 600 }}>{te.mbMin}\u2013{te.mbMax}</span>
+                      </div>
+                    </div>
+                    <div style={{ width: 60, fontSize: "10px", fontFamily: MONO, color: T.textSec, flexShrink: 0 }}>{te.totalMin}\u2013{te.totalMax} min</div>
                   </div>
                 );
               })}
             </div>
-          ))}
-          </div>
 
-          {/* Readout connector */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginTop: 14, gap: 8, fontSize: "11px", color: T.textTer }}>
-            <span>SWV readout per pad</span>
-            <svg width="40" height="2"><line x1="0" y1="1" x2="40" y2="1" stroke="#aaa" strokeWidth="1" /></svg>
-            <span style={{ fontWeight: 600, color: T.textSec }}>Multiplexed potentiostat</span>
-          </div>
-        </div>
-
-        {/* Legend */}
-        <div style={{ display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap", fontSize: "10px", color: T.textSec }}>
-          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ fontSize: "12px" }}>●</span> Direct detection</span>
-          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ fontSize: "12px" }}>◐</span> Proximity detection</span>
-          <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: 16, height: 10, border: `2px dashed ${T.danger}`, borderRadius: 3, display: "inline-block" }} /> Panel gap</span>
-          {colorBy === "readiness" && (
-            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-              <div style={{ width: 60, height: 8, borderRadius: 4, background: gradientCSS }} />
-              <span>Readiness</span>
-            </span>
-          )}
-        </div>
-        <p style={{ fontSize: "10px", color: T.textTer, marginTop: "8px", textAlign: "center", fontStyle: "italic" }}>
-          Layout optimized for: (1) IS6110 control at P1 for earliest capillary arrival, (2) shared-amplicon targets on adjacent pads, (3) drug classes grouped for visual interpretation.
-        </p>
-      </div>
-      </CollapsibleSection>
-
-      <CollapsibleSection title="In Situ RNP Formation Kinetics" defaultOpen={false} badge={{ text: kinetics.totals?.total_electrode || "30\u201350 min", bg: "#22c55e20", color: "#22c55e" }}>
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>In Situ RNP Formation Kinetics</div>
-        <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
-          Cas12a protein and pre-dried crRNA form the active RNP complex on-pad during the assay (Lesinski et al. 2024).
-          Solution-phase kinetics provide a lower bound on detection time. On-electrode estimates account for crRNA
-          rehydration, diffusion in porous LIG, and surface-tethered reporter cleavage — the dominant rate-limiting step.
-        </p>
-
-        {/* Phase breakdown table — solution vs on-electrode */}
-        <div style={{ overflowX: "auto", marginBottom: "16px" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
-            <thead>
-              <tr style={{ borderBottom: `2px solid ${T.border}` }}>
-                <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>Phase</th>
-                <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>Solution (lower bound)</th>
-                <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>On-electrode (estimated)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(kinetics.phases || []).map((phase, i) => (
-                <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}`, background: phase.is_bottleneck ? "#2563EB08" : "transparent" }}>
-                  <td style={{ padding: "8px 12px", fontWeight: phase.is_bottleneck ? 600 : 400 }}>
-                    {phase.phase}
-                    {phase.is_bottleneck && (
-                      <span style={{ fontSize: "9px", fontWeight: 700, color: "#2563EB", marginLeft: "8px", padding: "1px 6px", background: "#2563EB15", borderRadius: "4px" }}>RATE-LIMITING</span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: "center", padding: "8px 12px", color: T.textSec, fontFamily: MONO }}>{phase.solution_bound}</td>
-                  <td style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600, fontFamily: MONO }}>{phase.on_electrode}</td>
-                </tr>
-              ))}
-              {/* Detection total */}
-              <tr style={{ borderTop: `2px solid ${T.border}`, fontWeight: 700 }}>
-                <td style={{ padding: "8px 12px" }}>Detection total</td>
-                <td style={{ textAlign: "center", padding: "8px 12px", fontFamily: MONO }}>{kinetics.totals?.detection_solution || "~6\u20138 min"}</td>
-                <td style={{ textAlign: "center", padding: "8px 12px", fontFamily: MONO }}>{kinetics.totals?.detection_electrode || "15\u201330 min"}</td>
-              </tr>
-              <tr style={{ borderBottom: `1px solid ${T.borderLight}` }}>
-                <td style={{ padding: "8px 12px", color: T.textSec }}>+ RPA amplification</td>
-                <td style={{ textAlign: "center", padding: "8px 12px", color: T.textTer, fontFamily: MONO }}>{kinetics.totals?.rpa_time || "15\u201320 min"}</td>
-                <td style={{ textAlign: "center", padding: "8px 12px", color: T.textTer, fontFamily: MONO }}>{kinetics.totals?.rpa_time || "15\u201320 min"}</td>
-              </tr>
-              <tr style={{ borderTop: `2px solid ${T.border}`, fontWeight: 700, fontSize: "14px" }}>
-                <td style={{ padding: "10px 12px" }}>Assay total</td>
-                <td style={{ textAlign: "center", padding: "10px 12px", fontFamily: MONO }}>{kinetics.totals?.total_solution || "~23\u201328 min"}</td>
-                <td style={{ textAlign: "center", padding: "10px 12px", fontFamily: MONO }}>{kinetics.totals?.total_electrode || "30\u201350 min"}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        {/* WHO TPP compliance */}
-        <div style={{ marginBottom: "16px", padding: "8px 14px", borderRadius: "6px", background: "#22c55e12", borderLeft: `3px solid ${T.success}`, fontSize: "12px", color: T.textSec }}>
-          WHO TPP target: {kinetics.totals?.who_tpp_target || "< 120 min"}. Estimated total: {kinetics.totals?.total_electrode || "30\u201350 min"} — <strong style={{ color: T.success }}>within target</strong> with 2-4× margin for optimization.
-        </div>
-
-        {/* Key Insights callout */}
-        <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "8px", padding: "14px 18px", marginBottom: "12px" }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#2563EB", fontFamily: HEADING, marginBottom: "8px" }}>Key Insights</div>
-          {(kinetics.insights || []).map((ins, i) => (
-            <div key={i} style={{ marginBottom: i < (kinetics.insights || []).length - 1 ? "8px" : 0 }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "#2563EB", opacity: 0.9 }}>{i + 1}. {ins.title}</div>
-              <p style={{ fontSize: "11px", color: "#4a3d8f", lineHeight: 1.6, margin: "2px 0 0", opacity: 0.8 }}>{ins.text}</p>
+            <div style={{ display: "flex", gap: "12px", marginTop: "8px", fontSize: "9px", color: T.textTer }}>
+              <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: 10, height: 8, borderRadius: 2, background: "#93c5fd", display: "inline-block" }} /> RPA amplification</span>
+              <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: 10, height: 8, borderRadius: 2, background: "#c4b5fd", display: "inline-block" }} /> RNP formation</span>
+              <span style={{ display: "flex", alignItems: "center", gap: "4px" }}><span style={{ width: 10, height: 8, borderRadius: 2, background: "#86efac", display: "inline-block" }} /> MB cleavage</span>
             </div>
-          ))}
-        </div>
 
-      </div>
+            <div style={{ marginTop: "10px", fontSize: "11px", color: T.textTer, fontStyle: "italic" }}>
+              Absolute time estimates depend on the unmeasured surface trans-cleavage rate. These ranges bracket the uncertainty. The first electrode experiments will calibrate the model.
+            </div>
+          </div>
+
+          {/* 7E: Experimental Priorities */}
+          <div>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "6px" }}>
+              7E. Experimental Priority: What to Measure First
+            </div>
+            <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "12px", lineHeight: 1.6 }}>
+              The following 5 experiments maximally reduce uncertainty in the electrochemical performance model:
+            </p>
+
+            {[
+              { priority: 1, title: "Measure k_trans_surface", desc: "Incubate pre-formed RNP + target DNA with MB-ssDNA-modified LIG electrode; time-course SWV every 5 min. Fit \u0394I% vs time to first-order kinetics. One experiment, one number, reduces all prediction envelopes to a single line." },
+              { priority: 2, title: "Validate rpoB_H445Y (best candidate)", desc: "Highest predicted discrimination (12.5\u00d7). Run MUT and WT synthetic targets. If electrochemical disc \u2248 12.5\u00d7, the GUARD transfer assumption is confirmed." },
+              { priority: 3, title: "Validate rrs_A1401G (borderline candidate)", desc: "Lowest discrimination (3.0\u00d7). If it works on the electrode, everything else will too. If it fails, defines the discrimination floor." },
+              { priority: 4, title: "Test IS6110 at limiting dilution", desc: "Serial dilution of synthetic IS6110 target on a single E-CRISPR pad. Determines the actual limit of detection. Anchors the Poisson sensitivity curves." },
+              { priority: 5, title: "Measure electrode-to-electrode CV", desc: "Run 10 identical pads with the same target at the same concentration. The RSD determines the 3\u03c3 detection threshold and thus the minimum \u0394I% for a positive call." },
+            ].map(exp => (
+              <div key={exp.priority} style={{ display: "flex", gap: "12px", marginBottom: "12px", alignItems: "flex-start" }}>
+                <div style={{ width: 28, height: 28, borderRadius: "50%", background: T.primary, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "13px", fontFamily: MONO, flexShrink: 0 }}>{exp.priority}</div>
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: 700, color: T.text, marginBottom: "2px" }}>{exp.title}</div>
+                  <div style={{ fontSize: "11px", color: T.textSec, lineHeight: 1.5 }}>{exp.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </CollapsibleSection>
 
+      {/* ═══════════ SECTION 8: AS-RPA Thermodynamic Discrimination ═══════════ */}
       {results.some(r => r.asrpaDiscrimination) && (
       <CollapsibleSection title="AS-RPA Thermodynamic Discrimination" defaultOpen={false} badge={{ text: `${proximityCount} proximity`, bg: "#e8f4fa", color: "#3288bd" }}>
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
           <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>AS-RPA Thermodynamic Discrimination</div>
           <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "8px", lineHeight: 1.6 }}>
-            Proximity candidates use allele-specific RPA primers for discrimination. The 3′ terminal mismatch
-            identity determines extension blocking strength. AS-RPA discrimination happens in the <strong>amplification stage (Stage A)</strong>,
-            not on the electrode pad. The pad only detects whether amplicon was produced — the discrimination is already baked
-            into the primer selectivity.
-          </p>
-          <p style={{ fontSize: "11px", color: T.textTer, marginBottom: "16px", lineHeight: 1.5, fontStyle: "italic" }}>
-            For proximity targets, discrimination quality is controlled by primer design (Stage A), not crRNA design (Stage C).
-            The crRNA on the pad functions as a binary detector — did the allele-specific amplification produce product or not?
+            Proximity candidates use allele-specific RPA primers for discrimination. The 3\u2032 terminal mismatch
+            identity determines extension blocking strength. AS-RPA discrimination happens during <strong>amplification</strong>,
+            not on the electrode pad. The pad only detects whether amplicon was produced.
           </p>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${T.border}` }}>
-                  <th style={{ textAlign: "left", padding: "8px 12px", fontWeight: 700, fontFamily: HEADING, color: T.textSec }}>Target</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, fontFamily: HEADING, color: T.textSec }}>Pad</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, fontFamily: HEADING, color: T.textSec }}>Pool</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, fontFamily: HEADING, color: T.textSec }}>Mismatch</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, fontFamily: HEADING, color: T.textSec }}>ΔΔG</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, fontFamily: HEADING, color: T.textSec }}>Disc. Ratio</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, fontFamily: HEADING, color: T.textSec }}>Block</th>
-                  <th style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, fontFamily: HEADING, color: T.textSec }}>Specificity</th>
+                  {["Target", "Pad", "Mismatch", "\u0394\u0394G", "Disc. Ratio", "Block", "Specificity"].map(h => (
+                    <th key={h} style={{ textAlign: "center", padding: "8px 12px", fontWeight: 700, fontFamily: HEADING, color: T.textSec }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
                 {results.filter(r => r.asrpaDiscrimination).map(r => {
                   const d = r.asrpaDiscrimination;
                   const blockColor = d.block_class === "strong" ? T.success : d.block_class === "moderate" ? T.warning : T.danger;
-                  const pool = pooling.target_to_pool[r.label] || "?";
                   return (
                     <tr key={r.label} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
                       <td style={{ padding: "8px 12px", fontWeight: 600 }}>{r.label}</td>
                       <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: MONO, fontSize: "10px" }}>
-                        {pooling.electrode_layout.flat().indexOf(r.label) + 1 > 0 ? `P${pooling.electrode_layout.flat().indexOf(r.label) + 1}` : "—"}
-                      </td>
-                      <td style={{ padding: "8px 12px", textAlign: "center" }}>
-                        <span style={{ fontWeight: 700, color: POOL_COLORS[pool], fontSize: "11px" }}>Pool {pool}</span>
+                        {electrodeLayout.flat().indexOf(r.label) + 1 > 0 ? `P${electrodeLayout.flat().indexOf(r.label) + 1}` : "\u2014"}
                       </td>
                       <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: MONO, fontWeight: 700 }}>{d.terminal_mismatch}</td>
                       <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: MONO }}>{d.ddg_kcal.toFixed(1)} kcal/mol</td>
-                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: MONO, fontWeight: 700, color: d.disc_ratio >= 50 ? T.success : d.disc_ratio >= 10 ? T.warning : T.danger }}>{d.disc_ratio >= 100 ? "≥100" : d.disc_ratio.toFixed(0)}×</td>
+                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: MONO, fontWeight: 700, color: d.disc_ratio >= 50 ? T.success : d.disc_ratio >= 10 ? T.warning : T.danger }}>{d.disc_ratio >= 100 ? "\u2265100" : d.disc_ratio.toFixed(0)}\u00d7</td>
                       <td style={{ padding: "8px 12px", textAlign: "center" }}>
                         <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: blockColor + "20", color: blockColor, textTransform: "uppercase" }}>{d.block_class}</span>
                       </td>
@@ -4405,101 +4842,106 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             </table>
           </div>
           <div style={{ fontSize: "10px", color: T.textTer, marginTop: "8px", fontStyle: "italic" }}>
-            Discrimination ratios computed via Boltzmann conversion: exp(ΔΔG / RT) at 37 °C. Ratios &gt; 100× capped — kinetic effects dominate at high ΔΔG.
+            Discrimination ratios computed via Boltzmann conversion: exp(\u0394\u0394G / RT) at 37 \u00b0C. Ratios &gt; 100\u00d7 capped \u2014 kinetic effects dominate at high \u0394\u0394G.
           </div>
         </div>
       </CollapsibleSection>
       )}
 
+      {/* ═══════════ SECTION 9: Panel Composition ═══════════ */}
       <CollapsibleSection title="Panel Composition" defaultOpen={true} badge={{ text: `${results.length} targets`, bg: "#EFF6FF", color: "#2563EB" }}>
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "16px" }}>Panel Composition</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
-          {drugs.map((d) => {
-            const drugResults = results.filter((r) => r.drug === d);
-            const cnt = drugResults.length;
-            const primerCnt = drugResults.filter(r => r.hasPrimers).length;
-            const directDrug = drugResults.filter(r => r.strategy === "Direct" && r.disc > 0 && r.disc < 900);
-            const avgDiscDrug = directDrug.length ? +(directDrug.reduce((a, r) => a + r.disc, 0) / directDrug.length).toFixed(1) : null;
-            return (
-              <div key={d} style={{ padding: "16px", borderRadius: "10px", border: `1px solid ${T.border}`, background: T.bgSub, textAlign: "center" }}>
-                <DrugBadge drug={d} />
-                <div style={{ fontSize: "24px", fontWeight: 800, color: T.text, fontFamily: MONO, margin: "8px 0 4px" }}>{cnt}</div>
-                <div style={{ fontSize: "11px", color: T.textTer }}>candidates</div>
-                <div style={{ fontSize: "10px", color: primerCnt === cnt ? T.success : T.warning, fontWeight: 600, marginTop: "4px" }}>
-                  {primerCnt}/{cnt} with primers
-                </div>
-                {avgDiscDrug != null && (
-                  <div style={{ fontSize: "10px", color: avgDiscDrug >= 3 ? T.success : avgDiscDrug >= 2 ? T.warning : T.danger, fontWeight: 600, marginTop: "2px" }}>
-                    avg disc {avgDiscDrug}×
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "16px" }}>Panel Composition</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
+            {drugs.map((d) => {
+              const drugResults = results.filter((r) => r.drug === d);
+              const cnt = drugResults.length;
+              const primerCnt = drugResults.filter(r => r.hasPrimers).length;
+              const directDrug = drugResults.filter(r => r.strategy === "Direct" && r.disc > 0 && r.disc < 900);
+              const avgDiscDrug = directDrug.length ? +(directDrug.reduce((a, r) => a + r.disc, 0) / directDrug.length).toFixed(1) : null;
+              return (
+                <div key={d} style={{ padding: "16px", borderRadius: "10px", border: `1px solid ${T.border}`, background: T.bgSub, textAlign: "center" }}>
+                  <DrugBadge drug={d} />
+                  <div style={{ fontSize: "24px", fontWeight: 800, color: T.text, fontFamily: MONO, margin: "8px 0 4px" }}>{cnt}</div>
+                  <div style={{ fontSize: "11px", color: T.textTer }}>candidates</div>
+                  <div style={{ fontSize: "10px", color: primerCnt === cnt ? T.success : T.warning, fontWeight: 600, marginTop: "4px" }}>
+                    {primerCnt}/{cnt} with primers
                   </div>
-                )}
+                  {avgDiscDrug != null && (
+                    <div style={{ fontSize: "10px", color: avgDiscDrug >= 3 ? T.success : avgDiscDrug >= 2 ? T.warning : T.danger, fontWeight: 600, marginTop: "2px" }}>
+                      avg disc {avgDiscDrug}\u00d7
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
+            <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
+              <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.success }}>{directCount}</div>
+              <div style={{ fontSize: "11px", color: T.textSec }}>Direct detection</div>
+            </div>
+            <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
+              <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.purple }}>{proximityCount}</div>
+              <div style={{ fontSize: "11px", color: T.textSec }}>Proximity detection</div>
+            </div>
+            <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
+              <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.primary }}>15</div>
+              <div style={{ fontSize: "11px", color: T.textSec }}>Independent chambers</div>
+              <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>per-pad one-pot</div>
+            </div>
+          </div>
+
+          {(() => {
+            const canonicalCount = results.filter(r => r.isCanonicalPam === true || (r.pamVariant || "").startsWith("TTT")).length;
+            const expandedCount = results.filter(r => r.isCanonicalPam === false && r.pamVariant && !r.pamVariant.startsWith("TTT")).length;
+            if (expandedCount === 0 && canonicalCount === 0) return null;
+            return (
+              <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
+                <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
+                  <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.success }}>{canonicalCount}</div>
+                  <div style={{ fontSize: "11px", color: T.textSec }}>Canonical PAM</div>
+                  <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>TTTV \u2014 full activity</div>
+                </div>
+                <div style={{ flex: 1, background: expandedCount > 0 ? "#FEF3C7" : T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${expandedCount > 0 ? "#F59E0B40" : T.borderLight}`, textAlign: "center" }}>
+                  <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: expandedCount > 0 ? "#B45309" : T.textTer }}>{expandedCount}</div>
+                  <div style={{ fontSize: "11px", color: T.textSec }}>Expanded PAM</div>
+                  <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>enAsCas12a \u2014 penalised</div>
+                </div>
               </div>
             );
-          })}
+          })()}
         </div>
-
-        {/* Strategy breakdown */}
-        <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
-          <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
-            <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.success }}>{directCount}</div>
-            <div style={{ fontSize: "11px", color: T.textSec }}>Direct detection</div>
-          </div>
-          <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
-            <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.purple }}>{proximityCount}</div>
-            <div style={{ fontSize: "11px", color: T.textSec }}>Proximity detection</div>
-          </div>
-          <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
-            <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.primary }}>{withPrimers}</div>
-            <div style={{ fontSize: "11px", color: T.textSec }}>Assay-ready</div>
-            <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>primers + viable discrimination</div>
-          </div>
-        </div>
-        {/* PAM distribution */}
-        {(() => {
-          const canonicalCount = results.filter(r => r.isCanonicalPam === true || (r.pamVariant || "").startsWith("TTT")).length;
-          const expandedCount = results.filter(r => r.isCanonicalPam === false && r.pamVariant && !r.pamVariant.startsWith("TTT")).length;
-          if (expandedCount === 0 && canonicalCount === 0) return null;
-          return (
-            <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-              <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
-                <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.success }}>{canonicalCount}</div>
-                <div style={{ fontSize: "11px", color: T.textSec }}>Canonical PAM</div>
-                <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>TTTV — full activity</div>
-              </div>
-              <div style={{ flex: 1, background: expandedCount > 0 ? "#FEF3C7" : T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${expandedCount > 0 ? "#F59E0B40" : T.borderLight}`, textAlign: "center" }}>
-                <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: expandedCount > 0 ? "#B45309" : T.textTer }}>{expandedCount}</div>
-                <div style={{ fontSize: "11px", color: T.textSec }}>Expanded PAM</div>
-                <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>enAsCas12a — penalised</div>
-              </div>
-            </div>
-          );
-        })()}
-      </div>
       </CollapsibleSection>
 
+      {/* ═══════════ SECTION 10: IS6110 Species Control ═══════════ */}
       <CollapsibleSection title="Species Identification Control" defaultOpen={true} badge={{ text: controlIncluded ? "IS6110 included" : "pending", bg: controlIncluded ? "#22c55e20" : "#f59e0b20", color: controlIncluded ? "#22c55e" : "#f59e0b" }}>
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-          <Shield size={18} color={controlIncluded ? T.success : T.warning} />
-          <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>IS6110 — Dedicated Pad</span>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+            <Shield size={18} color={controlIncluded ? T.success : T.warning} />
+            <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>IS6110 \u2014 Dedicated Pad</span>
+          </div>
+          <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.6, margin: "0 0 16px" }}>
+            <strong>IS6110</strong> is a transposable element present in 6\u201316 copies per <em>M. tuberculosis</em> genome.
+            It occupies a dedicated electrode pad (position P1, top-left) positioned for earliest readout via capillary flow.
+          </p>
+          <div style={{ padding: "12px 16px", borderRadius: "8px", background: "#EFF6FF", borderLeft: `3px solid ${T.primary}`, fontSize: "12px", color: T.textSec, lineHeight: 1.6, marginBottom: "12px" }}>
+            <strong style={{ color: T.text }}>Blood cfDNA advantage:</strong> At blood titers as low as 10 cp/mL, IS6110 detection
+            probability exceeds 98% due to 6\u201316 genomic copies per MTB genome. IS6110 positivity triggers empirical first-line
+            treatment while resistance results accumulate on the remaining 14 pads.
+          </div>
+          <div style={{ padding: "12px 16px", borderRadius: "8px", background: controlIncluded ? T.successLight : T.warningLight, fontSize: "12px", color: controlIncluded ? T.success : T.warning, fontWeight: 600 }}>
+            {controlIncluded
+              ? "IS6110 species-level control included \u2014 dedicated E-CRISPR electrode pad P1 in detection array"
+              : "IS6110 control not in current result set \u2014 it will be automatically added during panel assembly"}
+          </div>
         </div>
-        <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.6, margin: "0 0 16px" }}>
-          <strong>IS6110</strong> is a transposable element present in 6–16 copies per <em>M. tuberculosis</em> genome.
-          It occupies a dedicated electrode pad (position P1, top-left) positioned for earliest readout via capillary flow.
-          The IS6110 crRNA is pre-loaded on its own pad and serves as a species-level internal positive control,
-          confirming MTB complex DNA presence before interpreting resistance results.
-        </p>
-        <div style={{ padding: "12px 16px", borderRadius: "8px", background: controlIncluded ? T.successLight : T.warningLight, fontSize: "12px", color: controlIncluded ? T.success : T.warning, fontWeight: 600 }}>
-          {controlIncluded
-            ? "IS6110 species-level control included — dedicated electrode pad P1 in detection array"
-            : "IS6110 control not in current result set — it will be automatically added during panel assembly"}
-        </div>
-      </div>
       </CollapsibleSection>
     </div>
   );
 };
+
 
 /* ═══════════════════════════════════════════════════════════════════
    DIAGNOSTICS TAB — Block 3 Sensitivity-Specificity Optimization
