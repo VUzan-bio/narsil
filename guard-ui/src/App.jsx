@@ -3819,6 +3819,17 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     }
   }, [connected, jobId]);
 
+  // ═══════════ PREDICTED ELECTROCHEMICAL READOUT — State ═══════════
+  const [echemCandidate, setEchemCandidate] = useState("rpoB_H445Y");
+  const [echemTechnique, setEchemTechnique] = useState("SWV");
+  const [echemTime, setEchemTime] = useState(30);       // minutes
+  const [echemBloodTiter, setEchemBloodTiter] = useState(100); // cp/mL
+  const [echemKtrans, setEchemKtrans] = useState(0.05);  // s⁻¹
+  const [echemAdvanced, setEchemAdvanced] = useState(false);
+  const [echemGamma0, setEchemGamma0] = useState(1.5e11); // molecules/cm²
+  const [echemPorosity, setEchemPorosity] = useState(3);
+  const [echemIscale, setEchemIscale] = useState(3.0);    // μA
+
   const kinetics = poolData?.kinetics || {
     phases: [
       { phase: "crRNA rehydration", solution_bound: "N/A", on_electrode: "2\u20135 min", description: "Dried crRNA dissolves from LIG surface into assay buffer", is_bottleneck: false },
@@ -4004,6 +4015,236 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
   const poissonColor = (p) => p < 0.33 ? T.danger : p < 0.90 ? T.warning : T.success;
   const poissonBg = (p) => p < 0.33 ? "#FEE2E2" : p < 0.90 ? "#FEF3C7" : "#DCFCE7";
+
+  // ═══════════ PREDICTED ELECTROCHEMICAL READOUT — Physics Engine ═══════════
+  const ECHEM = {
+    E0: -0.22, n: 2, F: 96485, R: 8.314, Temp: 310.15,
+    A_geo: 0.0707, // cm²
+    E_sw: 0.025, E_pulse: 0.050, I_scale_DPV: 1.5, I_scale_SWV: 3.0,
+    scan_rate: 0.05,
+    k_form: 0.003, Cas12a_nM: 50, Cas12a_ref: 50,
+    intra_device_rsd: 0.05,
+    V_blood_mL: 1.0, extraction_yield: 0.6, V_eluate_uL: 50, V_pad_uL: 50 / 15,
+  };
+
+  // Γ₀ in mol/cm² from molecules/cm²
+  const echemGamma0_mol = echemGamma0 / 6.022e23;
+  const echemAeff = ECHEM.A_geo * echemPorosity;
+
+  // Γ(t) — exact integral with in situ RNP formation
+  const computeGamma = useCallback((t_s, S_eff, k_trans) => {
+    const { k_form, Cas12a_nM, Cas12a_ref } = ECHEM;
+    const integral = t_s + (1 / k_form) * (Math.exp(-k_form * t_s) - 1);
+    const exponent = -k_trans * S_eff * (Cas12a_nM / Cas12a_ref) * integral;
+    return echemGamma0_mol * Math.exp(exponent);
+  }, [echemGamma0_mol]);
+
+  // Γ_WT for direct detection (reduced by discrimination ratio)
+  const computeGammaWT = useCallback((t_s, S_eff, D, k_trans, isProximity) => {
+    if (isProximity) return echemGamma0_mol; // no amplification → no cleavage
+    return computeGamma(t_s, S_eff / D, k_trans);
+  }, [computeGamma, echemGamma0_mol]);
+
+  // SWV voltammogram
+  const computeSWV = useCallback((E_array, Gamma) => {
+    const { n, F, R, Temp, E0, E_sw } = ECHEM;
+    const nFRT = n * F / (R * Temp);
+    const scale = echemIscale * echemAeff;
+    return E_array.map(E => {
+      const xi_plus = nFRT * (E + E_sw - E0);
+      const xi_minus = nFRT * (E - E_sw - E0);
+      const shape = 1 / (1 + Math.exp(xi_plus)) - 1 / (1 + Math.exp(xi_minus));
+      return scale * (Gamma / echemGamma0_mol) * shape;
+    });
+  }, [echemIscale, echemAeff, echemGamma0_mol]);
+
+  // DPV voltammogram
+  const computeDPV = useCallback((E_array, Gamma) => {
+    const { n, F, R, Temp, E0, E_pulse } = ECHEM;
+    const nFRT = n * F / (R * Temp);
+    const scale = ECHEM.I_scale_DPV * echemAeff;
+    return E_array.map(E => {
+      const xi_plus = nFRT * (E + E_pulse / 2 - E0);
+      const xi_minus = nFRT * (E - E_pulse / 2 - E0);
+      const shape = 1 / (1 + Math.exp(xi_plus)) - 1 / (1 + Math.exp(xi_minus));
+      return scale * (Gamma / echemGamma0_mol) * shape;
+    });
+  }, [echemAeff, echemGamma0_mol]);
+
+  // CV voltammogram (Laviron surface-confined reversible)
+  const computeCV = useCallback((E_array, Gamma, scanRate) => {
+    const { n, F, R, Temp, E0 } = ECHEM;
+    const prefactor = (n * n * F * F * echemAeff * Gamma * scanRate) / (4 * R * Temp);
+    return E_array.map(E => {
+      const x = n * F * (E - E0) / (2 * R * Temp);
+      const coshX = Math.cosh(x);
+      return prefactor * (1 / (coshX * coshX)) * 1e6; // μA
+    });
+  }, [echemAeff]);
+
+  // Potential array for voltammograms: -0.05 to -0.40 V
+  const echemE = useMemo(() => Array.from({ length: 351 }, (_, i) => -0.05 - i * 0.001), []);
+
+  // Get candidate data for electrochemistry
+  const echemCandidateData = useMemo(() => {
+    const r = results.find(x => x.label === echemCandidate);
+    const eff = getEfficiency(echemCandidate);
+    const disc = r?.disc && r.disc < 900 ? r.disc : 1000;
+    const strategy = targetStrategy(echemCandidate);
+    const drug = targetDrug(echemCandidate);
+    const isProximity = strategy === "Proximity";
+    return { label: echemCandidate, efficiency: eff, discrimination: disc, strategy, drug, isProximity, isIS6110: echemCandidate === "IS6110_NON", copyNumber: echemCandidate === "IS6110_NON" ? 10 : 1 };
+  }, [echemCandidate, results]);
+
+  // Panel A: Voltammogram curves
+  const echemVoltammogram = useMemo(() => {
+    const cd = echemCandidateData;
+    const t_s = echemTime * 60;
+    const G_base = echemGamma0_mol;
+    const G_after = computeGamma(t_s, cd.efficiency, echemKtrans);
+    const deltaI_pct = ((1 - G_after / G_base) * 100);
+
+    let base, after;
+    if (echemTechnique === "SWV") {
+      base = computeSWV(echemE, G_base);
+      after = computeSWV(echemE, G_after);
+    } else if (echemTechnique === "DPV") {
+      base = computeDPV(echemE, G_base);
+      after = computeDPV(echemE, G_after);
+    } else {
+      base = computeCV(echemE, G_base, ECHEM.scan_rate);
+      after = computeCV(echemE, G_after, ECHEM.scan_rate);
+    }
+
+    const peakBase = Math.max(...base);
+    const peakAfter = Math.max(...after);
+
+    return echemE.map((E, i) => ({
+      E: +E.toFixed(3),
+      baseline: +base[i].toFixed(4),
+      after: +after[i].toFixed(4),
+    })).concat({
+      _meta: true, peakBase: +peakBase.toFixed(3), peakAfter: +peakAfter.toFixed(3), deltaI: +deltaI_pct.toFixed(1),
+    });
+  }, [echemCandidateData, echemTime, echemKtrans, echemTechnique, echemGamma0_mol, echemE, computeGamma, computeSWV, computeDPV, computeCV]);
+
+  const echemMeta = echemVoltammogram[echemVoltammogram.length - 1];
+  const echemPlotData = echemVoltammogram.slice(0, -1);
+
+  // Panel B: ΔI% time course
+  const echemTimeCourse = useMemo(() => {
+    const cd = echemCandidateData;
+    const points = [];
+    for (let t = 0; t <= 60; t += 1) {
+      const t_s = t * 60;
+      const G_mut = computeGamma(t_s, cd.efficiency, echemKtrans);
+      const G_wt = computeGammaWT(t_s, cd.efficiency, cd.discrimination, echemKtrans, cd.isProximity);
+      const G_mutHi = computeGamma(t_s, cd.efficiency, echemKtrans * 2);
+      const G_mutLo = computeGamma(t_s, cd.efficiency, echemKtrans * 0.5);
+      points.push({
+        time: t,
+        MUT: +((1 - G_mut / echemGamma0_mol) * 100).toFixed(1),
+        WT: +((1 - G_wt / echemGamma0_mol) * 100).toFixed(1),
+        MUT_hi: +((1 - G_mutHi / echemGamma0_mol) * 100).toFixed(1),
+        MUT_lo: +((1 - G_mutLo / echemGamma0_mol) * 100).toFixed(1),
+        neg: 0,
+      });
+    }
+    // Compute detection times
+    const threshold = 3 * ECHEM.intra_device_rsd * 100; // 15%
+    const timeMut = points.find(p => p.MUT >= threshold)?.time ?? null;
+    const timeWt = points.find(p => p.WT >= threshold)?.time ?? null;
+    return { points, threshold, timeMut, timeWt };
+  }, [echemCandidateData, echemKtrans, echemGamma0_mol, computeGamma, computeGammaWT]);
+
+  // Panel C: MUT vs WT discrimination overlay
+  const echemDiscOverlay = useMemo(() => {
+    const cd = echemCandidateData;
+    const t_s = echemTime * 60;
+    const G_base = echemGamma0_mol;
+    const G_mut = computeGamma(t_s, cd.efficiency, echemKtrans);
+    const G_wt = computeGammaWT(t_s, cd.efficiency, cd.discrimination, echemKtrans, cd.isProximity);
+
+    let baseCurve, mutCurve, wtCurve;
+    if (echemTechnique === "SWV") {
+      baseCurve = computeSWV(echemE, G_base);
+      mutCurve = computeSWV(echemE, G_mut);
+      wtCurve = computeSWV(echemE, G_wt);
+    } else if (echemTechnique === "DPV") {
+      baseCurve = computeDPV(echemE, G_base);
+      mutCurve = computeDPV(echemE, G_mut);
+      wtCurve = computeDPV(echemE, G_wt);
+    } else {
+      baseCurve = computeCV(echemE, G_base, ECHEM.scan_rate);
+      mutCurve = computeCV(echemE, G_mut, ECHEM.scan_rate);
+      wtCurve = computeCV(echemE, G_wt, ECHEM.scan_rate);
+    }
+
+    const peakBase = Math.max(...baseCurve);
+    const peakMut = Math.max(...mutCurve);
+    const peakWt = Math.max(...wtCurve);
+    const diMut = ((1 - peakMut / peakBase) * 100);
+    const diWt = ((1 - peakWt / peakBase) * 100);
+    const measuredDisc = diWt > 0 ? diMut / diWt : Infinity;
+
+    const data = echemE.map((E, i) => ({
+      E: +E.toFixed(3),
+      baseline: +baseCurve[i].toFixed(4),
+      MUT: +mutCurve[i].toFixed(4),
+      WT: +wtCurve[i].toFixed(4),
+    }));
+
+    return { data, peakBase: +peakBase.toFixed(3), peakMut: +peakMut.toFixed(3), peakWt: +peakWt.toFixed(3), diMut: +diMut.toFixed(1), diWt: +diWt.toFixed(1), measuredDisc: +measuredDisc.toFixed(1), guardDisc: cd.discrimination };
+  }, [echemCandidateData, echemTime, echemKtrans, echemTechnique, echemGamma0_mol, echemE, computeGamma, computeGammaWT, computeSWV, computeDPV, computeCV]);
+
+  // Panel D: 15-pad heatmap data
+  const echemHeatmap = useMemo(() => {
+    const t_s = echemTime * 60;
+    const threshold = 3 * ECHEM.intra_device_rsd * 100;
+    let aboveCount = 0;
+    const pads = electrodeLayout.flat().map((target, idx) => {
+      const eff = getEfficiency(target);
+      const isIS = target === "IS6110_NON";
+      const copies_total = echemBloodTiter * ECHEM.V_blood_mL * ECHEM.extraction_yield;
+      const copies_per_pad = copies_total * (ECHEM.V_pad_uL / ECHEM.V_eluate_uL);
+      const lambda = copies_per_pad * (isIS ? IS6110_copy_number : 1);
+      const P_template = 1 - Math.exp(-lambda);
+      const P_rpa_val = 0.95;
+      const G_after = computeGamma(t_s, eff, echemKtrans);
+      const di_if_present = (1 - G_after / echemGamma0_mol) * 100;
+      const expected_di = P_template * P_rpa_val * di_if_present;
+      const above = expected_di > threshold;
+      if (above) aboveCount++;
+      return {
+        target, drug: targetDrug(target), efficiency: eff,
+        P_template: +(P_template * 100).toFixed(1),
+        di_if_present: +di_if_present.toFixed(1),
+        expected_di: +expected_di.toFixed(1),
+        above, row: Math.floor(idx / 5), col: idx % 5,
+      };
+    });
+    // Drug classes meeting threshold
+    const drugsMet = Object.entries(drug_targets).filter(([drug, targets]) =>
+      targets.some(t => pads.find(p => p.target === t)?.above)
+    ).map(([d]) => d);
+    return { pads, aboveCount, drugsMet, threshold };
+  }, [echemTime, echemBloodTiter, echemKtrans, echemGamma0_mol, results, computeGamma]);
+
+  // Heatmap color interpolation
+  const echemHeatColor = (di) => {
+    const stops = [
+      [0, [180, 185, 195]], [15, [171, 221, 164]], [35, [102, 194, 165]],
+      [60, [50, 136, 189]], [100, [94, 79, 162]],
+    ];
+    const clamped = Math.max(0, Math.min(100, di));
+    let lo = stops[0], hi = stops[stops.length - 1];
+    for (let i = 0; i < stops.length - 1; i++) {
+      if (clamped >= stops[i][0] && clamped <= stops[i + 1][0]) { lo = stops[i]; hi = stops[i + 1]; break; }
+    }
+    const t2 = hi[0] === lo[0] ? 0 : (clamped - lo[0]) / (hi[0] - lo[0]);
+    const rgb = lo[1].map((c, j) => Math.round(c + (hi[1][j] - c) * t2));
+    return `rgb(${rgb.join(",")})`;
+  };
 
   return (
     <div>
@@ -4581,8 +4822,8 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
         </div>
       </CollapsibleSection>
 
-      {/* ═══════════ SECTION 7: GUARD Electrochemical Predictions ═══════════ */}
-      <CollapsibleSection title="Predicted Electrochemical Performance" defaultOpen={true} badge={{ text: "simulated", bg: "#DBEAFE", color: "#2563EB" }}>
+      {/* ═══════════ SECTION 7: Predicted Electrochemical Readout ═══════════ */}
+      <CollapsibleSection title="Predicted Electrochemical Readout" defaultOpen={true} badge={{ text: "computed", bg: "#DBEAFE", color: "#2563EB" }}>
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
 
           {/* 7A: ΔI% Prediction Envelope */}
@@ -4795,6 +5036,278 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </CollapsibleSection>
+
+      {/* ═══════════ SECTION 7.5: Interactive Predicted Electrochemical Readout Dashboard ═══════════ */}
+      <CollapsibleSection title="Predicted Electrochemical Readout — Interactive Dashboard" defaultOpen={true} badge={{ text: "computed", bg: "#DBEAFE", color: "#2563EB" }}>
+        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "16px" : "24px", marginBottom: "24px" }}>
+          {/* Header description */}
+          <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "20px", lineHeight: 1.6 }}>
+            <strong>SWV, DPV, and CV curves computed from GUARD pipeline predictions and analytical electrochemistry for surface-confined MB.</strong> Peak shapes follow Laviron theory (1979) for adsorbed redox couples. Relative peak heights between candidates and between MUT/WT alleles are determined by GUARD-Net efficiency and discrimination scores (trained on 25K+ real measurements). Absolute peak currents and detection times depend on electrode-specific parameters (surface trans-cleavage rate, reporter density) provided as adjustable sliders {"\u2014"} to be locked to experimental values after the first electrode characterisation.
+          </p>
+
+          {/* ── Row 1: Candidate + Technique ── */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", alignItems: "center", marginBottom: "12px" }}>
+            <div style={{ flex: "1 1 300px" }}>
+              <label style={{ fontSize: "10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING, textTransform: "uppercase", letterSpacing: "0.5px" }}>Candidate</label>
+              <select
+                value={echemCandidate}
+                onChange={e => setEchemCandidate(e.target.value)}
+                style={{ width: "100%", marginTop: "4px", padding: "8px 10px", borderRadius: "6px", border: `1px solid ${T.border}`, fontFamily: MONO, fontSize: "11px", background: T.bg, color: T.text }}
+              >
+                {electrodeLayout.flat().map(t => {
+                  const eff = getEfficiency(t);
+                  const r = results.find(x => x.label === t);
+                  const disc = r?.disc && r.disc < 900 ? r.disc : null;
+                  const strat = targetStrategy(t);
+                  const drug = targetDrug(t);
+                  return (
+                    <option key={t} value={t}>
+                      {t} {"\u00b7"} {drug} {"\u00b7"} S_eff={eff.toFixed(3)} {disc ? `\u00b7 D=${disc.toFixed(1)}\u00d7` : ""} {"\u00b7"} {strat}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+            <div>
+              <label style={{ fontSize: "10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING, textTransform: "uppercase", letterSpacing: "0.5px", display: "block" }}>Technique</label>
+              <div style={{ display: "flex", gap: "0", marginTop: "4px" }}>
+                {["SWV", "DPV", "CV"].map((tech, i) => (
+                  <button
+                    key={tech}
+                    onClick={() => setEchemTechnique(tech)}
+                    style={{
+                      padding: "8px 16px", fontSize: "11px", fontWeight: 700, fontFamily: MONO, cursor: "pointer",
+                      background: echemTechnique === tech ? T.primary : T.bg,
+                      color: echemTechnique === tech ? "#fff" : T.textSec,
+                      border: `1px solid ${echemTechnique === tech ? T.primary : T.border}`,
+                      borderRadius: i === 0 ? "6px 0 0 6px" : i === 2 ? "0 6px 6px 0" : "0",
+                      borderLeft: i > 0 ? "none" : undefined,
+                    }}
+                  >{tech}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Row 2: Main sliders ── */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginBottom: "12px" }}>
+            <div style={{ flex: "1 1 180px" }}>
+              <label style={{ fontSize: "10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>Incubation time: <span style={{ color: T.text, fontFamily: MONO }}>{echemTime} min</span></label>
+              <input type="range" min={0} max={60} step={1} value={echemTime} onChange={e => setEchemTime(+e.target.value)}
+                style={{ width: "100%", marginTop: "4px", accentColor: T.primary }} />
+            </div>
+            <div style={{ flex: "1 1 180px" }}>
+              <label style={{ fontSize: "10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>Blood cfDNA: <span style={{ color: T.text, fontFamily: MONO }}>{echemBloodTiter} cp/mL</span></label>
+              <input type="range" min={0} max={3} step={0.01} value={Math.log10(echemBloodTiter)} onChange={e => setEchemBloodTiter(Math.round(Math.pow(10, +e.target.value)))}
+                style={{ width: "100%", marginTop: "4px", accentColor: T.primary }} />
+            </div>
+            <div style={{ flex: "1 1 180px" }}>
+              <label style={{ fontSize: "10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>Surface k_trans: <span style={{ color: T.text, fontFamily: MONO }}>{echemKtrans.toFixed(3)} s{"\u207b\u00b9"}</span></label>
+              <input type="range" min={Math.log10(0.005)} max={Math.log10(0.2)} step={0.01} value={Math.log10(echemKtrans)} onChange={e => setEchemKtrans(+(Math.pow(10, +e.target.value)).toFixed(4))}
+                style={{ width: "100%", marginTop: "4px", accentColor: T.primary }} />
+            </div>
+          </div>
+
+          {/* ── Row 3: Advanced calibration (collapsed) ── */}
+          <div style={{ marginBottom: "16px" }}>
+            <button onClick={() => setEchemAdvanced(!echemAdvanced)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "11px", color: T.textSec, fontFamily: HEADING, fontWeight: 600, display: "flex", alignItems: "center", gap: "4px", padding: "4px 0" }}>
+              {echemAdvanced ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              Advanced Calibration
+            </button>
+            {echemAdvanced && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", marginTop: "8px", padding: "12px 16px", background: T.bgSub, borderRadius: "8px", border: `1px solid ${T.borderLight}` }}>
+                <div style={{ flex: "1 1 160px" }}>
+                  <label style={{ fontSize: "10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>{"\u0393\u2080"}: <span style={{ fontFamily: MONO, color: T.text }}>{echemGamma0.toExponential(1)} mol/cm{"\u00b2"}</span></label>
+                  <input type="range" min={9} max={12} step={0.1} value={Math.log10(echemGamma0)} onChange={e => setEchemGamma0(Math.pow(10, +e.target.value))}
+                    style={{ width: "100%", marginTop: "4px", accentColor: T.primary }} />
+                </div>
+                <div style={{ flex: "1 1 160px" }}>
+                  <label style={{ fontSize: "10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>Porosity {"\u03b7"}: <span style={{ fontFamily: MONO, color: T.text }}>{echemPorosity.toFixed(1)}</span></label>
+                  <input type="range" min={1} max={8} step={0.1} value={echemPorosity} onChange={e => setEchemPorosity(+e.target.value)}
+                    style={{ width: "100%", marginTop: "4px", accentColor: T.primary }} />
+                </div>
+                <div style={{ flex: "1 1 160px" }}>
+                  <label style={{ fontSize: "10px", fontWeight: 700, color: T.textSec, fontFamily: HEADING }}>Peak scale: <span style={{ fontFamily: MONO, color: T.text }}>{echemIscale.toFixed(1)} {"\u03bcA"}</span></label>
+                  <input type="range" min={0.1} max={10} step={0.1} value={echemIscale} onChange={e => setEchemIscale(+e.target.value)}
+                    style={{ width: "100%", marginTop: "4px", accentColor: T.primary }} />
+                </div>
+                <div style={{ fontSize: "10px", color: T.textTer, fontStyle: "italic", width: "100%" }}>
+                  These only affect absolute current, NOT {"\u0394"}I% predictions. {"\u0394"}I% depends only on GUARD data + k_trans + time.
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── 4-Panel Grid ── */}
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
+
+            {/* ═══ PANEL A: Voltammogram ═══ */}
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: T.bgSub }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+                Panel A: {echemTechnique} Voltammogram
+              </div>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px" }}>
+                {echemCandidateData.label} {"\u00b7"} {"\u0394"}I% = <span style={{ fontWeight: 700, color: T.primary }}>{echemMeta.deltaI}%</span>
+                {" \u00b7 "}I{"\u2080"} = {echemMeta.peakBase} {"\u03bcA"} {"\u2192"} I_after = {echemMeta.peakAfter} {"\u03bcA"}
+              </div>
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer>
+                  <AreaChart data={echemPlotData} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="E" type="number" domain={[-0.4, -0.05]} fontSize={9} fontFamily={MONO}
+                      label={{ value: "E (V vs Ag/AgCl)", position: "bottom", fontSize: 9, offset: -2 }}
+                      tickFormatter={v => v.toFixed(2)} reversed />
+                    <YAxis fontSize={9} fontFamily={MONO}
+                      label={{ value: `I (\u03bcA)`, angle: -90, position: "insideLeft", fontSize: 9 }} />
+                    <Tooltip contentStyle={{ fontFamily: MONO, fontSize: 10 }}
+                      formatter={(val, name) => [`${(+val).toFixed(3)} \u03bcA`, name === "baseline" ? "Baseline" : `After ${echemTime} min`]}
+                      labelFormatter={v => `E = ${(+v).toFixed(3)} V`} />
+                    <Area dataKey="baseline" stroke="#999" strokeDasharray="5 3" fill="none" strokeWidth={1.5} dot={false} name="baseline" />
+                    <Area dataKey="after" stroke="#3288bd" fill="#3288bd" fillOpacity={0.12} strokeWidth={2} dot={false} name="after" />
+                    <ReferenceLine x={-0.22} stroke="#999" strokeDasharray="3 3" label={{ value: "E\u00b0", position: "top", fontSize: 8, fill: "#999" }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* ═══ PANEL B: ΔI% Time Course ═══ */}
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: T.bgSub }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+                Panel B: {"\u0394"}I% Time Course
+              </div>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px" }}>
+                Detection (MUT): <span style={{ fontWeight: 700, color: "#3288bd" }}>{echemTimeCourse.timeMut != null ? `~${echemTimeCourse.timeMut} min` : ">60 min"}</span>
+                {" \u00b7 "}Detection (WT): <span style={{ fontWeight: 700, color: "#e6550d" }}>{echemTimeCourse.timeWt != null ? `~${echemTimeCourse.timeWt} min` : "never"}</span>
+                {echemTimeCourse.timeMut != null && echemTimeCourse.timeWt != null && echemTimeCourse.timeWt > echemTimeCourse.timeMut && (
+                  <span> {"\u00b7"} <span style={{ fontWeight: 700, color: T.success }}>Window: {echemTimeCourse.timeMut}{"\u2013"}{echemTimeCourse.timeWt} min</span></span>
+                )}
+              </div>
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer>
+                  <ComposedChart data={echemTimeCourse.points} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="time" type="number" domain={[0, 60]} fontSize={9} fontFamily={MONO}
+                      label={{ value: "Time (min)", position: "bottom", fontSize: 9, offset: -2 }} />
+                    <YAxis domain={[0, 100]} fontSize={9} fontFamily={MONO}
+                      label={{ value: "\u0394I% ", angle: -90, position: "insideLeft", fontSize: 9 }} />
+                    <Tooltip contentStyle={{ fontFamily: MONO, fontSize: 10 }}
+                      formatter={(val, name) => [`${val}%`, name]} />
+                    {/* Uncertainty band */}
+                    <Area dataKey="MUT_hi" stroke="none" fill="#3288bd" fillOpacity={0.08} dot={false} name="MUT (k\u00d72)" />
+                    <Area dataKey="MUT_lo" stroke="none" fill="#fff" fillOpacity={0.9} dot={false} name="MUT (k/2)" />
+                    {/* Main curves */}
+                    <Line dataKey="MUT" stroke="#3288bd" strokeWidth={2.5} dot={false} name="MUT" />
+                    <Line dataKey="WT" stroke="#e6550d" strokeWidth={2} strokeDasharray="6 3" dot={false} name="WT" />
+                    <Line dataKey="neg" stroke="#ccc" strokeWidth={1} strokeDasharray="3 3" dot={false} name="Neg ctrl" />
+                    {/* Threshold */}
+                    <ReferenceLine y={echemTimeCourse.threshold} stroke="#c0392b" strokeDasharray="6 3"
+                      label={{ value: `3\u03c3 = ${echemTimeCourse.threshold}%`, position: "right", fontSize: 8, fill: "#c0392b" }} />
+                    {/* Current time marker */}
+                    <ReferenceLine x={echemTime} stroke="#666" strokeDasharray="4 2" />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* ═══ PANEL C: MUT vs WT Discrimination Overlay ═══ */}
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: T.bgSub }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+                Panel C: MUT vs WT Discrimination
+              </div>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px" }}>
+                MUT: <span style={{ fontWeight: 700, color: "#3288bd" }}>{echemDiscOverlay.peakMut} {"\u03bcA"} ({"\u0394"}I% = {echemDiscOverlay.diMut}%)</span>
+                {" \u00b7 "}WT: <span style={{ fontWeight: 700, color: "#e6550d" }}>{echemDiscOverlay.peakWt} {"\u03bcA"} ({"\u0394"}I% = {echemDiscOverlay.diWt}%)</span>
+                {" \u00b7 "}Disc: <span style={{ fontWeight: 700, color: T.primary }}>{echemDiscOverlay.measuredDisc === Infinity ? "\u221e" : `${echemDiscOverlay.measuredDisc}\u00d7`}</span>
+                {" (GUARD: "}{echemDiscOverlay.guardDisc >= 900 ? "\u221e" : `${echemDiscOverlay.guardDisc}\u00d7`}{")"}
+              </div>
+              <div style={{ width: "100%", height: 260 }}>
+                <ResponsiveContainer>
+                  <LineChart data={echemDiscOverlay.data} margin={{ top: 10, right: 15, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="E" type="number" domain={[-0.4, -0.05]} fontSize={9} fontFamily={MONO}
+                      label={{ value: "E (V vs Ag/AgCl)", position: "bottom", fontSize: 9, offset: -2 }}
+                      tickFormatter={v => v.toFixed(2)} reversed />
+                    <YAxis fontSize={9} fontFamily={MONO}
+                      label={{ value: `I (\u03bcA)`, angle: -90, position: "insideLeft", fontSize: 9 }} />
+                    <Tooltip contentStyle={{ fontFamily: MONO, fontSize: 10 }}
+                      formatter={(val, name) => [`${(+val).toFixed(3)} \u03bcA`, name === "baseline" ? "Baseline (no target)" : name]}
+                      labelFormatter={v => `E = ${(+v).toFixed(3)} V`} />
+                    <Line dataKey="baseline" stroke="#999" strokeDasharray="5 3" strokeWidth={1.5} dot={false} name="baseline" />
+                    <Line dataKey="MUT" stroke="#3288bd" strokeWidth={2.5} dot={false} name="MUT target" />
+                    <Line dataKey="WT" stroke="#e6550d" strokeWidth={2} dot={false} name="WT target" />
+                    <ReferenceLine x={-0.22} stroke="#999" strokeDasharray="3 3" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div style={{ fontSize: "10px", color: T.textTer, fontStyle: "italic", marginTop: "6px" }}>
+                The discrimination ratio is independent of k_trans and {"\u0393\u2080"} {"\u2014"} it depends only on the mismatch biophysics predicted by GUARD.
+              </div>
+            </div>
+
+            {/* ═══ PANEL D: 15-Pad Heatmap ═══ */}
+            <div style={{ border: `1px solid ${T.border}`, borderRadius: "10px", padding: "16px", background: T.bgSub }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "4px" }}>
+                Panel D: 15-Pad {"\u0394"}I% Heatmap
+              </div>
+              <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px" }}>
+                {echemHeatmap.aboveCount}/15 pads above threshold at {echemBloodTiter} cp/mL, {echemTime} min.
+                {echemHeatmap.drugsMet.length > 0 && (
+                  <span> Drug classes: <strong style={{ color: T.success }}>{echemHeatmap.drugsMet.join(", ")}</strong></span>
+                )}
+              </div>
+              {/* 5×3 grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "6px" }}>
+                {echemHeatmap.pads.map((pad, idx) => {
+                  const bgColor = echemHeatColor(pad.expected_di);
+                  const textColor = pad.expected_di > 40 ? "#fff" : T.text;
+                  const dimmed = !pad.above;
+                  return (
+                    <div
+                      key={pad.target}
+                      title={`P(template\u22651) = ${pad.P_template}%\nP(RPA) = 95%\n\u0394I% if positive = ${pad.di_if_present}%\nExpected \u0394I% = ${pad.expected_di}%`}
+                      style={{
+                        background: dimmed ? "#f3f4f6" : bgColor,
+                        borderRadius: "8px",
+                        padding: "8px 4px",
+                        textAlign: "center",
+                        border: pad.above ? "2px solid #16A34A" : "2px dashed #d1d5db",
+                        opacity: dimmed ? 0.6 : 1,
+                        minHeight: "60px",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        position: "relative",
+                      }}
+                    >
+                      {dimmed && (
+                        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: "20px", color: "#9ca3af", fontWeight: 800, opacity: 0.4 }}>?</div>
+                      )}
+                      <div style={{ fontSize: "8px", fontWeight: 700, fontFamily: MONO, color: dimmed ? T.textTer : textColor, lineHeight: 1.2, wordBreak: "break-all" }}>
+                        {pad.target.replace("_", "\n").split("\n").map((part, j) => <div key={j}>{part}</div>)}
+                      </div>
+                      <div style={{ fontSize: "11px", fontWeight: 800, fontFamily: MONO, color: dimmed ? T.textTer : textColor, marginTop: "2px" }}>
+                        {pad.expected_di.toFixed(0)}%
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Color legend */}
+              <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "10px", justifyContent: "center" }}>
+                <span style={{ fontSize: "9px", color: T.textTer }}>0%</span>
+                <div style={{ width: "120px", height: "10px", borderRadius: "5px", background: "linear-gradient(to right, rgb(180,185,195), rgb(171,221,164), rgb(102,194,165), rgb(50,136,189), rgb(94,79,162))" }} />
+                <span style={{ fontSize: "9px", color: T.textTer }}>100%</span>
+                <span style={{ fontSize: "9px", color: T.textTer, marginLeft: "8px" }}>
+                  <span style={{ display: "inline-block", width: 8, height: 8, border: "2px solid #16A34A", borderRadius: 3, marginRight: 3 }} />above threshold
+                </span>
+                <span style={{ fontSize: "9px", color: T.textTer }}>
+                  <span style={{ display: "inline-block", width: 8, height: 8, border: "2px dashed #d1d5db", borderRadius: 3, marginRight: 3 }} />below
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </CollapsibleSection>

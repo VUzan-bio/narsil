@@ -183,6 +183,7 @@ app.include_router(optimisation.router)
 app.include_router(ws.router)
 
 @app.get("/api/health")
+@app.get("/")
 async def health() -> dict:
     return {
         "status": "ok",
