@@ -2021,9 +2021,9 @@ const PriorityBadge = ({ rank }) => {
       width: isTop3 ? 28 : 24, height: isTop3 ? 28 : 24, borderRadius: "50%",
       fontSize: isTop3 ? "13px" : "11px", fontWeight: isTop3 ? 700 : 400,
       fontFamily: MONO,
-      background: isTop3 ? "#2563EB" : "transparent",
+      background: isTop3 ? T.text : "transparent",
       color: isTop3 ? "#fff" : T.textSec,
-      border: isTop3 ? "2px solid #2563EB" : `1px solid ${T.border}`,
+      border: isTop3 ? `2px solid ${T.text}` : `1px solid ${T.border}`,
     }}>
       {rank}
     </span>
@@ -2037,7 +2037,7 @@ const ExperimentalPriorityCard = ({ results }) => {
   if (top3.length === 0) return null;
   return (
     <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px 28px", marginBottom: "24px" }}>
-      <div style={{ fontSize: "11px", fontWeight: 700, color: T.primary, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "16px" }}>Experimental Priorities</div>
+      <div style={{ fontSize: "11px", fontWeight: 700, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "16px" }}>Experimental Priorities</div>
       <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
         {top3.map((r) => {
           const disc = r.strategy === "Direct" ? r.disc : (r.asrpaDiscrimination?.disc_ratio || 0);
@@ -2144,87 +2144,116 @@ const ReadinessChart = ({ results }) => {
     const c = r.readinessComponents || {};
     return { name: r.label, drug: r.drug, readiness: r.readinessScore, ...Object.fromEntries(axes.map(a => [a, +(c[a] || 0).toFixed(3)])) };
   });
-  const [hovRow, setHovRow] = useState(null);
-  const [hovCol, setHovCol] = useState(null);
+  const [hovIdx, setHovIdx] = useState(null);
+
+  const DRUG_LINE = { RIF: "#3288bd", INH: "#66c2a5", EMB: "#abdda4", PZA: "#d4a017", FQ: "#f46d43", AG: "#d53e4f", OTHER: "#9CA3AF", CTRL: "#9CA3AF" };
+
+  // SVG dimensions
+  const W = 600, H = 320, padL = 110, padR = 60, padT = 30, padB = 50;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+  const axisX = axes.map((_, i) => padL + (i / (axes.length - 1)) * plotW);
+
   return (
     <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "28px 32px", marginBottom: "24px" }}>
-      <div style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "8px" }}>
+      <div style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "8px" }}>
         <div>
           <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Diagnostic Readiness Score</div>
-          <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px" }}>Multi-axis composite (percentile-ranked within panel). Circle size and opacity encode per-axis percentile.</div>
+          <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px" }}>Parallel coordinates — each line is one candidate across 5 readiness axes. Strong candidates stay high. Colored by drug class.</div>
         </div>
-        <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
-          {axes.map(key => (
-            <div key={key} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "10px", color: T.textSec }}>
-              <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", backgroundColor: AXIS_COLORS[key] }} />
-              {AXIS_LABELS[key]}
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          {Object.entries(DRUG_LINE).filter(([k]) => chartData.some(r => r.drug === k)).map(([d, c]) => (
+            <div key={d} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: T.textSec }}>
+              <span style={{ display: "inline-block", width: 12, height: 3, borderRadius: 2, backgroundColor: c }} />
+              {d}
             </div>
           ))}
         </div>
       </div>
-      {/* Heatmap dot grid */}
+
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0 }}>
-          <thead>
-            <tr>
-              <th style={{ textAlign: "left", padding: "0 12px 10px 0", fontSize: "10px", fontWeight: 600, color: T.textTer, width: "120px" }}>Candidate</th>
-              {axes.map(a => (
-                <th key={a} style={{ textAlign: "center", padding: "0 4px 10px", fontSize: "10px", fontWeight: 600, color: hovCol === a ? T.text : T.textTer, transition: "color 0.15s", cursor: "default" }}
-                  onMouseEnter={() => setHovCol(a)} onMouseLeave={() => setHovCol(null)}>
-                  {AXIS_LABELS[a]}
-                </th>
-              ))}
-              <th style={{ textAlign: "center", padding: "0 4px 10px 16px", fontSize: "10px", fontWeight: 700, color: T.textSec, borderLeft: `1px solid ${T.borderLight}` }}>Overall</th>
-            </tr>
-          </thead>
-          <tbody>
-            {chartData.map((row, ri) => {
-              const isHov = hovRow === ri;
-              return (
-                <tr key={row.name} onMouseEnter={() => setHovRow(ri)} onMouseLeave={() => setHovRow(null)}
-                  style={{ background: isHov ? T.bgHover : ri % 2 === 0 ? "transparent" : T.bgSub, transition: "background 0.15s" }}>
-                  <td style={{ padding: "6px 12px 6px 0", fontSize: "11px", fontFamily: MONO, fontWeight: 600, color: T.text, whiteSpace: "nowrap" }}>{row.name}</td>
-                  {axes.map(a => {
-                    const v = row[a];
-                    const size = 8 + v * 20;
-                    return (
-                      <td key={a} style={{ textAlign: "center", padding: "6px 4px", position: "relative" }}>
-                        <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", position: "relative" }}
-                          title={`${AXIS_LABELS[a]}: ${(v * 100).toFixed(0)}%`}>
-                          <div style={{
-                            width: size, height: size, borderRadius: "50%",
-                            backgroundColor: AXIS_COLORS[a],
-                            opacity: 0.2 + v * 0.7,
-                            transition: "all 0.2s ease",
-                            transform: (hovCol === a || isHov) ? "scale(1.15)" : "scale(1)",
-                          }} />
-                          {v >= 0.5 && (
-                            <span style={{ position: "absolute", fontSize: "7px", fontWeight: 700, color: "#fff", pointerEvents: "none" }}>
-                              {(v * 100).toFixed(0)}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    );
-                  })}
-                  <td style={{ textAlign: "center", padding: "6px 4px 6px 16px", borderLeft: `1px solid ${T.borderLight}` }}>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                      <div style={{ width: "48px", height: "6px", borderRadius: "3px", background: T.borderLight, overflow: "hidden" }}>
-                        <div style={{ height: "100%", width: `${row.readiness * 100}%`, borderRadius: "3px",
-                          background: row.readiness >= 0.7 ? `linear-gradient(90deg, ${T.success}88, ${T.success})` : row.readiness >= 0.4 ? `linear-gradient(90deg, ${T.warning}88, ${T.warning})` : `linear-gradient(90deg, ${T.danger}88, ${T.danger})`,
-                          transition: "width 0.3s ease" }} />
-                      </div>
-                      <span style={{ fontSize: "11px", fontFamily: MONO, fontWeight: 700, color: row.readiness >= 0.7 ? T.success : row.readiness >= 0.4 ? T.warning : T.danger, minWidth: "28px" }}>
-                        {(row.readiness * 100).toFixed(0)}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: W, height: "auto" }}>
+          {/* Axis lines + labels */}
+          {axes.map((a, i) => (
+            <g key={a}>
+              <line x1={axisX[i]} y1={padT} x2={axisX[i]} y2={padT + plotH} stroke={T.borderLight} strokeWidth={1} />
+              <text x={axisX[i]} y={padT + plotH + 18} textAnchor="middle" fontSize={10} fontWeight={600} fill={T.textTer} fontFamily={MONO}>{AXIS_LABELS[a]}</text>
+              {/* Tick labels: 0, 50, 100 */}
+              <text x={axisX[i] - 6} y={padT + plotH + 2} textAnchor="end" fontSize={8} fill={T.textTer}>0</text>
+              <text x={axisX[i] - 6} y={padT + plotH / 2 + 2} textAnchor="end" fontSize={8} fill={T.textTer}>50</text>
+              <text x={axisX[i] - 6} y={padT + 4} textAnchor="end" fontSize={8} fill={T.textTer}>100</text>
+            </g>
+          ))}
+          {/* Horizontal reference lines at 0.5 (50%) */}
+          <line x1={axisX[0]} y1={padT + plotH / 2} x2={axisX[axes.length - 1]} y2={padT + plotH / 2} stroke={T.borderLight} strokeWidth={0.5} strokeDasharray="4,4" />
+
+          {/* Candidate lines — dim ones first, hovered on top */}
+          {chartData.map((row, ri) => {
+            const isHov = hovIdx === ri;
+            const lineColor = DRUG_LINE[row.drug] || "#9CA3AF";
+            const points = axes.map((a, i) => `${axisX[i]},${padT + plotH * (1 - row[a])}`).join(" ");
+            return (
+              <polyline key={row.name} points={points} fill="none"
+                stroke={isHov ? lineColor : lineColor}
+                strokeWidth={isHov ? 2.5 : 1.3}
+                strokeOpacity={hovIdx != null ? (isHov ? 1 : 0.12) : 0.55}
+                strokeLinejoin="round"
+                style={{ transition: "stroke-opacity 0.2s, stroke-width 0.2s", cursor: "pointer" }}
+                onMouseEnter={() => setHovIdx(ri)} onMouseLeave={() => setHovIdx(null)}
+              />
+            );
+          })}
+
+          {/* Dots at axis intersections for hovered line */}
+          {hovIdx != null && axes.map((a, i) => {
+            const row = chartData[hovIdx];
+            const y = padT + plotH * (1 - row[a]);
+            return (
+              <g key={a}>
+                <circle cx={axisX[i]} cy={y} r={4} fill={DRUG_LINE[row.drug] || "#9CA3AF"} stroke="#fff" strokeWidth={1.5} />
+                <text x={axisX[i] + 8} y={y + 3} fontSize={9} fontWeight={700} fill={T.text} fontFamily={MONO}>{(row[a] * 100).toFixed(0)}%</text>
+              </g>
+            );
+          })}
+
+          {/* Hovered candidate label */}
+          {hovIdx != null && (() => {
+            const row = chartData[hovIdx];
+            const readinessColor = row.readiness >= 0.7 ? T.success : row.readiness >= 0.4 ? T.warning : T.danger;
+            return (
+              <g>
+                <text x={padL - 8} y={padT + plotH * (1 - row[axes[0]]) + 4} textAnchor="end" fontSize={10} fontWeight={700} fill={T.text} fontFamily={MONO}>{row.name}</text>
+                <text x={axisX[axes.length - 1] + 12} y={padT + plotH * (1 - row[axes[axes.length - 1]]) + 4} textAnchor="start" fontSize={10} fontWeight={700} fill={readinessColor} fontFamily={MONO}>{(row.readiness * 100).toFixed(0)}</text>
+              </g>
+            );
+          })()}
+
+          {/* Right-side readiness scores (always visible) */}
+          <text x={axisX[axes.length - 1] + 12} y={padT - 6} textAnchor="start" fontSize={9} fontWeight={600} fill={T.textTer}>Score</text>
+          {hovIdx == null && chartData.map((row, ri) => {
+            const y = padT + plotH * (1 - row[axes[axes.length - 1]]);
+            const readinessColor = row.readiness >= 0.7 ? T.success : row.readiness >= 0.4 ? T.warning : T.danger;
+            return (
+              <text key={ri} x={axisX[axes.length - 1] + 12} y={y + 3} fontSize={8} fill={readinessColor} fontFamily={MONO}
+                style={{ cursor: "pointer" }} onMouseEnter={() => setHovIdx(ri)} onMouseLeave={() => setHovIdx(null)}>
+                {(row.readiness * 100).toFixed(0)}
+              </text>
+            );
+          })}
+        </svg>
       </div>
+
+      {/* Panel-wide gap detection */}
+      {(() => {
+        const axisAvgs = axes.map(a => ({ axis: a, avg: chartData.reduce((s, r) => s + r[a], 0) / chartData.length }));
+        const weakest = axisAvgs.reduce((min, cur) => cur.avg < min.avg ? cur : min);
+        if (weakest.avg < 0.4) return (
+          <div style={{ marginTop: "12px", padding: "8px 14px", background: `${T.warning}10`, border: `1px solid ${T.warning}30`, borderRadius: "8px", fontSize: "11px", color: T.textSec, lineHeight: 1.5 }}>
+            Panel-wide gap: <strong style={{ color: T.text }}>{AXIS_LABELS[weakest.axis]}</strong> axis averages {(weakest.avg * 100).toFixed(0)}% — consider strengthening candidates on this dimension.
+          </div>
+        );
+        return null;
+      })()}
     </div>
   );
 };
@@ -2494,28 +2523,20 @@ const OverviewTab = ({ results, scorer, jobId }) => {
     return +(1 - (6 * dSq) / (n * (n * n - 1))).toFixed(2);
   })();
 
-  /* Adaptyv-style grouped stat section */
-  const StatGroup = ({ title, items }) => (
-    <div style={{ minWidth: 0 }}>
-      <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>{title}</div>
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${items.length}, 1fr)`, gap: 0 }}>
-        {items.map((s, i) => (
-          <div key={s.l} style={{ paddingLeft: i > 0 ? "16px" : 0, borderLeft: i > 0 ? `1px solid ${T.borderLight}` : "none" }}>
-            <div style={{ fontSize: "10px", fontWeight: 500, color: T.textTer, marginBottom: "6px" }}>{s.l}</div>
-            <div style={{ fontSize: mobile ? "18px" : "22px", fontWeight: 700, color: T.text, fontFamily: MONO, lineHeight: 1.2 }}>{s.v}</div>
-            {s.sub && <div style={{ fontSize: "10px", color: T.textTer, marginTop: "3px" }}>{s.sub}</div>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  // Verdict-first computed values
+  const assayReady = results.filter(r => r.readinessScore != null && r.readinessScore >= 0.4 && r.hasPrimers).length;
+  const totalTargets = results.length;
+  const sensitivity = totalTargets ? Math.round(withPrimers / totalTargets * 100) : 0;
+  const missingPrimers = results.filter(r => !r.hasPrimers);
+  const belowThreshold = results.filter(r => r.readinessScore != null && r.readinessScore < 0.4);
+  const discModel = directResults.some(r => r.discMethod === "neural") ? "GUARD-Net disc head" : directResults.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "XGBoost · 15 features" : "position × destab";
 
   return (
     <div>
-      {/* Explainer box — same blue as stat bar */}
-      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "10px", padding: mobile ? "16px" : "20px 24px", marginBottom: "24px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 700, color: T.primaryDark, fontFamily: HEADING, marginBottom: "8px" }}>How to read these results</div>
-        <div style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.7, opacity: 0.85 }}>
+      {/* Explainer box — neutral tone */}
+      <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "10px", padding: mobile ? "16px" : "20px 24px", marginBottom: "24px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>How to read these results</div>
+        <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7 }}>
           <p style={{ margin: "0 0 8px" }}>
             Each <strong>candidate</strong> is a CRISPR guide RNA (crRNA) designed to detect one specific drug-resistance mutation in <em>M. tuberculosis</em>.
             The pipeline evaluates every candidate on four axes:
@@ -2531,30 +2552,104 @@ const OverviewTab = ({ results, scorer, jobId }) => {
         </div>
       </div>
 
-      {/* Grouped stat bar — glass morphism */}
-      <div style={{ background: "rgba(255,255,255,0.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: `1px solid rgba(255,255,255,0.7)`, borderRadius: "16px", padding: mobile ? "20px 16px" : "28px 36px", marginBottom: "24px", display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr auto 1fr auto 1fr auto 1fr", gap: mobile ? "20px" : "0", alignItems: "start", width: "100%", boxSizing: "border-box", boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.03)" }}>
-        <StatGroup title="Panel" items={[
-          { l: "Candidates", v: results.length },
-          { l: "Drug classes", v: drugs.length },
-          { l: "Detection", v: `${directCount} / ${proximityCount}`, sub: "direct / proximity" },
-        ]} />
-        <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "100%", background: `linear-gradient(${mobile ? "90deg" : "180deg"}, transparent, ${T.borderLight}, transparent)`, margin: mobile ? 0 : "0 20px" }} />
-        <StatGroup title="Primers" items={[
-          { l: "Designed", v: `${withPrimers}/${results.length}` },
-          { l: "Coverage", v: `${results.length ? Math.round(withPrimers / results.length * 100) : 0}%` },
-        ]} />
-        <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "100%", background: `linear-gradient(${mobile ? "90deg" : "180deg"}, transparent, ${T.borderLight}, transparent)`, margin: mobile ? 0 : "0 20px" }} />
-        <StatGroup title="Discrimination" items={[
-          { l: "Avg. ratio", v: `${avgDisc}×` },
-          { l: "Diagnostic-grade", v: highDisc, sub: "≥ 3× threshold" },
-          { l: "Model", v: directResults.some(r => r.discMethod === "neural") ? "Neural" : directResults.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "Learned" : "Heuristic", sub: directResults.some(r => r.discMethod === "neural") ? "GUARD-Net disc head · 235K" : directResults.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "XGBoost · 15 features" : "position × destab" },
-        ]} />
-        <div style={{ width: mobile ? "100%" : "1px", height: mobile ? "1px" : "100%", background: `linear-gradient(${mobile ? "90deg" : "180deg"}, transparent, ${T.borderLight}, transparent)`, margin: mobile ? 0 : "0 20px" }} />
-        <StatGroup title="Predicted Activity" items={[
-          { l: "Avg. activity", v: usesGuardNet && avgEnsemble ? avgEnsemble : avgScore },
-          { l: "Range", v: `${minScore} – ${maxScore}`, sub: "min – max" },
-          ...(usesGuardNet && modelAgreement != null ? [{ l: "Model ρ", v: modelAgreement, sub: "heuristic vs net" }] : []),
-        ]} />
+      {/* ── Verdict-first panel ── */}
+      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "16px", padding: mobile ? "20px 16px" : "28px 36px", marginBottom: "24px", boxShadow: "0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.03)" }}>
+        {/* Headline verdict */}
+        <div style={{ marginBottom: "24px" }}>
+          <div style={{ fontSize: mobile ? "22px" : "28px", fontWeight: 800, color: T.text, fontFamily: HEADING, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+            {assayReady} of {totalTargets} targets are assay-ready
+          </div>
+          <div style={{ fontSize: "12px", color: T.textTer, marginTop: "6px" }}>
+            {drugs.length} drug classes · {directCount} direct / {proximityCount} proximity detection · {sensitivity}% primer coverage
+          </div>
+        </div>
+
+        {/* Three evidence columns */}
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: mobile ? "20px" : "28px" }}>
+          {/* Column 1: Can we detect resistance? */}
+          <div>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "14px" }}>Can we detect resistance?</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: "12px", color: T.textSec }}>Drug classes</span>
+                <span style={{ fontSize: "18px", fontWeight: 700, color: T.text, fontFamily: MONO }}>{drugs.length}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: "12px", color: T.textSec }}>Primer coverage</span>
+                <span style={{ fontSize: "18px", fontWeight: 700, color: T.text, fontFamily: MONO }}>{sensitivity}%</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: "12px", color: T.textSec }}>Detection split</span>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: T.textSec, fontFamily: MONO }}>{directCount} direct · {proximityCount} prox</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Column 2: How confident are we? */}
+          <div style={{ borderLeft: mobile ? "none" : `1px solid ${T.borderLight}`, paddingLeft: mobile ? 0 : "28px" }}>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "14px" }}>How confident are we?</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: "12px", color: T.textSec }}>Avg discrimination</span>
+                <span style={{ fontSize: "18px", fontWeight: 700, color: T.text, fontFamily: MONO }}>{avgDisc}×</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: "12px", color: T.textSec }}>Diagnostic-grade (≥3×)</span>
+                <span style={{ fontSize: "18px", fontWeight: 700, color: T.text, fontFamily: MONO }}>{highDisc}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: "12px", color: T.textSec }}>Mean activity</span>
+                <span style={{ fontSize: "18px", fontWeight: 700, color: T.text, fontFamily: MONO }}>{usesGuardNet && avgEnsemble ? avgEnsemble : avgScore}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                <span style={{ fontSize: "12px", color: T.textSec }}>Activity range</span>
+                <span style={{ fontSize: "13px", fontWeight: 600, color: T.textSec, fontFamily: MONO }}>{minScore} – {maxScore}</span>
+              </div>
+              {usesGuardNet && modelAgreement != null && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                  <span style={{ fontSize: "12px", color: T.textSec }}>Model ρ (heuristic vs net)</span>
+                  <span style={{ fontSize: "13px", fontWeight: 600, color: T.textSec, fontFamily: MONO }}>{modelAgreement}</span>
+                </div>
+              )}
+              <div style={{ fontSize: "10px", color: T.textTer, marginTop: "2px" }}>
+                Disc model: {discModel}
+              </div>
+            </div>
+          </div>
+
+          {/* Column 3: What's missing? */}
+          <div style={{ borderLeft: mobile ? "none" : `1px solid ${T.borderLight}`, paddingLeft: mobile ? 0 : "28px" }}>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "14px" }}>What's missing?</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+              {missingPrimers.length > 0 ? (
+                <div>
+                  <div style={{ fontSize: "12px", color: T.textSec, marginBottom: "4px" }}>{missingPrimers.length} target{missingPrimers.length > 1 ? "s" : ""} need primers</div>
+                  <div style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO }}>{missingPrimers.map(r => r.label).join(", ")}</div>
+                </div>
+              ) : (
+                <div style={{ fontSize: "12px", color: T.success }}>All targets have primers</div>
+              )}
+              {belowThreshold.length > 0 ? (
+                <div>
+                  <div style={{ fontSize: "12px", color: T.textSec, marginBottom: "4px" }}>{belowThreshold.length} below readiness threshold</div>
+                  <div style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO }}>{belowThreshold.map(r => r.label).join(", ")}</div>
+                </div>
+              ) : (
+                <div style={{ fontSize: "12px", color: T.success }}>All targets above readiness threshold</div>
+              )}
+              {(() => {
+                const lowDisc = directResults.filter(r => r.disc < 3 && r.disc > 0);
+                if (lowDisc.length === 0) return null;
+                return (
+                  <div>
+                    <div style={{ fontSize: "12px", color: T.textSec, marginBottom: "4px" }}>{lowDisc.length} below 3× discrimination</div>
+                    <div style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO }}>{lowDisc.map(r => r.label).join(", ")}</div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Experimental Priorities */}
@@ -3378,10 +3473,10 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
 
   return (
     <div>
-      {/* Blue explainer box */}
-      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "10px", padding: mobile ? "14px" : "18px 22px", marginBottom: "16px" }}>
-        <div style={{ fontSize: "13px", fontWeight: 700, color: T.primaryDark, fontFamily: HEADING, marginBottom: "6px" }}>Reading the table</div>
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : hasML ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr", gap: "6px 20px", fontSize: "12px", color: T.primaryDark, lineHeight: 1.5, opacity: 0.85 }}>
+      {/* Explainer box — neutral */}
+      <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "10px", padding: mobile ? "14px" : "18px 22px", marginBottom: "16px" }}>
+        <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "6px" }}>Reading the table</div>
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : hasML ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr", gap: "6px 20px", fontSize: "12px", color: T.textSec, lineHeight: 1.5 }}>
           <div><strong>Score</strong> — predicted trans-cleavage activity (0–1). Higher = stronger SWV signal decrease. {hasML ? `Ensemble of heuristic + ${hasGuardNet ? "GUARD-Net" : "CNN"}.` : "Heuristic composite."}</div>
           <div><strong>Disc</strong> — fold-difference in cleavage between MUT and WT templates. ≥ 3× = diagnostic-grade discrimination (specificity proxy: ~1-1/disc).</div>
           {hasML && <div><strong>{mlColLabel}</strong> — {hasGuardNet ? "GUARD-Net neural network" : "ML calibrated"} activity prediction (before ensemble).</div>}
