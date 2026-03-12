@@ -2537,7 +2537,7 @@ const UMAPPanel = ({ jobId }) => {
   if (loading) return null;
   if (!umapData) return null;
 
-  const GENE_COLORS = { rpoB: "#e6194b", katG: "#3cb44b", inhA: "#4363d8", embB: "#f58231", pncA: "#911eb4", gyrA: "#42d4f4", rrs: "#f032e6", IS6110: "#bfef45" };
+  const GENE_COLORS = { rpoB: "#e6194b", katG: "#3cb44b", fabG1: "#4363d8", embB: "#f58231", pncA: "#911eb4", gyrA: "#42d4f4", rrs: "#f032e6", eis: "#aaffc3", IS6110: "#bfef45" };
   const getGene = (label) => { if (!label) return "other"; const g = label.replace(/_.*/, ""); return GENE_COLORS[g] ? g : "other"; };
   const colorOpts = [
     { key: "drug", label: "Drug class" },
@@ -3705,7 +3705,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
       {/* Explainer box — blue */}
       <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "10px", padding: mobile ? "14px" : "14px 22px", marginBottom: "16px" }}>
         <div style={{ display: "flex", gap: "20px", fontSize: "11px", color: T.primaryDark, lineHeight: 1.5, flexWrap: "wrap", opacity: 0.85 }}>
-          <div><strong>Activity</strong> — GUARD-Net predicted Cas12a trans-cleavage (0–1). <strong>PAM-adj</strong> = Activity × PAM penalty (actual signal strength).</div>
+          <div><strong>Activity</strong> — GUARD-Net predicted Cas12a on-target efficiency (0–1). <strong>PAM-adj</strong> = Activity × PAM penalty (actual signal strength).</div>
           <div><strong>Disc</strong> — MUT/WT fold-difference. <span style={{ color: T.success }}>≥3×</span> diagnostic-grade. <span style={{ color: T.danger }}>&lt;2×</span> insufficient.</div>
           <div><strong>QC</strong> — biophysical heuristic (GC, homopolymer, off-target, self-comp). Sanity check, not a ranking score.</div>
           <div>Click any row to expand full details, scored sequence, primers, and alternatives.</div>
@@ -4197,7 +4197,7 @@ const DiscriminationTab = ({ results }) => {
 
       {/* Discrimination chart — horizontal lollipop */}
       {(() => {
-        const DRUG_DC = { RIF: "#2563EB", INH: "#D97706", EMB: "#2563EB", FQ: "#E11D48", AG: "#2563EB", PZA: "#16A34A", OTHER: "#9CA3AF" };
+        const DRUG_DC = { RIF: "#2563EB", INH: "#D97706", EMB: "#0D9488", FQ: "#E11D48", AG: "#F97316", PZA: "#16A34A", OTHER: "#9CA3AF" };
         const sorted = [...directCands].sort((a, b) => b.disc - a.disc);
         const discChart = sorted.map((r) => ({ name: r.label, disc: +r.disc, score: r.score, drug: r.drug }));
         const diagGrade = discChart.filter(d => d.disc >= 3).length;
@@ -4291,11 +4291,11 @@ const DiscriminationTab = ({ results }) => {
               const bestDisc = discChart[0];
               const worstDisc = discChart[discChart.length - 1];
               const below2 = discChart.filter(d => d.disc < 2);
-              const avgDisc = +(discChart.reduce((a, d) => a + d.disc, 0) / discChart.length).toFixed(1);
+              const avgDisc = discChart.length ? +(discChart.reduce((a, d) => a + d.disc, 0) / discChart.length).toFixed(1) : 0;
               return (
                 <div style={{ marginTop: "14px", padding: "12px 16px", background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "8px", fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
                   <strong style={{ color: T.primary }}>Interpretation:</strong> {diagGrade}/{directCands.length} candidates reach diagnostic-grade (≥ 3×), panel avg {avgDisc}×{directCands.some(r => r.discMethod === "neural") ? " (neural disc head)" : directCands.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? " (learned model)" : " (heuristic)"}.
-                  {bestDisc ? ` Highest: ${bestDisc.name} at ${bestDisc.disc.toFixed(1)}× — likely a seed-region mismatch (positions 1–4).` : ""}
+                  {bestDisc ? ` Highest: ${bestDisc.name} at ${bestDisc.disc.toFixed(1)}× — likely a seed-region mismatch (positions 1–8).` : ""}
                   {worstDisc ? ` Lowest: ${worstDisc.name} at ${worstDisc.disc.toFixed(1)}×${worstDisc.disc < 2 ? " — insufficient for any detection method, SM enhancement required." : worstDisc.disc < 3 ? " — acceptable but not diagnostic-grade." : "."}` : ""}
                   {below2.length > 0 ? ` ${below2.length} candidate${below2.length > 1 ? "s" : ""} (${below2.map(d => d.name).slice(0, 3).join(", ")}${below2.length > 3 ? "…" : ""}) fall below the 2× minimum — these have PAM-distal mismatches and require synthetic mismatch engineering.` : " All candidates meet the 2× minimum detection threshold."}
                   {excellent > 0 ? ` ${excellent} candidate${excellent > 1 ? "s" : ""} ${excellent > 1 ? "achieve" : "achieves"} excellent (≥ 10×) discrimination, suitable for lateral-flow deployment.` : ""}
