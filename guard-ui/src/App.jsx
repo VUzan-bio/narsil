@@ -28,18 +28,19 @@ import {
    DESIGN TOKENS — Adaptyv Foundry–inspired
    ═══════════════════════════════════════════════════════════════════ */
 const T = {
-  bg: "#FFFFFF", bgSub: "#F7F9FC", bgHover: "#EEF2F7",
-  border: "#E3E8EF", borderLight: "#F0F3F7",
-  text: "#111827", textSec: "#6B7280", textTer: "#9CA3AF",
-  primary: "#2563EB", primaryLight: "#DBEAFE", primaryDark: "#1E40AF", primarySub: "#BFDBFE",
-  success: "#16A34A", successLight: "#DCFCE7",
+  bg: "#FFFFFF", bgSub: "#FAFAF7", bgHover: "#F5F5F0",
+  border: "#E7E5E4", borderLight: "#F5F5F0",
+  text: "#1C1917", textSec: "#78716C", textTer: "#A8A29E",
+  primary: "#B45309", primaryLight: "#FFFBEB", primaryDark: "#92400E", primarySub: "#FDE68A",
+  success: "#15803D", successLight: "#DCFCE7",
   warning: "#D97706", warningLight: "#FEF3C7",
-  danger: "#DC2626", dangerLight: "#FEE2E2",
-  purple: "#2563EB", purpleLight: "#DBEAFE",
-  sidebar: "#FAFBFD", sidebarActive: "#DBEAFE", sidebarHover: "#F3F4F6", sidebarText: "#374151",
-  riskGreen: "#6BBF8A", riskGreenBg: "#E8F5EC",
-  riskAmber: "#E8A855", riskAmberBg: "#FDF2E0",
-  riskRed: "#E07070", riskRedBg: "#FBEAEA",
+  danger: "#B91C1C", dangerLight: "#FEE2E2",
+  navy: "#1E3A5F", navyLight: "#EFF6FF",
+  purple: "#1E3A5F", purpleLight: "#E0E7F0",
+  sidebar: "#FAFAF7", sidebarActive: "#FFFBEB", sidebarHover: "#F5F5F0", sidebarText: "#44403C",
+  riskGreen: "#15803D", riskGreenBg: "#DCFCE7",
+  riskAmber: "#B45309", riskAmberBg: "#FFFBEB",
+  riskRed: "#B91C1C", riskRedBg: "#FEE2E2",
 };
 const FONT = "'Urbanist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif";
 const HEADING = "'Urbanist', sans-serif";
@@ -353,20 +354,20 @@ const BIBLIOGRAPHY = [
    UTILITY COMPONENTS
    ═══════════════════════════════════════════════════════════════════ */
 const DRUG_COLORS = {
-  RIF: { bg: "#DBEAFE", text: "#1E40AF" }, INH: { bg: "#FEF3C7", text: "#92400E" },
-  EMB: { bg: "#DBEAFE", text: "#1E40AF" }, FQ: { bg: "#FFE4E6", text: "#9F1239" },
-  AG: { bg: "#DBEAFE", text: "#1E40AF" }, PZA: { bg: "#F0FDF4", text: "#166534" },
+  RIF: { bg: "#FFFBEB", text: "#92400E" }, INH: { bg: "#FEF3C7", text: "#92400E" },
+  EMB: { bg: "#E0E7F0", text: "#1E3A5F" }, FQ: { bg: "#FFE4E6", text: "#9F1239" },
+  AG: { bg: "#E0E7F0", text: "#1E3A5F" }, PZA: { bg: "#F0FDF4", text: "#166534" },
 };
-const DEFAULT_DRUG = { bg: "#F3F4F6", text: "#6B7280" };
+const DEFAULT_DRUG = { bg: "#F5F5F0", text: "#78716C" };
 
 const Badge = ({ children, variant = "default" }) => {
   const s = {
-    default: { background: "#F3F4F6", color: "#6B7280" },
+    default: { background: "#F5F5F0", color: "#78716C" },
     primary: { background: T.primaryLight, color: T.primaryDark },
     success: { background: "#DCFCE7", color: "#166534" },
     warning: { background: "#FEF3C7", color: "#92400E" },
     danger: { background: "#FEE2E2", color: "#991B1B" },
-    purple: { background: "#DBEAFE", color: "#1E40AF" },
+    purple: { background: "#E0E7F0", color: "#1E3A5F" },
   };
   return (
     <span style={{ ...(s[variant] || s.default), padding: "3px 10px", borderRadius: "999px", fontSize: "11px", fontWeight: 600, letterSpacing: "0.01em", display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>{children}</span>
@@ -555,8 +556,8 @@ const AmpliconMap = ({ r }) => {
       <line x1={pad} y1={45} x2={W - pad} y2={45} stroke={T.border} strokeWidth={2} />
       {r.fwd && <rect x={x(0)} y={36} width={fwdEnd * scale} height={18} rx={3} fill="#16A34A" fillOpacity={0.15} stroke="#16A34A" strokeWidth={1} />}
       {r.fwd && <text x={x(fwdEnd / 2)} y={32} textAnchor="middle" fontSize={8} fill="#16A34A" fontWeight={600}>FWD</text>}
-      {r.rev && <rect x={x(revStart)} y={36} width={30 * scale} height={18} rx={3} fill="#2563EB" fillOpacity={0.15} stroke="#2563EB" strokeWidth={1} />}
-      {r.rev && <text x={x(revStart + 15)} y={32} textAnchor="middle" fontSize={8} fill="#2563EB" fontWeight={600}>REV</text>}
+      {r.rev && <rect x={x(revStart)} y={36} width={30 * scale} height={18} rx={3} fill="#1E3A5F" fillOpacity={0.15} stroke="#1E3A5F" strokeWidth={1} />}
+      {r.rev && <text x={x(revStart + 15)} y={32} textAnchor="middle" fontSize={8} fill="#1E3A5F" fontWeight={600}>REV</text>}
       <rect x={x(pamStart)} y={36} width={4 * scale} height={18} rx={2} fill={T.warning} fillOpacity={0.3} stroke={T.warning} strokeWidth={1} />
       <text x={x(pamStart + 2)} y={72} textAnchor="middle" fontSize={8} fill={T.warning} fontWeight={600}>PAM</text>
       <rect x={x(spacerStart)} y={36} width={r.spacer.length * scale} height={18} rx={3} fill={T.primary} fillOpacity={0.25} stroke={T.primary} strokeWidth={1.5} />
@@ -602,7 +603,7 @@ const MismatchProfile = ({ spacer, wtSpacer, strategy }) => {
         <span style={{ width: 40, fontSize: "10px", color: T.textTer, fontWeight: 600 }}>WT</span>
         {wtSpacer.split("").map((c, i) => {
           const mm = c !== spacer[i];
-          return (<span key={`w${i}`} style={{ width: 18, height: 22, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "3px", fontWeight: 700, fontSize: "11px", background: mm ? "#F3F4F6" : "transparent", color: mm ? T.textSec : NUC[c], border: mm ? `1px solid ${T.border}` : `1px solid ${T.borderLight}` }}>{c}</span>);
+          return (<span key={`w${i}`} style={{ width: 18, height: 22, display: "inline-flex", alignItems: "center", justifyContent: "center", borderRadius: "3px", fontWeight: 700, fontSize: "11px", background: mm ? "#F5F5F0" : "transparent", color: mm ? T.textSec : NUC[c], border: mm ? `1px solid ${T.border}` : `1px solid ${T.borderLight}` }}>{c}</span>);
         })}
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "4px" }}>
@@ -691,7 +692,7 @@ const CandidateViewer = ({ r, onClose }) => {
         {r.strategy === "Proximity" && (
           <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "10px", padding: "16px 20px", marginBottom: "24px" }}>
             <div style={{ fontSize: "13px", fontWeight: 700, color: T.purple, fontFamily: HEADING, marginBottom: "6px" }}>Proximity Detection — PAM Desert Region</div>
-            <div style={{ fontSize: "12px", color: "#1E40AF", lineHeight: 1.6 }}>
+            <div style={{ fontSize: "12px", color: "#1E3A5F", lineHeight: 1.6 }}>
               <p style={{ margin: "0 0 6px" }}>
                 The <strong>{r.gene} {r.ref}{r.pos}{r.alt}</strong> mutation sits in a high-GC region with no Cas12a PAM placing the SNP within any spacer.
                 Instead, the crRNA binds a conserved site <strong>{r.proximityDistance ? `${r.proximityDistance} bp` : "nearby"}</strong> from the mutation.
@@ -1687,10 +1688,10 @@ const MethodsPage = () => {
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(4, 1fr)", gap: mobile ? "16px" : "20px" }}>
         {[
-          { step: "001", icon: Target, title: "Define targets", desc: "Resolve WHO catalogue mutations to H37Rv genomic coordinates, codon context, and drug class annotations.", color: "#2563EB" },
-          { step: "002", icon: Brain, title: "Score candidates", desc: "Scan PAM sites, generate crRNAs, and predict activity with GUARD-Net trained on 25K+ measurements.", color: "#0d9488" },
-          { step: "003", icon: Zap, title: "Optimise panel", desc: "Simulated annealing over candidate assignments with co-designed AS-RPA primers and multiplex constraints.", color: "#7c3aed" },
-          { step: "004", icon: Shield, title: "Assess clinically", desc: "Evaluate against WHO TPP thresholds for per-drug sensitivity, specificity, and three operating modes.", color: "#e11d48" },
+          { step: "001", icon: Target, title: "Define targets", desc: "Resolve WHO catalogue mutations to H37Rv genomic coordinates, codon context, and drug class annotations.", color: "#B45309" },
+          { step: "002", icon: Brain, title: "Score candidates", desc: "Scan PAM sites, generate crRNAs, and predict activity with GUARD-Net trained on 25K+ measurements.", color: "#1E3A5F" },
+          { step: "003", icon: Zap, title: "Optimise panel", desc: "Simulated annealing over candidate assignments with co-designed AS-RPA primers and multiplex constraints.", color: "#92400E" },
+          { step: "004", icon: Shield, title: "Assess clinically", desc: "Evaluate against WHO TPP thresholds for per-drug sensitivity, specificity, and three operating modes.", color: "#15803D" },
         ].map((c, idx) => (
           <div
             key={c.title}
@@ -1773,9 +1774,9 @@ const MethodsPage = () => {
       {/* Bento grid: 3 feature cards */}
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
         {[
-          { icon: Cpu, title: "Target DNA Branch", tag: "CNN", desc: "Multi-scale convolutions (k=3,5,7) scan the 34-nt target context for PAM quality, seed composition, and dinucleotide patterns.", accent: "#2563EB" },
-          { icon: Layers, title: "Guide RNA Branch", tag: "RNA-FM", desc: "Pre-trained foundation model (23M sequences) captures folding stability and accessibility governing Cas12a loading.", accent: "#0d9488" },
-          { icon: TrendingUp, title: "R-Loop Propagation", tag: "RLPA", desc: "Causal attention encodes PAM-proximal to distal directionality. +6.7% cross-dataset generalisation vs bidirectional.", accent: "#7c3aed" },
+          { icon: Cpu, title: "Target DNA Branch", tag: "CNN", desc: "Multi-scale convolutions (k=3,5,7) scan the 34-nt target context for PAM quality, seed composition, and dinucleotide patterns.", accent: "#B45309" },
+          { icon: Layers, title: "Guide RNA Branch", tag: "RNA-FM", desc: "Pre-trained foundation model (23M sequences) captures folding stability and accessibility governing Cas12a loading.", accent: "#1E3A5F" },
+          { icon: TrendingUp, title: "R-Loop Propagation", tag: "RLPA", desc: "Causal attention encodes PAM-proximal to distal directionality. +6.7% cross-dataset generalisation vs bidirectional.", accent: "#92400E" },
         ].map(c => (
           <div key={c.title} style={{
             background: T.bg,
@@ -1876,10 +1877,10 @@ const MethodsPage = () => {
         {archOpen && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0px" }}>
             {[
-              { label: "Branch 1", title: "Multi-Scale CNN", accent: "#2563EB", input: "34-nt one-hot encoded target (4 PAM + 20 protospacer + 10 flanking).", process: "Three parallel conv paths (k=3,5,7), 32 channels each, BN + dropout(0.3). Projected to 64-dim via 1×1 conv.", output: "64-dim per position: dinucleotide preferences, seed complementarity, PAM patterns." },
-              { label: "Branch 2", title: "RNA-FM Projection", accent: "#0d9488", input: "Guide RNA (20–23 nt). Processed by frozen RNA-FM (23M sequences, masked LM).", process: "640-dim per-nucleotide embeddings → trainable linear → 64-dim. Zero-padded to 34 positions.", output: "64-dim structural embedding: folding, stability, 5' accessibility." },
-              { label: "Fusion", title: "R-Loop Propagation Attention", accent: "#7c3aed", input: "Concatenated 128-dim (64 CNN + 64 RNA-FM) at each of 34 positions.", process: "Single-head attention, 32-dim Q/K/V, causal mask (PAM-proximal → distal), learnable 34×34 positional bias.", output: "Attention-weighted 128-dim features re-weighted by positional importance." },
-              { label: "Output", title: "Multi-Task Heads", accent: "#e11d48", input: "RLPA-weighted representation, globally pooled.", process: "Efficiency: 128→64→32→1 (sigmoid). Discrimination: 547→64→32→1 (Softplus).", output: "Two scalars: efficiency (0–1) and discrimination ratio (fold-change MUT/WT)." },
+              { label: "Branch 1", title: "Multi-Scale CNN", accent: "#B45309", input: "34-nt one-hot encoded target (4 PAM + 20 protospacer + 10 flanking).", process: "Three parallel conv paths (k=3,5,7), 32 channels each, BN + dropout(0.3). Projected to 64-dim via 1×1 conv.", output: "64-dim per position: dinucleotide preferences, seed complementarity, PAM patterns." },
+              { label: "Branch 2", title: "RNA-FM Projection", accent: "#1E3A5F", input: "Guide RNA (20–23 nt). Processed by frozen RNA-FM (23M sequences, masked LM).", process: "640-dim per-nucleotide embeddings → trainable linear → 64-dim. Zero-padded to 34 positions.", output: "64-dim structural embedding: folding, stability, 5' accessibility." },
+              { label: "Fusion", title: "R-Loop Propagation Attention", accent: "#92400E", input: "Concatenated 128-dim (64 CNN + 64 RNA-FM) at each of 34 positions.", process: "Single-head attention, 32-dim Q/K/V, causal mask (PAM-proximal → distal), learnable 34×34 positional bias.", output: "Attention-weighted 128-dim features re-weighted by positional importance." },
+              { label: "Output", title: "Multi-Task Heads", accent: "#15803D", input: "RLPA-weighted representation, globally pooled.", process: "Efficiency: 128→64→32→1 (sigmoid). Discrimination: 547→64→32→1 (Softplus).", output: "Two scalars: efficiency (0–1) and discrimination ratio (fold-change MUT/WT)." },
             ].map((block, idx, arr) => (
               <div key={block.title} style={{ padding: "18px 0", borderBottom: idx < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
@@ -1909,10 +1910,10 @@ const MethodsPage = () => {
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
         {[
-          { icon: TrendingUp, title: "Per-drug sensitivity", desc: "WHO TPP minimums: ≥95% RIF, ≥90% INH/FQ, ≥80% EMB/PZA/AG.", accent: "#2563EB" },
-          { icon: Shield, title: "Specificity estimate", desc: "Discrimination ratio predicts false-positive rates. ≥3× diagnostic-grade, ≥10× reference-lab.", accent: "#0d9488" },
-          { icon: Settings, title: "Three operating modes", desc: "High Sensitivity (field), Balanced (WHO TPP), High Specificity (reference lab).", accent: "#7c3aed" },
-          { icon: Layers, title: "Ranked alternatives", desc: "3–5 backup candidates per target with documented efficiency-discrimination tradeoffs.", accent: "#e11d48" },
+          { icon: TrendingUp, title: "Per-drug sensitivity", desc: "WHO TPP minimums: ≥95% RIF, ≥90% INH/FQ, ≥80% EMB/PZA/AG.", accent: "#B45309" },
+          { icon: Shield, title: "Specificity estimate", desc: "Discrimination ratio predicts false-positive rates. ≥3× diagnostic-grade, ≥10× reference-lab.", accent: "#1E3A5F" },
+          { icon: Settings, title: "Three operating modes", desc: "High Sensitivity (field), Balanced (WHO TPP), High Specificity (reference lab).", accent: "#92400E" },
+          { icon: Layers, title: "Ranked alternatives", desc: "3–5 backup candidates per target with documented efficiency-discrimination tradeoffs.", accent: "#15803D" },
         ].map(c => (
           <div key={c.title} style={{
             display: "flex", gap: "16px", padding: "22px 24px",
@@ -1947,10 +1948,10 @@ const MethodsPage = () => {
         border: `1px solid ${T.border}`,
       }}>
         {[
-          { label: "Excellent", val: "≥ 10×", desc: "Single-plex clinical use. Robust across sample types.", accent: "#16A34A" },
-          { label: "Good", val: "≥ 3×", desc: "Multiplex panel. Electrochemical and lateral flow.", accent: "#2563EB" },
-          { label: "Acceptable", val: "≥ 2×", desc: "Requires confirmatory readout or dual-target.", accent: "#D97706" },
-          { label: "Insufficient", val: "< 2×", desc: "Synthetic mismatch enhancement needed.", accent: "#DC2626" },
+          { label: "Excellent", val: "≥ 10×", desc: "Single-plex clinical use. Robust across sample types.", accent: "#15803D" },
+          { label: "Good", val: "≥ 3×", desc: "Multiplex panel. Electrochemical and lateral flow.", accent: "#1E3A5F" },
+          { label: "Acceptable", val: "≥ 2×", desc: "Requires confirmatory readout or dual-target.", accent: "#B45309" },
+          { label: "Insufficient", val: "< 2×", desc: "Synthetic mismatch enhancement needed.", accent: "#B91C1C" },
         ].map(t => (
           <div key={t.label} style={{ background: T.bg, padding: "24px 20px" }}>
             <div style={{ fontSize: "28px", fontWeight: 700, color: T.text, fontFamily: FONT, letterSpacing: "-0.03em", marginBottom: "2px" }}>{t.val}</div>
@@ -2137,7 +2138,7 @@ const gradientColor = (t) => {
     { t: 0.25, r: 171, g: 221, b: 164 },  // #abdda4 — pale green
     { t: 0.50, r: 102, g: 194, b: 165 },  // #66c2a5 — teal
     { t: 0.75, r: 50,  g: 136, b: 189 },  // #3288bd — blue
-    { t: 1.00, r: 37,  g: 99,  b: 235 },  // #2563EB — deep blue (high)
+    { t: 1.00, r: 30,  g: 58,  b: 95 },   // #1E3A5F — deep navy (high)
   ];
   let lower = stops[0], upper = stops[stops.length - 1];
   for (let i = 0; i < stops.length - 1; i++) {
@@ -2150,18 +2151,18 @@ const gradientColor = (t) => {
   const b = Math.round(lower.b + f * (upper.b - lower.b));
   return `rgb(${r},${g},${b})`;
 };
-const gradientCSS = "linear-gradient(90deg, #b4b9c3, #abdda4, #66c2a5, #3288bd, #2563EB)";
-const CHART_TEXT = "#1f2937";
-const CHART_TEXT_SEC = "#6b7280";
-const CHART_GRID = "#e5e7eb";
-const PASS_GREEN = "#22c55e";
-const AXIS_COLORS = { efficiency: "#abdda4", discrimination: "#2563EB", primers: "#3288bd", safety: "#66c2a5", gc: "#b0b0b0" };
+const gradientCSS = "linear-gradient(90deg, #b4b9c3, #abdda4, #66c2a5, #3288bd, #1E3A5F)";
+const CHART_TEXT = "#1C1917";
+const CHART_TEXT_SEC = "#78716C";
+const CHART_GRID = "#E7E5E4";
+const PASS_GREEN = "#15803D";
+const AXIS_COLORS = { efficiency: "#abdda4", discrimination: "#1E3A5F", primers: "#3288bd", safety: "#66c2a5", gc: "#b0b0b0" };
 const AXIS_LABELS = { efficiency: "Activity", discrimination: "Discrimination", primers: "Primers", safety: "Off-target", gc: "GC" };
 
 const RiskDot = ({ level, size = 12 }) => (
   <span style={{
     display: "inline-block", width: size, height: size, borderRadius: "50%",
-    backgroundColor: RISK_COLORS[level] || "#6b7280", flexShrink: 0,
+    backgroundColor: RISK_COLORS[level] || "#78716C", flexShrink: 0,
   }} />
 );
 
@@ -2314,7 +2315,7 @@ const ReadinessChart = ({ results }) => {
   const [hovIdx, setHovIdx] = useState(null);
 
   // UMAP-style gradient colors per drug class
-  const DRUG_LINE = { RIF: "#2563EB", INH: "#D97706", EMB: "#0D9488", PZA: "#16A34A", FQ: "#E11D48", AG: "#F97316", OTHER: "#6B7280", CTRL: "#6B7280" };
+  const DRUG_LINE = { RIF: "#1E3A5F", INH: "#B45309", EMB: "#0D9488", PZA: "#15803D", FQ: "#B91C1C", AG: "#92400E", OTHER: "#78716C", CTRL: "#78716C" };
 
   // Full-width responsive SVG — use viewBox for scaling
   const W = 900, H = 290, padL = 100, padR = 80, padT = 20, padB = 34;
@@ -2350,16 +2351,16 @@ const ReadinessChart = ({ results }) => {
         {/* Axis lines */}
         {axes.map((a, i) => (
           <g key={a}>
-            <line x1={axisX[i]} y1={padT} x2={axisX[i]} y2={padT + plotH} stroke="#E5E7EB" strokeWidth={1} />
+            <line x1={axisX[i]} y1={padT} x2={axisX[i]} y2={padT + plotH} stroke="#E7E5E4" strokeWidth={1} />
             {/* Axis label */}
-            <text x={axisX[i]} y={padT + plotH + 24} textAnchor="middle" fontSize={11} fontWeight={600} fill="#6B7280" fontFamily="Urbanist, sans-serif">{AXIS_LABELS[a]}</text>
+            <text x={axisX[i]} y={padT + plotH + 24} textAnchor="middle" fontSize={11} fontWeight={600} fill="#78716C" fontFamily="Urbanist, sans-serif">{AXIS_LABELS[a]}</text>
             {/* Tick marks at 0%, 25%, 50%, 75%, 100% */}
             {[0, 0.25, 0.5, 0.75, 1].map(v => {
               const ty = padT + plotH * (1 - v);
               return (
                 <g key={v}>
                   <line x1={axisX[i] - 3} y1={ty} x2={axisX[i] + 3} y2={ty} stroke="#D1D5DB" strokeWidth={0.5} />
-                  {i === 0 && <text x={axisX[0] - 8} y={ty + 3} textAnchor="end" fontSize={9} fill="#9CA3AF">{Math.round(v * 100)}</text>}
+                  {i === 0 && <text x={axisX[0] - 8} y={ty + 3} textAnchor="end" fontSize={9} fill="#A8A29E">{Math.round(v * 100)}</text>}
                 </g>
               );
             })}
@@ -2367,12 +2368,12 @@ const ReadinessChart = ({ results }) => {
         ))}
 
         {/* 50% reference line */}
-        <line x1={axisX[0]} y1={padT + plotH / 2} x2={axisX[axes.length - 1]} y2={padT + plotH / 2} stroke="#E5E7EB" strokeWidth={0.7} strokeDasharray="6,4" />
+        <line x1={axisX[0]} y1={padT + plotH / 2} x2={axisX[axes.length - 1]} y2={padT + plotH / 2} stroke="#E7E5E4" strokeWidth={0.7} strokeDasharray="6,4" />
 
         {/* Candidate polylines — non-hovered first (dimmed), then hovered on top */}
         {chartData.map((row, ri) => {
           if (hovIdx != null && hovIdx === ri) return null; // draw hovered last
-          const lineColor = DRUG_LINE[row.drug] || "#6B7280";
+          const lineColor = DRUG_LINE[row.drug] || "#78716C";
           const points = axes.map((a, i) => `${axisX[i]},${padT + plotH * (1 - row[a])}`).join(" ");
           return (
             <polyline key={row.name} points={points} fill="none"
@@ -2388,7 +2389,7 @@ const ReadinessChart = ({ results }) => {
         {/* Hovered line (on top, bold) */}
         {hovIdx != null && (() => {
           const row = chartData[hovIdx];
-          const lineColor = DRUG_LINE[row.drug] || "#6B7280";
+          const lineColor = DRUG_LINE[row.drug] || "#78716C";
           const points = axes.map((a, i) => `${axisX[i]},${padT + plotH * (1 - row[a])}`).join(" ");
           return (
             <polyline points={points} fill="none" stroke={lineColor} strokeWidth={3}
@@ -2400,11 +2401,11 @@ const ReadinessChart = ({ results }) => {
         {hovIdx != null && axes.map((a, i) => {
           const row = chartData[hovIdx];
           const y = padT + plotH * (1 - row[a]);
-          const lineColor = DRUG_LINE[row.drug] || "#6B7280";
+          const lineColor = DRUG_LINE[row.drug] || "#78716C";
           return (
             <g key={a}>
               <circle cx={axisX[i]} cy={y} r={5} fill={lineColor} stroke="#fff" strokeWidth={2} />
-              <text x={axisX[i] + (i === axes.length - 1 ? -10 : 10)} y={y - 8} textAnchor={i === axes.length - 1 ? "end" : "start"} fontSize={10} fontWeight={700} fill="#374151" fontFamily="Urbanist, sans-serif">{(row[a] * 100).toFixed(0)}%</text>
+              <text x={axisX[i] + (i === axes.length - 1 ? -10 : 10)} y={y - 8} textAnchor={i === axes.length - 1 ? "end" : "start"} fontSize={10} fontWeight={700} fill="#44403C" fontFamily="Urbanist, sans-serif">{(row[a] * 100).toFixed(0)}%</text>
             </g>
           );
         })}
@@ -2412,13 +2413,13 @@ const ReadinessChart = ({ results }) => {
         {/* Hovered candidate name + readiness score */}
         {hovIdx != null && (() => {
           const row = chartData[hovIdx];
-          const lineColor = DRUG_LINE[row.drug] || "#6B7280";
+          const lineColor = DRUG_LINE[row.drug] || "#78716C";
           const readinessColor = row.readiness >= 0.7 ? T.success : row.readiness >= 0.4 ? T.warning : T.danger;
           const firstY = padT + plotH * (1 - row[axes[0]]);
           return (
             <g>
               {/* Left: target name */}
-              <rect x={2} y={firstY - 10} width={padL - 12} height={18} rx={3} fill="#fff" stroke="#E5E7EB" strokeWidth={0.5} />
+              <rect x={2} y={firstY - 10} width={padL - 12} height={18} rx={3} fill="#fff" stroke="#E7E5E4" strokeWidth={0.5} />
               <text x={padL - 14} y={firstY + 3} textAnchor="end" fontSize={10} fontWeight={700} fill={lineColor} fontFamily="Urbanist, sans-serif">{row.name}</text>
               {/* Right: readiness score */}
               <rect x={axisX[axes.length - 1] + 8} y={padT + plotH * (1 - row[axes[axes.length - 1]]) - 10} width={55} height={18} rx={3} fill={readinessColor} opacity={0.15} />
@@ -2428,7 +2429,7 @@ const ReadinessChart = ({ results }) => {
         })()}
 
         {/* Right-side readiness scores (always visible when not hovering) */}
-        <text x={axisX[axes.length - 1] + 12} y={padT - 8} textAnchor="start" fontSize={9} fontWeight={600} fill="#9CA3AF">Readiness</text>
+        <text x={axisX[axes.length - 1] + 12} y={padT - 8} textAnchor="start" fontSize={9} fontWeight={600} fill="#A8A29E">Readiness</text>
         {hovIdx == null && chartData.map((row, ri) => {
           const y = padT + plotH * (1 - row[axes[axes.length - 1]]);
           const readinessColor = row.readiness >= 0.7 ? T.success : row.readiness >= 0.4 ? T.warning : T.danger;
@@ -2443,7 +2444,7 @@ const ReadinessChart = ({ results }) => {
         {/* Left-side candidate names (always visible when not hovering) */}
         {hovIdx == null && chartData.map((row, ri) => {
           const y = padT + plotH * (1 - row[axes[0]]);
-          const lineColor = DRUG_LINE[row.drug] || "#6B7280";
+          const lineColor = DRUG_LINE[row.drug] || "#78716C";
           return (
             <text key={ri} x={padL - 8} y={y + 3} textAnchor="end" fontSize={8} fill={lineColor} fontFamily="Urbanist, sans-serif" opacity={0.7}
               style={{ cursor: "pointer" }} onMouseEnter={() => setHovIdx(ri)} onMouseLeave={() => setHovIdx(null)}>
@@ -2471,7 +2472,7 @@ const ReadinessChart = ({ results }) => {
 /* ═══════════════════════════════════════════════════════════════════
    UMAP EMBEDDING PANEL
    ═══════════════════════════════════════════════════════════════════ */
-const DRUG_CANVAS = { RIF: "#2563EB", INH: "#D97706", EMB: "#2563EB", FQ: "#E11D48", AG: "#2563EB", PZA: "#16A34A", OTHER: "#6B7280" };
+const DRUG_CANVAS = { RIF: "#1E3A5F", INH: "#B45309", EMB: "#1E3A5F", FQ: "#B91C1C", AG: "#1E3A5F", PZA: "#15803D", OTHER: "#78716C" };
 
 const UMAPPanel = ({ jobId }) => {
   const [umapData, setUmapData] = useState(null);
@@ -2528,7 +2529,7 @@ const UMAPPanel = ({ jobId }) => {
         const gcNorm = 1 - Math.min(Math.abs(gc - 0.5) / 0.25, 1);
         return gradientColor(gcNorm);
       }
-      if (colorBy === "strategy") return p.detection_strategy === "direct" ? "#3288bd" : "#2563EB";
+      if (colorBy === "strategy") return p.detection_strategy === "direct" ? "#3288bd" : "#1E3A5F";
       return gradientColor(0.5);
     };
 
@@ -3005,8 +3006,8 @@ const OverviewTab = ({ results, scorer, jobId }) => {
               </ResponsiveContainer>
               {/* Quadrant labels */}
               <div style={{ position: "absolute", top: "24px", right: "28px", fontSize: "9px", fontWeight: 700, color: "#66c2a5", opacity: 0.8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Diagnostic-ready</div>
-              <div style={{ position: "absolute", top: "24px", left: "60px", fontSize: "9px", fontWeight: 700, color: "#9ca3af", opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Low score</div>
-              <div style={{ position: "absolute", bottom: "42px", right: "28px", fontSize: "9px", fontWeight: 700, color: "#9ca3af", opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Low discrimination</div>
+              <div style={{ position: "absolute", top: "24px", left: "60px", fontSize: "9px", fontWeight: 700, color: "#A8A29E", opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Low score</div>
+              <div style={{ position: "absolute", bottom: "42px", right: "28px", fontSize: "9px", fontWeight: 700, color: "#A8A29E", opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Low discrimination</div>
             </div>
             {/* Legend */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px", flexWrap: "wrap" }}>
@@ -3510,7 +3511,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
       {r.strategy === "Proximity" && (
         <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "10px", padding: "14px 18px", marginBottom: "16px" }}>
           <div style={{ fontSize: "12px", fontWeight: 700, color: T.purple, fontFamily: HEADING, marginBottom: "4px" }}>Proximity Detection — PAM Desert</div>
-          <div style={{ fontSize: "11px", color: "#1E40AF", lineHeight: 1.5 }}>
+          <div style={{ fontSize: "11px", color: "#1E3A5F", lineHeight: 1.5 }}>
             crRNA binds a conserved site {r.proximityDistance ? `${r.proximityDistance} bp` : "near"} the mutation. Discrimination via AS-RPA primers.
           </div>
         </div>
@@ -4253,7 +4254,7 @@ const DiscriminationTab = ({ results }) => {
 
       {/* Discrimination chart — horizontal lollipop */}
       {(() => {
-        const DRUG_DC = { RIF: "#2563EB", INH: "#D97706", EMB: "#0D9488", FQ: "#E11D48", AG: "#F97316", PZA: "#16A34A", OTHER: "#9CA3AF" };
+        const DRUG_DC = { RIF: "#1E3A5F", INH: "#B45309", EMB: "#0D9488", FQ: "#B91C1C", AG: "#92400E", PZA: "#15803D", OTHER: "#A8A29E" };
         const sorted = [...directCands].sort((a, b) => b.disc - a.disc);
         const discChart = sorted.map((r) => ({ name: r.label, disc: +r.disc, score: r.score, drug: r.drug }));
         const diagGrade = discChart.filter(d => d.disc >= 3).length;
@@ -4697,8 +4698,8 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   ];
 
   // Drug colors for pads
-  const PAD_DRUG_COLORS = { RIF: "#2563EB", INH: "#3288bd", EMB: "#66c2a5", PZA: "#abdda4", FQ: "#60A5FA", AG: "#4ba3cc", CTRL: "#9ca3af" };
-  const PAD_DRUG_BG = { RIF: "#EFF6FF", INH: "#e8f4fa", EMB: "#ecf8f4", PZA: "#f2f9ee", FQ: "#EFF6FF", AG: "#eaf6fc", CTRL: "#f3f4f6" };
+  const PAD_DRUG_COLORS = { RIF: "#1E3A5F", INH: "#B45309", EMB: "#0D9488", PZA: "#15803D", FQ: "#B91C1C", AG: "#92400E", CTRL: "#A8A29E" };
+  const PAD_DRUG_BG = { RIF: "#E0E7F0", INH: "#FFFBEB", EMB: "#ecf8f4", PZA: "#f2f9ee", FQ: "#FEE2E2", AG: "#FFFBEB", CTRL: "#F5F5F0" };
 
   const targetDrug = (t) => {
     const r = results.find(x => x.label === t);
@@ -4750,7 +4751,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   };
 
   const WHO_thresholds = { RIF: 0.95, INH: 0.90, FQ: 0.90, EMB: 0.80, PZA: 0.80, AG: 0.80 };
-  const DRUG_LINE_COLORS = { RIF: "#2563EB", INH: "#D97706", EMB: "#0D9488", PZA: "#16A34A", FQ: "#E11D48", AG: "#F97316", IS6110: "#6B7280" };
+  const DRUG_LINE_COLORS = { RIF: "#1E3A5F", INH: "#B45309", EMB: "#0D9488", PZA: "#15803D", FQ: "#B91C1C", AG: "#92400E", IS6110: "#78716C" };
 
   // ═══════════ PREDICTED ELECTROCHEMICAL READOUT — Physics Engine ═══════════
   // Architecture-specific electrochemistry configurations
@@ -5133,7 +5134,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   return (
     <div>
       {/* ═══════════ SECTION 0: 3D Interactive Chip Render ═══════════ */}
-      <CollapsibleSection title="Device Architecture · 3D" defaultOpen={true} badge={{ text: "interactive", bg: "#DBEAFE", color: "#2563EB" }}>
+      <CollapsibleSection title="Device Architecture · 3D" defaultOpen={true} badge={{ text: "interactive", bg: "#FFFBEB", color: "#B45309" }}>
         <ChipRender3D
           electrodeLayout={electrodeLayout}
           targetDrug={targetDrug}
@@ -5176,10 +5177,10 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
               </thead>
               <tbody>
                 {(kinetics.phases || []).map((phase, i) => (
-                  <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}`, background: phase.is_bottleneck ? "#2563EB08" : "transparent" }}>
+                  <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}`, background: phase.is_bottleneck ? "#B4530908" : "transparent" }}>
                     <td style={{ padding: "8px 12px", fontWeight: phase.is_bottleneck ? 600 : 400 }}>
                       {phase.phase}
-                      {phase.is_bottleneck && <span style={{ fontSize: "9px", fontWeight: 700, color: "#2563EB", marginLeft: "8px", padding: "1px 6px", background: "#2563EB15", borderRadius: "4px" }}>RATE-LIMITING</span>}
+                      {phase.is_bottleneck && <span style={{ fontSize: "9px", fontWeight: 700, color: "#B45309", marginLeft: "8px", padding: "1px 6px", background: "#B4530915", borderRadius: "4px" }}>RATE-LIMITING</span>}
                     </td>
                     <td style={{ textAlign: "center", padding: "8px 12px", color: T.textSec, fontFamily: FONT }}>{phase.solution_bound}</td>
                     <td style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600, fontFamily: FONT }}>{phase.on_electrode}</td>
@@ -5208,12 +5209,12 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             WHO TPP target: {kinetics.totals?.who_tpp_target || "< 120 min"}. Estimated total: {kinetics.totals?.total_electrode || "30\u201350 min"} — <strong style={{ color: T.success }}>within target</strong> with 2-4\u00d7 margin.
           </div>
 
-          <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "8px", padding: "14px 18px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, color: "#2563EB", fontFamily: HEADING, marginBottom: "8px" }}>Key Insights</div>
+          <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: "8px", padding: "14px 18px" }}>
+            <div style={{ fontSize: "11px", fontWeight: 700, color: "#B45309", fontFamily: HEADING, marginBottom: "8px" }}>Key Insights</div>
             {(kinetics.insights || []).map((ins, i) => (
               <div key={i} style={{ marginBottom: i < (kinetics.insights || []).length - 1 ? "8px" : 0 }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: "#2563EB", opacity: 0.9 }}>{i + 1}. {ins.title}</div>
-                <p style={{ fontSize: "11px", color: "#4a3d8f", lineHeight: 1.6, margin: "2px 0 0", opacity: 0.8 }}>{ins.text}</p>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: "#B45309", opacity: 0.9 }}>{i + 1}. {ins.title}</div>
+                <p style={{ fontSize: "11px", color: "#92400E", lineHeight: 1.6, margin: "2px 0 0", opacity: 0.8 }}>{ins.text}</p>
               </div>
             ))}
           </div>
@@ -5222,7 +5223,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
 
       {/* ═══════════ SECTION 2: Predicted Electrochemical Readout ═══════════ */}
-      <CollapsibleSection title="Predicted Electrochemical Readout" defaultOpen={true} badge={{ text: "computed", bg: "#DBEAFE", color: "#2563EB" }}>
+      <CollapsibleSection title="Predicted Electrochemical Readout" defaultOpen={true} badge={{ text: "computed", bg: "#FFFBEB", color: "#B45309" }}>
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "16px" : "24px", marginBottom: "24px" }}>
           {/* Header description — architecture-dependent */}
           <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "20px", lineHeight: 1.6 }}>
@@ -5357,7 +5358,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
           {/* ── 3-Panel Grid: A (voltammogram), B (time course), C (discrimination) ── */}
           {(() => {
             // Electrochemistry panel color palette
-            const EC = { green: "#10b981", greenLight: "#10b98120", purple: "#8b5cf6", purpleLight: "#8b5cf610", pink: "#ec4899", pinkLight: "#ec489915", gray: "#9ca3af", blue: "#3b82f6", orange: "#f59e0b" };
+            const EC = { green: "#10b981", greenLight: "#10b98120", purple: "#8b5cf6", purpleLight: "#8b5cf610", pink: "#ec4899", pinkLight: "#ec489915", gray: "#A8A29E", blue: "#1E3A5F", orange: "#B45309" };
             // Architecture-aware E-axis helpers
             const eS = archCfg.E_start, eE = archCfg.E_end;
             const eRange = eE - eS;
@@ -5788,7 +5789,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
       {/* ═══════════ SECTION 8: AS-RPA Thermodynamic Discrimination ═══════════ */}
       {results.some(r => r.asrpaDiscrimination) && (
-      <CollapsibleSection title="AS-RPA Thermodynamic Discrimination" defaultOpen={false} badge={{ text: `${proximityCount} proximity`, bg: "#e8f4fa", color: "#3288bd" }}>
+      <CollapsibleSection title="AS-RPA Thermodynamic Discrimination" defaultOpen={false} badge={{ text: `${proximityCount} proximity`, bg: "#FFFBEB", color: "#B45309" }}>
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
           <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>AS-RPA Thermodynamic Discrimination</div>
           <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "8px", lineHeight: 1.6 }}>
@@ -6276,12 +6277,12 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <AreaChart data={combined} margin={{ top: 10, right: 15, bottom: 25, left: 15 }}>
                     <defs>
                       <linearGradient id="mutAreaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#2563EB" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="#2563EB" stopOpacity={0.03} />
+                        <stop offset="0%" stopColor="#1E3A5F" stopOpacity={0.35} />
+                        <stop offset="100%" stopColor="#1E3A5F" stopOpacity={0.03} />
                       </linearGradient>
                       <linearGradient id="wtAreaFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#9ca3af" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="#9ca3af" stopOpacity={0.03} />
+                        <stop offset="0%" stopColor="#A8A29E" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="#A8A29E" stopOpacity={0.03} />
                       </linearGradient>
                       <linearGradient id="overlapAreaFill" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor="#66c2a5" stopOpacity={0.15} />
@@ -6296,29 +6297,29 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                         <div style={{ ...tooltipStyle, padding: "10px 14px" }}>
                           <div style={{ fontWeight: 600, fontSize: "11px", color: T.text, marginBottom: "4px" }}>Activity: {label}</div>
                           {payload.map(p => p.dataKey !== "overlap" && (
-                            <div key={p.dataKey} style={{ fontSize: "11px", color: p.dataKey === "mut" ? "#2563EB" : "#9ca3af" }}>
+                            <div key={p.dataKey} style={{ fontSize: "11px", color: p.dataKey === "mut" ? "#1E3A5F" : "#A8A29E" }}>
                               {p.dataKey === "mut" ? "Mutant" : "Wildtype"}: {p.value?.toFixed(4)}
                             </div>
                           ))}
                         </div>
                       );
                     }} />
-                    <ReferenceLine x={meanMut} stroke="#2563EB" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ MUT", position: "insideTopRight", fontSize: 9, fill: "#2563EB", fontWeight: 700 }} />
-                    <ReferenceLine x={meanWt} stroke="#9ca3af" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ WT", position: "insideTopRight", fontSize: 9, fill: "#9ca3af", fontWeight: 700 }} />
+                    <ReferenceLine x={meanMut} stroke="#1E3A5F" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ MUT", position: "insideTopRight", fontSize: 9, fill: "#1E3A5F", fontWeight: 700 }} />
+                    <ReferenceLine x={meanWt} stroke="#A8A29E" strokeDasharray="3 3" strokeWidth={1} label={{ value: "μ WT", position: "insideTopRight", fontSize: 9, fill: "#A8A29E", fontWeight: 700 }} />
                     <Area type="monotone" dataKey="overlap" stroke="none" fill="url(#overlapAreaFill)" isAnimationActive={false} />
-                    <Area type="monotone" dataKey="mut" stroke="#2563EB" strokeWidth={2.5} fill="url(#mutAreaFill)" isAnimationActive={false} />
-                    <Area type="monotone" dataKey="wt" stroke="#9ca3af" strokeWidth={2} fill="url(#wtAreaFill)" isAnimationActive={false} strokeDasharray="6 3" />
+                    <Area type="monotone" dataKey="mut" stroke="#1E3A5F" strokeWidth={2.5} fill="url(#mutAreaFill)" isAnimationActive={false} />
+                    <Area type="monotone" dataKey="wt" stroke="#A8A29E" strokeWidth={2} fill="url(#wtAreaFill)" isAnimationActive={false} strokeDasharray="6 3" />
                   </AreaChart>
                 </ResponsiveContainer>
                 {/* Custom legend + stats */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px", flexWrap: "wrap", gap: "12px" }}>
                   <div style={{ display: "flex", gap: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                      <div style={{ width: "16px", height: "3px", background: "#2563EB", borderRadius: "2px" }} />
+                      <div style={{ width: "16px", height: "3px", background: "#1E3A5F", borderRadius: "2px" }} />
                       <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>Mutant (A<sub>MUT</sub>)</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                      <div style={{ width: "16px", height: "3px", background: "#9ca3af", borderRadius: "2px", borderBottom: "1px dashed #9ca3af" }} />
+                      <div style={{ width: "16px", height: "3px", background: "#A8A29E", borderRadius: "2px", borderBottom: "1px dashed #A8A29E" }} />
                       <span style={{ fontSize: "10px", color: T.textSec, fontWeight: 500 }}>Wildtype (A<sub>WT</sub>)</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
@@ -6329,11 +6330,11 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <div style={{ display: "flex", gap: "20px" }}>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ MUT</div>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#2563EB", fontFamily: FONT }}>{meanMut}</div>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#1E3A5F", fontFamily: FONT }}>{meanMut}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ WT</div>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#9ca3af", fontFamily: FONT }}>{meanWt}</div>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: "#A8A29E", fontFamily: FONT }}>{meanWt}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>SEPARATION</div>
