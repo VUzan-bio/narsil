@@ -5019,56 +5019,6 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${xS(p.E).toFixed(1)} ${yS(p.I).toFixed(1)}`).join(' ') + ' Z';
   };
 
-  // Panel D: 14-pad heatmap data
-  const echemHeatmap = useMemo(() => {
-    const t_s = echemTime * 60;
-    const threshold = 3 * ECHEM.intra_device_rsd * 100;
-    let aboveCount = 0;
-    const pads = electrodeLayout.flat().map((target, idx) => {
-      const eff = getEfficiency(target);
-      const isIS = target === "IS6110";
-      const copies_total = echemBloodTiter * ECHEM.V_blood_mL * ECHEM.extraction_yield;
-      const copies_per_pad = copies_total * (ECHEM.V_pad_uL / ECHEM.V_eluate_uL);
-      const lambda = copies_per_pad * (isIS ? IS6110_copy_number : 1);
-      const P_template = 1 - Math.exp(-lambda);
-      const P_rpa_val = 0.95;
-      const G_after = computeGamma(t_s, eff, echemKtrans);
-      const di_if_present = (1 - G_after / echemGamma0_mol) * 100;
-      const expected_di = P_template * P_rpa_val * di_if_present;
-      const above = expected_di > threshold;
-      if (above) aboveCount++;
-      return {
-        target, drug: targetDrug(target), efficiency: eff,
-        P_template: +(P_template * 100).toFixed(1),
-        di_if_present: +di_if_present.toFixed(1),
-        expected_di: +expected_di.toFixed(1),
-        above, row: Math.floor(idx / 7), col: idx % 7,
-      };
-    });
-    // Drug classes meeting threshold
-    const drugsMet = Object.entries(drug_targets).filter(([drug, targets]) =>
-      targets.some(t => pads.find(p => p.target === t)?.above)
-    ).map(([d]) => d);
-    return { pads, aboveCount, drugsMet, threshold };
-  }, [echemTime, echemBloodTiter, echemKtrans, echemGamma0_mol, results, computeGamma]);
-
-  // Heatmap color interpolation — green-blue gradient
-  const echemHeatColor = (di) => {
-    const stops = [
-      [0, 230, 233, 238], [15, 205, 228, 216], [35, 160, 212, 190],
-      [55, 102, 194, 165], [75, 65, 152, 175], [100, 45, 100, 158],
-    ];
-    const c = Math.max(0, Math.min(100, di));
-    let lo = stops[0], hi = stops[stops.length - 1];
-    for (let i = 0; i < stops.length - 1; i++) {
-      if (c >= stops[i][0] && c <= stops[i + 1][0]) { lo = stops[i]; hi = stops[i + 1]; break; }
-    }
-    const f = lo[0] === hi[0] ? 0 : (c - lo[0]) / (hi[0] - lo[0]);
-    return `rgb(${Math.round(lo[1] + (hi[1] - lo[1]) * f)},${Math.round(lo[2] + (hi[2] - lo[2]) * f)},${Math.round(lo[3] + (hi[3] - lo[3]) * f)})`;
-  };
-  const lighten = (rgb, pct) => { const m = rgb.match(/\d+/g).map(Number); return `rgb(${m.map(v => Math.min(255, v + Math.round(255 * pct / 100))).join(',')})`; };
-  const darken = (rgb, pct) => { const m = rgb.match(/\d+/g).map(Number); return `rgb(${m.map(v => Math.max(0, v - Math.round(255 * pct / 100))).join(',')})`; };
-
   return (
     <div>
       {/* ═══════════ SECTION 0: 3D Interactive Chip Render ═══════════ */}
@@ -5723,47 +5673,6 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
         </div>
       </CollapsibleSection>
 
-      {/* ═══════════ SECTION 7: Pad-Level Heatmap ═══════════ */}
-      <CollapsibleSection title="Pad-Level Expected \u0394I%" defaultOpen={false} badge={{ text: `${echemHeatmap.aboveCount}/${electrodeLayout.flat().length} above 3\u03c3`, bg: echemHeatmap.aboveCount >= 10 ? "#DCFCE7" : "#FEF3C7", color: echemHeatmap.aboveCount >= 10 ? "#16A34A" : "#D97706" }}>
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: mobile ? "16px" : "24px", marginBottom: "24px" }}>
-          <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
-            Expected {"\u0394"}I% per electrode pad at <strong style={{ fontFamily: MONO }}>{echemBloodTiter} cp/mL</strong> blood cfDNA,{" "}
-            <strong style={{ fontFamily: MONO }}>{echemTime} min</strong> incubation,{" "}
-            k_trans = <strong style={{ fontFamily: MONO }}>{echemKtrans.toFixed(3)} s{"\u207b\u00b9"}</strong>.
-            Values combine Poisson template probability, RPA amplification efficiency, and Cas12a cleavage kinetics.
-          </p>
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(7, 1fr)`, gap: "6px", marginBottom: "16px" }}>
-            {echemHeatmap.pads.map((pad, idx) => {
-              const bg = echemHeatColor(pad.expected_di);
-              const drugColor = PAD_DRUG_COLORS[pad.drug] || "#888";
-              return (
-                <div key={pad.target} style={{
-                  background: bg, borderRadius: "8px", padding: "10px 6px", textAlign: "center",
-                  border: pad.above ? `2px solid ${darken(bg, 20)}` : `1px solid ${T.borderLight}`,
-                  opacity: pad.above ? 1 : 0.65,
-                }}>
-                  <div style={{ fontSize: "8px", fontWeight: 700, color: darken(bg, 50), fontFamily: MONO, marginBottom: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {pad.target.replace(/_/g, " ")}
-                  </div>
-                  <div style={{ fontSize: "16px", fontWeight: 800, fontFamily: MONO, color: darken(bg, 55) }}>
-                    {pad.expected_di.toFixed(0)}%
-                  </div>
-                  <div style={{ fontSize: "8px", color: darken(bg, 40), marginTop: "2px" }}>
-                    P={pad.P_template}%
-                  </div>
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: drugColor, margin: "4px auto 0", opacity: 0.8 }} />
-                </div>
-              );
-            })}
-          </div>
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center", fontSize: "10px", color: T.textSec }}>
-            <span>3{"\u03c3"} threshold: <strong style={{ fontFamily: MONO }}>{echemHeatmap.threshold.toFixed(0)}%</strong></span>
-            <span>{"\u00b7"} Pads above: <strong style={{ color: T.success }}>{echemHeatmap.aboveCount}</strong>/{electrodeLayout.flat().length}</span>
-            <span>{"\u00b7"} Drug classes detected: <strong>{echemHeatmap.drugsMet.join(", ") || "none"}</strong></span>
-          </div>
-        </div>
-      </CollapsibleSection>
-
       {/* ═══════════ SECTION 8: AS-RPA Thermodynamic Discrimination ═══════════ */}
       {results.some(r => r.asrpaDiscrimination) && (
       <CollapsibleSection title="AS-RPA Thermodynamic Discrimination" defaultOpen={false} badge={{ text: `${proximityCount} proximity`, bg: "#e8f4fa", color: "#3288bd" }}>
@@ -5813,72 +5722,6 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       </CollapsibleSection>
       )}
 
-      {/* ═══════════ SECTION 9: Panel Composition ═══════════ */}
-      <CollapsibleSection title="Panel Composition" defaultOpen={true} badge={{ text: `${results.length} targets`, bg: "#EFF6FF", color: "#2563EB" }}>
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "24px", marginBottom: "24px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "16px" }}>Panel Composition</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
-            {drugs.map((d) => {
-              const drugResults = results.filter((r) => r.drug === d);
-              const cnt = drugResults.length;
-              const primerCnt = drugResults.filter(r => r.hasPrimers).length;
-              const directDrug = drugResults.filter(r => r.strategy === "Direct" && r.disc > 0 && r.disc < 900);
-              const avgDiscDrug = directDrug.length ? +(directDrug.reduce((a, r) => a + r.disc, 0) / directDrug.length).toFixed(1) : null;
-              return (
-                <div key={d} style={{ padding: "16px", borderRadius: "10px", border: `1px solid ${T.border}`, background: T.bgSub, textAlign: "center" }}>
-                  <DrugBadge drug={d} />
-                  <div style={{ fontSize: "24px", fontWeight: 800, color: T.text, fontFamily: MONO, margin: "8px 0 4px" }}>{cnt}</div>
-                  <div style={{ fontSize: "11px", color: T.textTer }}>candidates</div>
-                  <div style={{ fontSize: "10px", color: primerCnt === cnt ? T.success : T.warning, fontWeight: 600, marginTop: "4px" }}>
-                    {primerCnt}/{cnt} with primers
-                  </div>
-                  {avgDiscDrug != null && (
-                    <div style={{ fontSize: "10px", color: avgDiscDrug >= 3 ? T.success : avgDiscDrug >= 2 ? T.warning : T.danger, fontWeight: 600, marginTop: "2px" }}>
-                      avg disc {avgDiscDrug}\u00d7
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ display: "flex", gap: "12px", marginTop: "16px" }}>
-            <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
-              <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.success }}>{directCount}</div>
-              <div style={{ fontSize: "11px", color: T.textSec }}>Direct detection</div>
-            </div>
-            <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
-              <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.purple }}>{proximityCount}</div>
-              <div style={{ fontSize: "11px", color: T.textSec }}>Proximity detection</div>
-            </div>
-            <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
-              <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.primary }}>14</div>
-              <div style={{ fontSize: "11px", color: T.textSec }}>Independent chambers</div>
-              <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>per-pad one-pot</div>
-            </div>
-          </div>
-
-          {(() => {
-            const canonicalCount = results.filter(r => r.isCanonicalPam === true || (r.pamVariant || "").startsWith("TTT")).length;
-            const expandedCount = results.filter(r => r.isCanonicalPam === false && r.pamVariant && !r.pamVariant.startsWith("TTT")).length;
-            if (expandedCount === 0 && canonicalCount === 0) return null;
-            return (
-              <div style={{ display: "flex", gap: "12px", marginTop: "8px" }}>
-                <div style={{ flex: 1, background: T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${T.borderLight}`, textAlign: "center" }}>
-                  <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: T.success }}>{canonicalCount}</div>
-                  <div style={{ fontSize: "11px", color: T.textSec }}>Canonical PAM</div>
-                  <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>TTTV \u2014 full activity</div>
-                </div>
-                <div style={{ flex: 1, background: expandedCount > 0 ? "#FEF3C7" : T.bgSub, borderRadius: "8px", padding: "12px", border: `1px solid ${expandedCount > 0 ? "#F59E0B40" : T.borderLight}`, textAlign: "center" }}>
-                  <div style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: expandedCount > 0 ? "#B45309" : T.textTer }}>{expandedCount}</div>
-                  <div style={{ fontSize: "11px", color: T.textSec }}>Expanded PAM</div>
-                  <div style={{ fontSize: "9px", color: T.textTer, marginTop: "2px" }}>enAsCas12a \u2014 penalised</div>
-                </div>
-              </div>
-            );
-          })()}
-        </div>
-      </CollapsibleSection>
 
     </div>
   );
