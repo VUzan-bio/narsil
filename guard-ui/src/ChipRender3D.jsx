@@ -966,7 +966,9 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     }).join(" ");
   };
 
-  const allReporters = arch === "B" ? reporters : arch === "C" ? reportersC : [];
+  const _reporters = stateRef.current?.reporters || [];
+  const _reportersC = stateRef.current?.reportersC || [];
+  const allReporters = arch === "B" ? _reporters : arch === "C" ? _reportersC : [];
   const cleavedCount = cas12aActive && allReporters.length > 0 ? Math.round(allReporters.length * Math.min(1, incubationMin / 28)) : 0;
 
   // Architecture-dependent layer labels
