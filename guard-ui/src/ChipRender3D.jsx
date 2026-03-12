@@ -4,8 +4,8 @@ import * as THREE from "three";
 /* ═══════════════════════════════════════════════════════════════
    CONSTANTS & HELPERS
    ═══════════════════════════════════════════════════════════════ */
-const DRUG_HEX = { RIF: 0x2563EB, INH: 0x3288bd, EMB: 0x66c2a5, PZA: 0xabdda4, FQ: 0x60A5FA, AG: 0x4ba3cc, CTRL: 0x9ca3af, OTHER: 0x888888 };
-const DRUG_CSS = { RIF: "#2563EB", INH: "#3288bd", EMB: "#66c2a5", PZA: "#abdda4", FQ: "#60A5FA", AG: "#4ba3cc", CTRL: "#9ca3af", OTHER: "#888888" };
+const DRUG_HEX = { RIF: 0x4338CA, INH: 0xD97706, EMB: 0x059669, PZA: 0x0891B2, FQ: 0xDC2626, AG: 0x7C3AED, CTRL: 0x9ca3af, OTHER: 0x888888 };
+const DRUG_CSS = { RIF: "#4338CA", INH: "#D97706", EMB: "#059669", PZA: "#0891B2", FQ: "#DC2626", AG: "#7C3AED", CTRL: "#9ca3af", OTHER: "#888888" };
 const addAt = (parent, mesh, x, y, z) => { mesh.position.set(x, y, z); parent.add(mesh); return mesh; };
 
 /* ── Architecture-dependent SWV curve generators ── */
