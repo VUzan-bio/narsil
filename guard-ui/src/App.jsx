@@ -108,7 +108,8 @@ const RESULTS = MUTATIONS.map((m, i) => {
   const heuristic = +(0.6 + Math.random() * 0.35).toFixed(3);
   const cnnRaw = +(0.5 + Math.random() * 0.4).toFixed(4);
   const cnnCal = +(cnnRaw * 0.8 + 0.18).toFixed(4);
-  const ensemble = +(heuristic * 0.35 + cnnCal * 0.65).toFixed(4);
+  const pamPen = [1.0, 0.65, 0.55, 0.45, 1.0, 0.40, 0.35, 0.30][i % 8];
+  const pamAdj = +(cnnCal * pamPen).toFixed(4);
   const discRatio = +(1.5 + Math.random() * 8).toFixed(1);
   const mutAct = +(0.5 + Math.random() * 0.45).toFixed(2);
   const wtAct = +(1.0 / Math.max(discRatio, 0.01)).toFixed(4);
@@ -117,9 +118,9 @@ const RESULTS = MUTATIONS.map((m, i) => {
     strategy: i % 3 === 0 ? "Direct" : i % 3 === 1 ? "Proximity" : "Direct",
     spacer, wtSpacer, pam: ["TTTG", "TTCA", "TATA", "CTTG", "TTTC", "TCTG", "TGTC", "ATTG"][i % 8],
     pamVariant: ["TTTV", "TTCV", "TATV", "CTTV", "TTTV", "TCTV", "TGTV", "ATTV"][i % 8],
-    pamPenalty: [1.0, 0.65, 0.55, 0.45, 1.0, 0.40, 0.35, 0.30][i % 8],
+    pamPenalty: pamPen,
     isCanonicalPam: i % 8 === 0 || i % 8 === 4,
-    score: heuristic, cnnScore: cnnRaw, cnnCalibrated: cnnCal, ensembleScore: ensemble,
+    score: heuristic, cnnScore: cnnRaw, cnnCalibrated: cnnCal, pamAdjusted: pamAdj,
     mlScores: [{ model_name: "guard_net", predicted_efficiency: cnnRaw }],
     disc: discRatio,
     discrimination: { model_name: "learned_lightgbm", ratio: discRatio, mut_activity: mutAct, wt_activity: wtAct },
@@ -138,7 +139,7 @@ RESULTS.push({
   gene: "IS6110", ref: "N", pos: 0, alt: "N", drug: "OTHER", drugFull: "Other", conf: "N/A", tier: 0,
   label: "IS6110_NON", strategy: "Direct", spacer: "AATGTCGCCGCGATCGAGCG", wtSpacer: "AATGTCGCCGCGATCGAGCG",
   pam: "TTTG", pamVariant: "TTTV", pamPenalty: 1.0, isCanonicalPam: true,
-  score: 0.95, cnnScore: 0.88, cnnCalibrated: 0.91, ensembleScore: 0.924,
+  score: 0.95, cnnScore: 0.88, cnnCalibrated: 0.91, pamAdjusted: 0.91,
   mlScores: [{ model_name: "guard_net", predicted_efficiency: 0.88 }],
   disc: 999, discrimination: { model_name: "learned_lightgbm", ratio: 999, mut_activity: 0.95, wt_activity: 0.001 },
   gc: 0.65, ot: 0, hasPrimers: true, hasSM: false,
@@ -479,7 +480,7 @@ function transformApiCandidate(c) {
       neuralDisc: sc.neural_disc ?? null, featureDisc: sc.feature_disc ?? null,
       cnnScore: sc.cnn_score ?? null,
       cnnCalibrated: sc.cnn_calibrated ?? null,
-      ensembleScore: sc.ensemble_score ?? null,
+      pamAdjusted: (sc.cnn_calibrated != null && sc.pam_penalty != null) ? +(sc.cnn_calibrated * sc.pam_penalty).toFixed(4) : sc.cnn_calibrated ?? null,
       mlScores: sc.ml_scores || [],
       ot: 0, hasPrimers: c.has_primers, hasSM: c.has_sm || false,
       smSpacer: c.sm_enhanced_spacer || null, smPosition: c.sm_position || null,
@@ -509,7 +510,7 @@ function transformApiCandidate(c) {
     discrimination: c.discrimination || null,
     cnnScore: c.cnn_score ?? null,
     cnnCalibrated: c.cnn_calibrated ?? null,
-    ensembleScore: c.ensemble_score ?? null,
+    pamAdjusted: (c.cnn_calibrated != null && c.pam_penalty != null) ? +(c.cnn_calibrated * c.pam_penalty).toFixed(4) : c.cnn_calibrated ?? null,
     mlScores: c.ml_scores || [],
     ot: c.offtarget_count, hasPrimers: c.has_primers, hasSM: c.has_sm,
     smSpacer: c.sm_enhanced_spacer || null, smPosition: c.sm_position || null,
@@ -659,11 +660,11 @@ const CandidateViewer = ({ r, onClose }) => {
         {/* Key metrics */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: mobile ? "8px" : "0", background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: mobile ? "12px" : "16px", marginBottom: "24px" }}>
           {[
-            { l: r.ensembleScore != null ? "Ensemble" : "Score", v: (r.ensembleScore || r.score).toFixed(3), c: (r.ensembleScore || r.score) > 0.8 ? T.primary : (r.ensembleScore || r.score) > 0.65 ? T.warning : T.danger },
-            ...(r.ensembleScore != null ? [{ l: "Heuristic", v: r.score.toFixed(3), c: T.textSec }] : []),
-            ...(r.cnnCalibrated != null ? [{ l: r.mlScores?.some(m => (m.model_name || m.modelName) === "guard_net") ? "GUARD-Net" : "CNN (cal)", v: r.cnnCalibrated.toFixed(3), c: r.cnnCalibrated > 0.7 ? T.primary : r.cnnCalibrated > 0.5 ? T.warning : T.danger }] : []),
+            { l: "Activity", v: (r.cnnCalibrated ?? r.score).toFixed(3), c: (r.cnnCalibrated ?? r.score) > 0.7 ? T.primary : (r.cnnCalibrated ?? r.score) > 0.5 ? T.warning : T.danger },
+            ...(r.pamAdjusted != null && r.pamPenalty != null && r.pamPenalty < 1.0 ? [{ l: "PAM-adjusted", v: `${r.pamAdjusted.toFixed(3)} (${r.pamPenalty}×)`, c: T.textSec }] : []),
             { l: r.strategy === "Proximity" ? "Disc (AS-RPA)" : "Discrimination", v: r.strategy === "Proximity" ? (r.asrpaDiscrimination ? (r.asrpaDiscrimination.block_class === "none" ? "1× (no mismatch)" : `${r.asrpaDiscrimination.disc_ratio >= 100 ? "≥100" : r.asrpaDiscrimination.disc_ratio.toFixed(0)}× ${r.asrpaDiscrimination.terminal_mismatch}`) : "AS-RPA") : r.gene === "IS6110" ? "N/A (control)" : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×`, c: r.strategy === "Proximity" ? (r.asrpaDiscrimination?.block_class === "none" ? T.danger : T.purple) : r.gene === "IS6110" ? T.textTer : discColor },
             ...(r.strategy === "Proximity" && r.proximityDistance ? [{ l: "Distance", v: `${r.proximityDistance} bp`, c: T.purple }] : []),
+            { l: "Biophysical QC", v: r.score.toFixed(3), c: T.textTer },
             { l: "GC%", v: `${(r.gc * 100).toFixed(0)}%`, c: T.text },
             { l: "Off-targets", v: r.ot, c: r.ot === 0 ? T.success : T.warning },
             { l: "PAM", v: r.pam, c: T.text, badge: r.pamVariant && r.pamVariant !== "TTTV" ? r.pamVariant : null, penalty: r.pamPenalty },
@@ -1129,8 +1130,8 @@ const HomePage = ({ goTo, connected }) => {
       });
     } else {
       const m5Detail = scorer === "guard_net"
-        ? "241 candidates scored — GUARD-Net efficiency (0.125–0.608) · GUARD-Net discrimination (0.288–0.959) · Ensemble α=0.05 (0.288–0.942)"
-        : "241 candidates scored — Heuristic (0.125–0.608) · SeqCNN calibrated T=1.1 (0.288–0.959) · Ensemble α=0.05 (0.288–0.942)";
+        ? "241 candidates scored — GUARD-Net activity (0.125–0.608) · GUARD-Net discrimination (0.288–0.959) · PAM-adjusted (0.045–0.608)"
+        : "241 candidates scored — Heuristic QC (0.125–0.608) · SeqCNN calibrated T=1.1 (0.288–0.959) · PAM-adjusted (0.045–0.608)";
       setPipeStats([
         { module_id: "M1",   detail: "14 WHO catalogue mutations → genomic coordinates on H37Rv (NC_000962.3)", candidates_out: 14,  duration_ms: 1 },
         { module_id: "M2",   detail: "34,364 positions scanned → 1,797 PAM sites → 334 candidates",             candidates_out: 334, duration_ms: 98 },
@@ -2134,7 +2135,7 @@ const ExperimentalPriorityCard = ({ results }) => {
       <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
         {top3.map((r) => {
           const disc = r.strategy === "Direct" ? r.disc : (r.asrpaDiscrimination?.disc_ratio || 0);
-          const eff = r.ensembleScore || r.score;
+          const eff = r.cnnCalibrated ?? r.score;
           return (
             <div key={r.label} style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
               <PriorityBadge rank={r.experimentalPriority} />
@@ -2625,7 +2626,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
   const mlModelLabel = usesGuardNet ? "GUARD-Net" : "Heuristic";
   const mlModelDetail = usesGuardNet ? "235K params · CNN + RNA-FM + RLPA" : "Biophysical features";
 
-  const getResultScore = (r) => usesGuardNet ? (r.ensembleScore || r.score) : r.score;
+  const getResultScore = (r) => r.cnnCalibrated ?? r.score;
   const drugs = [...new Set(results.map((r) => r.drug))];
   const byDrug = drugs.map((d) => ({ drug: d, count: results.filter((r) => r.drug === d).length, avgScore: +(results.filter((r) => r.drug === d).reduce((a, r) => a + getResultScore(r), 0) / results.filter((r) => r.drug === d).length).toFixed(3) }));
   const withPrimers = results.filter((r) => r.hasPrimers).length;
@@ -2634,13 +2635,14 @@ const OverviewTab = ({ results, scorer, jobId }) => {
   const highDisc = directResults.filter((r) => r.disc >= 3).length;
   const directCount = results.filter((r) => r.strategy === "Direct").length;
   const proximityCount = results.filter((r) => r.strategy === "Proximity").length;
-  const avgScore = results.length ? +(results.reduce((a, r) => a + getResultScore(r), 0) / results.length).toFixed(3) : 0;
+  const avgActivity = results.length ? +(results.reduce((a, r) => a + getResultScore(r), 0) / results.length).toFixed(3) : 0;
   const minScore = results.length ? Math.min(...results.map(r => getResultScore(r))).toFixed(3) : "0";
   const maxScore = results.length ? Math.max(...results.map(r => getResultScore(r))).toFixed(3) : "0";
   const cnnResults = results.filter(r => r.cnnCalibrated != null);
-  const avgCNN = cnnResults.length ? +(cnnResults.reduce((a, r) => a + r.cnnCalibrated * (r.pamPenalty ?? 1.0), 0) / cnnResults.length).toFixed(3) : null;
-  const ensResults = results.filter(r => r.ensembleScore != null);
-  const avgEnsemble = ensResults.length ? +(ensResults.reduce((a, r) => a + r.ensembleScore, 0) / ensResults.length).toFixed(3) : null;
+  const avgCNN = cnnResults.length ? +(cnnResults.reduce((a, r) => a + r.cnnCalibrated, 0) / cnnResults.length).toFixed(3) : null;
+  const pamAdjResults = results.filter(r => r.pamAdjusted != null);
+  const avgPamAdj = pamAdjResults.length ? +(pamAdjResults.reduce((a, r) => a + r.pamAdjusted, 0) / pamAdjResults.length).toFixed(3) : null;
+  const avgScore = avgActivity; // alias for scatter plot
 
   // Model agreement — Spearman ρ between heuristic and GUARD-Net (PAM-adjusted)
   const modelAgreement = (() => {
@@ -2678,7 +2680,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
             The pipeline evaluates every candidate on four axes:
           </p>
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "6px 24px", fontSize: "12px" }}>
-            <div><strong>Score</strong> (0–1) — predicted Cas12a trans-cleavage activity. A score of 0.8 means the crRNA is expected to trigger strong collateral cleavage of MB-ssDNA reporters, producing a measurable SWV signal decrease within 15–30 min. Below 0.4, the guide may not generate a detectable signal within a clinically useful timeframe. {usesGuardNet ? "Computed as an ensemble of GUARD-Net (trained on 25K+ activity measurements) and heuristic biophysical features." : "Computed from position-weighted biophysical features."}</div>
+            <div><strong>Activity</strong> (0–1) — predicted Cas12a trans-cleavage efficiency. A score of 0.8 means the crRNA is expected to trigger strong collateral cleavage of reporters, producing a measurable SWV signal decrease within 15–30 min. Below 0.4, the guide may not generate a detectable signal within a clinically useful timeframe. {usesGuardNet ? "Predicted by GUARD-Net (trained on 25K+ activity measurements). PAM-adjusted score accounts for non-canonical PAM penalty." : "Computed from position-weighted biophysical features."} The heuristic QC score independently checks GC content, homopolymer runs, self-complementarity, and off-targets.</div>
             <div><strong>Discrimination</strong> (×) — fold-difference in cleavage activity between the mutant (resistant) and wildtype (susceptible) template. A 5× ratio means the guide cleaves 5× faster on the mutant — so the assay signal from a resistant sample is 5× stronger than from a susceptible sample. ≥ 3× is diagnostic-grade. {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Predicted by a gradient-boosted model trained on 6,136 EasyDesign pairs using 15 thermodynamic features." : "Predicted by heuristic position × destabilisation model."}</div>
             <div><strong>RPA Primers</strong> — isothermal amplification primers (37°C, no thermal cycler). RPA amplifies the target region in 15–20 min, then Cas12a detects the amplified product. A candidate without primers cannot be used as a complete assay.</div>
             <div><strong>Drug class</strong> — which antibiotic the mutation confers resistance to (e.g. RIF = rifampicin, INH = isoniazid). A 14-plex panel covers all 6 WHO priority drug classes for MDR/XDR-TB.</div>
@@ -2757,10 +2759,19 @@ const OverviewTab = ({ results, scorer, jobId }) => {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: T.textSec }}>
                   <Zap size={12} color={T.textTer} strokeWidth={1.8} />
-                  Mean activity
+                  Avg. activity{usesGuardNet ? " (GUARD-Net)" : ""}
                 </span>
-                <span style={{ fontSize: "20px", fontWeight: 700, color: T.text, fontFamily: FONT }}>{usesGuardNet && avgEnsemble ? avgEnsemble : avgScore}</span>
+                <span style={{ fontSize: "20px", fontWeight: 700, color: T.text, fontFamily: FONT }}>{avgActivity}</span>
               </div>
+              {avgPamAdj != null && avgPamAdj !== avgActivity && (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: T.textSec }}>
+                    <BarChart3 size={12} color={T.textTer} strokeWidth={1.8} />
+                    Avg. PAM-adjusted
+                  </span>
+                  <span style={{ fontSize: "17px", fontWeight: 600, color: T.textSec, fontFamily: FONT }}>{avgPamAdj}</span>
+                </div>
+              )}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: T.textSec }}>
                   <BarChart3 size={12} color={T.textTer} strokeWidth={1.8} />
@@ -2864,7 +2875,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
 
       {/* Score vs Discrimination Scatter — readiness-sized dots */}
       {!mobile && (() => {
-        const getScore = (r) => usesGuardNet ? (r.ensembleScore || r.score) : r.score;
+        const getScore = (r) => usesGuardNet ? (r.cnnCalibrated ?? r.score) : r.score;
         const hasReadiness = results.some(r => r.readinessScore != null);
         const scatterData = results.filter(r => r.disc > 0 && r.disc < 900).map(r => ({
           score: getScore(r), disc: Math.min(r.disc, 25), label: r.label, drug: r.drug, strategy: r.strategy, hasPrimers: r.hasPrimers, readiness: r.readinessScore || 0.5,
@@ -2974,7 +2985,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
       {/* Heuristic vs GUARD-Net Scatter */}
       {!mobile && usesGuardNet && avgCNN != null && (() => {
         const scatterData = results.filter(r => r.cnnCalibrated != null).map(r => ({
-          heuristic: r.score, guardNet: r.cnnCalibrated * (r.pamPenalty ?? 1.0), ensemble: r.ensembleScore || r.score,
+          heuristic: r.score, guardNet: r.cnnCalibrated, pamAdj: r.pamAdjusted ?? r.cnnCalibrated,
           label: r.label, drug: r.drug,
         }));
         const agreePct = (() => {
@@ -2989,16 +3000,16 @@ const OverviewTab = ({ results, scorer, jobId }) => {
               <div>
                 <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>Scoring Model Comparison</div>
                 <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5 }}>
-                  Heuristic score (x) vs GUARD-Net calibrated score (y) per candidate. Points near the diagonal indicate model agreement.
-                  Candidates above the line are scored higher by GUARD-Net; below by heuristic.
+                  Biophysical QC (x) vs GUARD-Net activity (y) per candidate. Points near the diagonal indicate model agreement.
+                  Candidates above the line have higher activity than their QC score suggests; below indicates biophysical concerns.
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0, marginLeft: "20px" }}>
                 <div style={{ display: "flex", gap: "16px" }}>
                   <div><div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>AGREEMENT</div><div style={{ fontSize: "13px", fontWeight: 800, color: T.primary, fontFamily: FONT }}>{agreePct}%</div></div>
                   {modelAgreement != null && <div><div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>SPEARMAN</div><div style={{ fontSize: "13px", fontWeight: 800, color: T.text, fontFamily: FONT }}>{modelAgreement}</div></div>}
-                  <div><div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>AVG HEURISTIC</div><div style={{ fontSize: "13px", fontWeight: 800, color: T.text, fontFamily: FONT }}>{avgScore}</div></div>
-                  <div><div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>AVG GUARD-NET</div><div style={{ fontSize: "13px", fontWeight: 800, color: T.primary, fontFamily: FONT }}>{avgCNN}</div></div>
+                  <div><div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>AVG QC</div><div style={{ fontSize: "13px", fontWeight: 800, color: T.text, fontFamily: FONT }}>{avgScore}</div></div>
+                  <div><div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>AVG ACTIVITY</div><div style={{ fontSize: "13px", fontWeight: 800, color: T.primary, fontFamily: FONT }}>{avgCNN}</div></div>
                 </div>
               </div>
             </div>
@@ -3006,8 +3017,8 @@ const OverviewTab = ({ results, scorer, jobId }) => {
             <ResponsiveContainer width="100%" height={340}>
               <ScatterChart margin={{ top: 10, right: 20, bottom: 25, left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
-                <XAxis type="number" dataKey="heuristic" name="Heuristic" domain={[0, 1]} tick={{ fontSize: 10, fontFamily: FONT, fill: CHART_TEXT_SEC }} label={{ value: "Heuristic Score", position: "insideBottom", offset: -12, fontSize: 11, fill: CHART_TEXT }} />
-                <YAxis type="number" dataKey="guardNet" name="GUARD-Net" domain={[0, 1]} tick={{ fontSize: 10, fontFamily: FONT, fill: CHART_TEXT_SEC }} label={{ value: "GUARD-Net (calibrated)", angle: -90, position: "insideLeft", offset: 10, fontSize: 11, fill: CHART_TEXT }} />
+                <XAxis type="number" dataKey="heuristic" name="Biophysical QC" domain={[0, 1]} tick={{ fontSize: 10, fontFamily: FONT, fill: CHART_TEXT_SEC }} label={{ value: "Biophysical QC (heuristic)", position: "insideBottom", offset: -12, fontSize: 11, fill: CHART_TEXT }} />
+                <YAxis type="number" dataKey="guardNet" name="Activity" domain={[0, 1]} tick={{ fontSize: 10, fontFamily: FONT, fill: CHART_TEXT_SEC }} label={{ value: "Activity (GUARD-Net)", angle: -90, position: "insideLeft", offset: 10, fontSize: 11, fill: CHART_TEXT }} />
                 <Tooltip content={({ payload }) => {
                   if (!payload?.length) return null;
                   const d = payload[0]?.payload;
@@ -3015,10 +3026,10 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                   const diff = d.guardNet - d.heuristic;
                   return (
                     <div style={{ ...tooltipStyle, padding: "12px 16px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "12px", color: gradientColor(d.ensemble), marginBottom: "4px" }}>{d.label}</div>
-                      <div style={{ fontSize: "11px", color: T.textSec }}>Heuristic: <strong style={{ color: T.text }}>{d.heuristic.toFixed(3)}</strong></div>
-                      <div style={{ fontSize: "11px", color: T.textSec }}>GUARD-Net: <strong style={{ color: T.primary }}>{d.guardNet.toFixed(3)}</strong></div>
-                      <div style={{ fontSize: "11px", color: T.textSec }}>Ensemble: <strong style={{ color: T.text }}>{d.ensemble.toFixed(3)}</strong></div>
+                      <div style={{ fontWeight: 700, fontSize: "12px", color: gradientColor(d.guardNet), marginBottom: "4px" }}>{d.label}</div>
+                      <div style={{ fontSize: "11px", color: T.textSec }}>Activity: <strong style={{ color: T.primary }}>{d.guardNet.toFixed(3)}</strong></div>
+                      <div style={{ fontSize: "11px", color: T.textSec }}>PAM-adjusted: <strong style={{ color: T.text }}>{d.pamAdj.toFixed(3)}</strong></div>
+                      <div style={{ fontSize: "11px", color: T.textSec }}>QC (heuristic): <strong style={{ color: T.textTer }}>{d.heuristic.toFixed(3)}</strong></div>
                       <div style={{ fontSize: "11px", color: diff > 0.05 ? T.success : diff < -0.05 ? T.warning : T.textTer, marginTop: "2px" }}>
                         {"\u0394"} = {diff > 0 ? "+" : ""}{diff.toFixed(3)} ({diff > 0.05 ? "Net scores higher" : diff < -0.05 ? "Heuristic scores higher" : "Models agree"})
                       </div>
@@ -3028,7 +3039,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                 <ReferenceLine segment={[{ x: 0, y: 0 }, { x: 1, y: 1 }]} stroke="#333333" strokeDasharray="6 4" strokeWidth={1} opacity={0.6} />
                 <Scatter data={scatterData} isAnimationActive={false}>
                   {scatterData.map((entry, i) => (
-                    <Cell key={i} fill={gradientColor(entry.ensemble)} r={7} stroke="rgba(0,0,0,0.1)" strokeWidth={1} opacity={0.85} />
+                    <Cell key={i} fill={gradientColor(entry.guardNet)} r={7} stroke="rgba(0,0,0,0.1)" strokeWidth={1} opacity={0.85} />
                   ))}
                 </Scatter>
               </ScatterChart>
@@ -3039,7 +3050,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ fontSize: "10px", color: T.textTer }}>Low</span>
                 <div style={{ width: 120, height: 8, borderRadius: 4, background: gradientCSS }} />
-                <span style={{ fontSize: "10px", color: T.textTer }}>High ensemble</span>
+                <span style={{ fontSize: "10px", color: T.textTer }}>High activity</span>
               </div>
               <span style={{ fontSize: "10px", color: T.textTer }}>|</span>
               <span style={{ fontSize: "10px", color: T.textTer }}>Dashed line = perfect agreement (y = x)</span>
@@ -3054,7 +3065,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                   <strong style={{ color: T.primary }}>Interpretation:</strong> {agreePct}% of candidates are classified the same way by both models (above/below 0.5 threshold). {onLine}/{scatterData.length} score within ±0.05 of each other.
                   {aboveLine.length > 0 ? ` GUARD-Net scores ${aboveLine.length} candidate${aboveLine.length > 1 ? "s" : ""} higher (${aboveLine.slice(0, 2).map(d => d.label).join(", ")}${aboveLine.length > 2 ? "\u2026" : ""}).` : ""}
                   {belowLine.length > 0 ? ` Heuristic scores ${belowLine.length} candidate${belowLine.length > 1 ? "s" : ""} higher (${belowLine.slice(0, 2).map(d => d.label).join(", ")}${belowLine.length > 2 ? "\u2026" : ""}).` : ""}
-                  {modelAgreement != null ? ` Rank correlation \u03c1 = ${modelAgreement} \u2014 ${modelAgreement >= 0.7 ? "strong agreement, ensemble adds stability" : modelAgreement >= 0.4 ? "moderate agreement, ensemble captures complementary signal" : "weak agreement, models capture different features \u2014 ensemble is critical"}.` : ""}
+                  {modelAgreement != null ? ` Rank correlation \u03c1 = ${modelAgreement} \u2014 ${modelAgreement >= 0.7 ? "strong agreement, QC corroborates activity predictions" : modelAgreement >= 0.4 ? "moderate agreement, QC catches biophysical edge cases activity model misses" : "weak agreement, models measure different things \u2014 QC serves as independent sanity check"}.` : ""}
                 </div>
               );
             })()}
@@ -3274,7 +3285,7 @@ const SpacerArchitecture = ({ r }) => {
 
 const generateInterpretation = (r) => {
   const lines = [];
-  const eff = r.ensembleScore || r.score;
+  const eff = r.cnnCalibrated ?? r.score;
   const gc = r.gc * 100;
   const disc = typeof r.disc === "number" ? r.disc : 0;
   const spacer = (r.hasSM && r.smSpacer) ? r.smSpacer : r.spacer;
@@ -3397,11 +3408,11 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
       {/* Key metrics row */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "0", background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: "14px", marginBottom: "20px" }}>
         {[
-          { l: "Ensemble", v: (r.ensembleScore || r.score).toFixed(3), c: (r.ensembleScore || r.score) > 0.8 ? T.primary : (r.ensembleScore || r.score) > 0.65 ? T.warning : T.danger },
-          { l: "Heuristic", v: r.score.toFixed(3), c: T.textSec },
-          ...(r.cnnCalibrated != null ? [{ l: r.mlScores?.some(m => (m.model_name || m.modelName) === "guard_net") ? "GUARD-Net" : "CNN (cal)", v: r.cnnCalibrated.toFixed(3), c: r.cnnCalibrated > 0.7 ? T.primary : r.cnnCalibrated > 0.5 ? T.warning : T.danger }] : []),
+          { l: "Activity", v: (r.cnnCalibrated ?? r.score).toFixed(3), c: (r.cnnCalibrated ?? r.score) > 0.7 ? T.primary : (r.cnnCalibrated ?? r.score) > 0.5 ? T.warning : T.danger },
+          ...(r.pamAdjusted != null && r.pamPenalty != null && r.pamPenalty < 1.0 ? [{ l: "PAM-adjusted", v: `${r.pamAdjusted.toFixed(3)} (${r.pamPenalty}×)`, c: T.textSec }] : []),
           { l: r.strategy === "Proximity" ? "Disc (AS-RPA)" : "Discrimination", v: r.strategy === "Proximity" ? (r.asrpaDiscrimination ? (r.asrpaDiscrimination.block_class === "none" ? "1× (no mismatch)" : `${r.asrpaDiscrimination.disc_ratio >= 100 ? "≥100" : r.asrpaDiscrimination.disc_ratio.toFixed(0)}× ${r.asrpaDiscrimination.terminal_mismatch}`) : "AS-RPA") : r.gene === "IS6110" ? "N/A (control)" : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×`, c: r.strategy === "Proximity" ? (r.asrpaDiscrimination?.block_class === "none" ? T.danger : T.purple) : r.gene === "IS6110" ? T.textTer : discColor },
           ...(r.strategy === "Proximity" && r.proximityDistance ? [{ l: "Distance", v: `${r.proximityDistance} bp`, c: T.purple }] : []),
+          { l: "Biophysical QC", v: r.score.toFixed(3), c: T.textTer },
           { l: "GC%", v: `${(r.gc * 100).toFixed(0)}%`, c: T.text },
           { l: "Off-targets", v: r.ot, c: r.ot === 0 ? T.success : T.warning },
           { l: "Strategy", v: r.strategy, c: r.strategy === "Direct" ? T.success : T.purple },
@@ -3585,7 +3596,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
 const CandidatesTab = ({ results, jobId, connected, scorer }) => {
   const mobile = useIsMobile();
   const [search, setSearch] = useState("");
-  const defaultSort = results.some(r => r.readinessScore != null) ? "readinessScore" : (scorer === "guard_net" ? "ensembleScore" : "score");
+  const defaultSort = results.some(r => r.readinessScore != null) ? "readinessScore" : (scorer === "guard_net" ? "cnnCalibrated" : "score");
   const [sortKey, setSortKey] = useState(defaultSort);
   const [sortDir, setSortDir] = useState(-1);
   const [drugFilter, setDrugFilter] = useState("ALL");
@@ -3599,11 +3610,11 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
     if (!target) return { target_label: targetLabel, alternatives: [] };
     const sameGene = results.filter(r => r.gene === target.gene && r.label !== targetLabel);
     const alts = sameGene.slice(0, 5).map((r, i) => ({
-      rank: i + 2, spacer_seq: r.spacer, score: +(r.ensembleScore || r.score).toFixed(3),
+      rank: i + 2, spacer_seq: r.spacer, score: +(r.cnnCalibrated ?? r.score).toFixed(3),
       discrimination: +(r.disc || 0).toFixed(1), has_primers: r.hasPrimers,
       tradeoff: r.score > target.score ? "Higher score" : r.disc > target.disc ? "Higher discrimination" : "Alternative spacer",
     }));
-    return { target_label: targetLabel, selected: { rank: 1, spacer_seq: target.spacer, score: +(target.ensembleScore || target.score).toFixed(3), discrimination: +(target.disc || 0).toFixed(1) }, alternatives: alts };
+    return { target_label: targetLabel, selected: { rank: 1, spacer_seq: target.spacer, score: +(target.cnnCalibrated ?? target.score).toFixed(3), discrimination: +(target.disc || 0).toFixed(1) }, alternatives: alts };
   }, [results]);
 
   const loadTopK = useCallback((targetLabel) => {
@@ -3646,17 +3657,19 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
 
   const hasGuardNet = scorer === "guard_net" || results.some(r => r.mlScores?.some(m => (m.model_name || m.modelName) === "guard_net"));
   const hasML = hasGuardNet || results.some(r => r.cnnCalibrated != null);
-  const mlColLabel = hasGuardNet ? "GN" : "CNN";
 
   const hasReadiness = filtered.some(r => r.readinessScore != null);
-  // Reduced column set: #, Target, Drug, Spacer, Activity, Disc, Readiness
+  const hasPamAdj = filtered.some(r => r.pamAdjusted != null && r.pamAdjusted !== r.cnnCalibrated);
+  // Columns: #, Target, Drug, Spacer, Activity, PAM-adj, Disc, QC, Readiness
   const cols = [
     ...(hasReadiness ? [{ key: "experimentalPriority", label: "#", w: 36 }] : []),
-    { key: "label", label: "Target", w: 150 },
-    { key: "drug", label: "Drug", w: 60 },
-    { key: "spacer", label: "Spacer", w: 220 },
-    { key: "ensembleScore", label: "Activity", w: 70 },
-    { key: "disc", label: "Disc", w: 70 },
+    { key: "label", label: "Target", w: 140 },
+    { key: "drug", label: "Drug", w: 54 },
+    { key: "spacer", label: "Spacer", w: 200 },
+    { key: "cnnCalibrated", label: "Activity", w: 66 },
+    ...(hasPamAdj ? [{ key: "pamAdjusted", label: "PAM-adj", w: 66 }] : []),
+    { key: "disc", label: "Disc", w: 64 },
+    { key: "score", label: "QC", w: 48 },
     ...(hasReadiness ? [{ key: "readinessScore", label: "Readiness", w: 90 }] : []),
   ];
 
@@ -3668,9 +3681,9 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
       {/* Explainer box — blue */}
       <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "10px", padding: mobile ? "14px" : "14px 22px", marginBottom: "16px" }}>
         <div style={{ display: "flex", gap: "20px", fontSize: "11px", color: T.primaryDark, lineHeight: 1.5, flexWrap: "wrap", opacity: 0.85 }}>
-          <div><strong>Activity</strong> — predicted Cas12a trans-cleavage (0–1). {hasML ? "Ensemble score." : "Heuristic."}</div>
+          <div><strong>Activity</strong> — GUARD-Net predicted Cas12a trans-cleavage (0–1). <strong>PAM-adj</strong> = Activity × PAM penalty (actual signal strength).</div>
           <div><strong>Disc</strong> — MUT/WT fold-difference. <span style={{ color: T.success }}>≥3×</span> diagnostic-grade. <span style={{ color: T.danger }}>&lt;2×</span> insufficient.</div>
-          <div><strong>Readiness</strong> — multi-axis composite (disc 40%, activity 20%, primers 15%, off-target 15%, GC 10%).</div>
+          <div><strong>QC</strong> — biophysical heuristic (GC, homopolymer, off-target, self-comp). Sanity check, not a ranking score.</div>
           <div>Click any row to expand full details, scored sequence, primers, and alternatives.</div>
         </div>
       </div>
@@ -3699,7 +3712,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
         <div>
           {filtered.map((r) => {
             const isExpanded = expanded === r.label;
-            const scoreVal = r.ensembleScore || r.score;
+            const scoreVal = r.cnnCalibrated ?? r.score;
             const discColor = r.gene === "IS6110" ? T.textTer : r.strategy === "Proximity" ? T.textSec : r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger;
             const riskLevel = r.riskProfile?.overall;
             const riskBorderColor = riskLevel === "red" ? T.danger : riskLevel === "amber" ? T.warning : "transparent";
@@ -3780,7 +3793,8 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
               const riskLevel = r.riskProfile?.overall;
               const riskBorderColor = riskLevel === "red" ? T.danger : riskLevel === "amber" ? T.warning : "transparent";
               const discColor = r.gene === "IS6110" ? T.textTer : r.strategy === "Proximity" ? T.textSec : r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger;
-              const activityVal = r.ensembleScore || r.score;
+              const activityVal = r.cnnCalibrated ?? r.score;
+              const pamAdjVal = r.pamAdjusted ?? activityVal;
               const stratIcon = r.strategy === "Proximity" ? "P" : "D";
               return (
                 <React.Fragment key={r.label}>
@@ -3820,12 +3834,16 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                         <span style={{ fontFamily: MONO, fontSize: "11px", letterSpacing: "1px", color: T.textTer }}>{r.spacer?.slice(0, 24)}</span>
                       )}
                     </td>
-                    {/* Activity — single ensemble score, plain ink */}
-                    <td style={{ padding: "10px 12px", fontFamily: FONT, fontWeight: 600, fontSize: "11px", color: T.text }}>{activityVal.toFixed(3)}</td>
+                    {/* Activity — GUARD-Net calibrated, colored */}
+                    <td style={{ padding: "10px 12px", fontFamily: FONT, fontWeight: 600, fontSize: "11px", color: activityVal > 0.7 ? T.primary : activityVal > 0.5 ? T.warning : T.danger }}>{activityVal.toFixed(3)}</td>
+                    {/* PAM-adj — activity × PAM penalty, dimmer */}
+                    {hasPamAdj && <td style={{ padding: "10px 12px", fontFamily: FONT, fontSize: "11px", color: T.textSec }}>{pamAdjVal.toFixed(3)}{r.pamPenalty != null && r.pamPenalty < 1.0 ? <span style={{ fontSize: "9px", color: T.textTer, marginLeft: "2px" }}>({r.pamPenalty}×)</span> : ""}</td>}
                     {/* Disc — colored by threshold (the one meaningful color) */}
                     <td style={{ padding: "10px 12px", fontFamily: FONT, fontWeight: 600, fontSize: "11px", color: r.pamDisrupted ? "#7c3aed" : discColor }}>
                       {r.pamDisrupted ? <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: "#7c3aed18", color: "#7c3aed", border: "1px solid #7c3aed33", letterSpacing: "0.04em" }}>PAM</span> : r.gene === "IS6110" ? <span style={{ fontSize: "10px" }}>N/A</span> : r.strategy === "Proximity" ? <span style={{ fontSize: "10px" }}>AS-RPA</span> : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×`}
                     </td>
+                    {/* QC — heuristic, small gray */}
+                    <td style={{ padding: "10px 8px", fontFamily: FONT, fontSize: "10px", color: T.textTer }}>{r.score.toFixed(2)}</td>
                     {/* Readiness — gradient fill (keep strongest visual element) */}
                     {hasReadiness && (
                       <td style={{ padding: "10px 8px" }}>
@@ -3926,7 +3944,7 @@ const CrossReactivityMatrix = () => {
   const getOnTargetScore = (idx) => {
     const label = labels[idx];
     const r = RESULTS.find(x => x.label === label);
-    return r ? (r.ensembleScore || r.score || 0).toFixed(2) : "—";
+    return r ? (r.cnnCalibrated ?? r.score || 0).toFixed(2) : "—";
   };
 
   const pairMap = {};
@@ -4287,7 +4305,7 @@ const DiscriminationTab = ({ results }) => {
                 <td style={{ padding: "10px 14px", fontSize: "10px", color: r.pamDisrupted ? "#7c3aed" : r.discMethod === "neural" ? "#3b82f6" : (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature" ? T.success : T.textTer }}>
                   {r.pamDisrupted ? "PAM gating" : r.discMethod === "neural" ? "Neural" : (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature" ? "Learned" : "Heuristic"}
                 </td>
-                <td style={{ padding: "10px 14px", fontFamily: FONT }}>{(r.ensembleScore || r.score).toFixed(3)}</td>
+                <td style={{ padding: "10px 14px", fontFamily: FONT }}>{(r.cnnCalibrated ?? r.score).toFixed(3)}</td>
                 <td style={{ padding: "10px 14px" }}>
                   {r.pamDisrupted ? (
                     <Badge variant="success">PAM-disrupted</Badge>
@@ -4594,7 +4612,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     return "OTHER";
   };
   const targetStrategy = (t) => { const r = results.find(x => x.label === t); return r ? r.strategy : "Direct"; };
-  const targetScore = (t) => { const r = results.find(x => x.label === t); return r ? (r.ensembleScore || r.score || 0) : 0; };
+  const targetScore = (t) => { const r = results.find(x => x.label === t); return r ? (r.cnnCalibrated ?? r.score || 0) : 0; };
   const coAmpliconGroups = [["rpoB_H445Y","rpoB_H445D"],["rpoB_S450L","rpoB_S450W"],["katG_S315T","katG_S315N"],["embB_M306V","embB_M306I"]];
   const isCoAmplicon = (t) => coAmpliconGroups.some(g => g.includes(t));
   const coAmpliconPartner = (t) => { const g = coAmpliconGroups.find(g => g.includes(t)); return g ? g.filter(x => x !== t)[0] : null; };
@@ -4604,7 +4622,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     const kr = (kinetics.target_ranking || []).find(x => x.target === target);
     if (kr) return kr.efficiency;
     const r = results.find(x => x.label === target);
-    return r ? (r.ensembleScore || r.score || 0.75) : 0.75;
+    return r ? (r.cnnCalibrated ?? r.score || 0.75) : 0.75;
   };
 
   // pncA_H57D status check
@@ -5804,7 +5822,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
       const discT = p.discrimination_threshold || 3.0;
 
       const perTarget = res.map(r => {
-        const eff = r.ensembleScore ?? r.score ?? 0;
+        const eff = r.cnnCalibrated ?? r.score ?? 0;
         const disc = r.disc != null && r.disc < 900 ? r.disc : 0;
         const asrpaViable = r.strategy !== "Proximity" || !r.asrpaDiscrimination || r.asrpaDiscrimination.block_class !== "none";
         const ready = r.hasPrimers && eff >= effT && asrpaViable && (r.strategy === "Proximity" || disc >= discT);
@@ -5829,7 +5847,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
       const specificity = specValues.length ? specValues.reduce((a, v) => a + v, 0) / specValues.length : 0;
       const sensitivity = resistanceTargets.length ? assayReady / resistanceTargets.length : 0;
 
-      const meanEff = res.length > 0 ? res.reduce((a, r) => a + (r.ensembleScore ?? r.score ?? 0), 0) / res.length : 0;
+      const meanEff = res.length > 0 ? res.reduce((a, r) => a + (r.cnnCalibrated ?? r.score ?? 0), 0) / res.length : 0;
 
       setDiagnostics({
         sensitivity, specificity, coverage: assayReady, total_targets: resistanceTargets.length,
@@ -5982,7 +6000,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
         const effT = paramName === "efficiency_threshold" ? v : baseP.efficiency_threshold;
         const discT = paramName === "discrimination_threshold" ? v : baseP.discrimination_threshold;
         const ready = resistanceResults.filter(r => {
-          const eff = r.ensembleScore || r.score;
+          const eff = r.cnnCalibrated ?? r.score;
           const disc = r.disc != null && r.disc < 900 ? r.disc : 0;
           return r.hasPrimers && eff >= effT && (r.strategy === "Proximity" || disc >= discT);
         }).length;
@@ -6017,7 +6035,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
       for (const dT of discGrid) {
         for (const eT of effGrid) {
           const ready = resistanceResults.filter(r => {
-            const eff = r.ensembleScore || r.score;
+            const eff = r.cnnCalibrated ?? r.score;
             const disc = r.disc != null && r.disc < 900 ? r.disc : 0;
             return r.hasPrimers && eff >= eT && (r.strategy === "Proximity" || disc >= dT);
           }).length;
@@ -6124,7 +6142,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             const discT = p.discrimination_threshold || 3.0;
             // Filter to candidates that pass the active preset's thresholds
             const filtered = results.filter(r => {
-              const eff = r.ensembleScore || r.score;
+              const eff = r.cnnCalibrated ?? r.score;
               if (eff < effT) return false;
               if (r.gene === "IS6110") return false; // species control
               if (r.strategy === "Proximity") return !(r.asrpaDiscrimination?.block_class === "none");
@@ -6139,9 +6157,9 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               </div>
             );
             const plotResults = filtered;
-            const mutScores = plotResults.map(r => r.ensembleScore || r.score);
+            const mutScores = plotResults.map(r => r.cnnCalibrated ?? r.score);
             const wtScores = plotResults.map(r => {
-              const eff = r.ensembleScore || r.score;
+              const eff = r.cnnCalibrated ?? r.score;
               const disc = r.disc > 0 && r.disc < 900 ? r.disc : 0.9;
               return eff / disc;
             });
@@ -6684,7 +6702,7 @@ const ResultsPage = ({ connected, jobId, scorer: scorerProp, goTo }) => {
         setResults(RESULTS.map(r => ({
           ...r,
           cnnScore: undefined, cnnCalibrated: undefined,
-          ensembleScore: undefined, mlScores: [],
+          pamAdjusted: undefined, mlScores: [],
         })));
       } else {
         setResults(RESULTS);
@@ -7068,7 +7086,7 @@ const ScoringPage = ({ connected }) => {
         <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, marginBottom: "16px" }}>
           Dual-branch neural network combining a target-DNA CNN with RNA Foundation Model (RNA-FM) embeddings for crRNA secondary structure.
           R-Loop Propagation Attention (RLPA) encodes the biophysics of Cas12a's directional R-loop formation into the architecture.
-          Trained on 25,000+ cis- and trans-cleavage measurements from Kim et al. (2018) and Huang et al. (2024). Ensemble with heuristic serves as primary ranking score.
+          Trained on 25,000+ cis- and trans-cleavage measurements from Kim et al. (2018) and Huang et al. (2024). Activity score serves as primary ranking; heuristic provides independent biophysical QC.
         </p>
 
         {/* Architecture branches */}
@@ -7940,7 +7958,7 @@ const ResearchPage = ({ connected }) => {
             {
               icon: <RefreshCw size={18} />,
               title: "Active Learning Loop",
-              desc: "Feed experimental measurements back into GUARD-Net. Fluorescence or electrochemical data recalibrates the ensemble, closing the gap between in silico and platform-specific signal.",
+              desc: "Feed experimental measurements back into GUARD-Net. Fluorescence or electrochemical data recalibrates activity predictions, closing the gap between in silico and platform-specific signal.",
               milestone: "Phase 1 — Experimental validation",
               ready: true,
             },
