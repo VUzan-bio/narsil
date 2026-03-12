@@ -129,6 +129,8 @@ const RESULTS = MUTATIONS.map((m, i) => {
     amplicon: i < 12 ? 120 + Math.floor(Math.random() * 60) : null,
     mutActivity: mutAct,
     wtActivity: wtAct,
+    pamDisrupted: false,
+    pamDisruptionType: null,
     refs: WHO_REFS[refKey] || null,
   };
 });
@@ -141,6 +143,7 @@ RESULTS.push({
   disc: 999, discrimination: { model_name: "learned_lightgbm", ratio: 999, mut_activity: 0.95, wt_activity: 0.001 },
   gc: 0.65, ot: 0, hasPrimers: true, hasSM: false,
   fwd: seq(30), rev: seq(30), amplicon: 142, mutActivity: 0.95, wtActivity: 0.001,
+  pamDisrupted: false, pamDisruptionType: null,
   refs: { who: "N/A", catalogue: "Species control", pmid: "30593580", cryptic: null, freq: "6–16 copies/genome" },
 });
 
@@ -1918,6 +1921,10 @@ const HomePage = ({ goTo, connected }) => {
               title: "Specificity estimates",
               text: "The proxy formula (1\u22121/disc) assumes perfectly separated signal distributions with a midpoint threshold. In practice, specificity depends on signal variance and threshold selection \u2014 a target with disc = 7\u00d7 and high activity variance could have worse specificity than disc = 5\u00d7 with low variance. WHO TPP compliance requires experimental validation on clinical isolate panels. All specificity statuses are marked \u201cPending\u201d accordingly.",
             },
+            {
+              title: "PAM-disruption detection",
+              text: "The pipeline flags cases where the resistance SNP falls within the Cas12a PAM sequence, which would give binary (infinite) discrimination. However, this is extremely rare in M.\u00a0tuberculosis due to its high GC content (65.6%) \u2014 canonical TTTV PAMs require three consecutive thymines, making SNP\u2013PAM overlap a low-probability event for the WHO-catalogued resistance mutations targeted here.",
+            },
           ].map((item, i) => (
             <div key={i} style={{ background: T.bgSub, borderRadius: "8px", padding: "12px 16px", border: `1px solid ${T.borderLight}` }}>
               <div style={{ fontSize: "12px", fontWeight: 700, color: T.text, marginBottom: "4px" }}>{item.title}</div>
@@ -3245,12 +3252,22 @@ const generateInterpretation = (r) => {
     lines.push(`Expanded PAM (${r.pam}${r.pamVariant ? `, ${r.pamVariant}` : ""}) \u2014 recognized by enAsCas12a with reduced activity vs canonical TTTV.${penaltyStr} This is the best available PAM site in the GC-rich M. tuberculosis genomic context around this mutation.`);
   }
 
+  // PAM disruption — binary discrimination override
+  if (r.pamDisrupted) {
+    const disruptionDetail = r.pamDisruptionType === "wt_pam_broken"
+      ? "Binary discrimination \u2014 the resistance SNP disrupts the PAM consensus in the wildtype sequence. Cas12a cannot bind WT DNA at this locus, providing effectively infinite discrimination. This is the strongest possible discrimination mechanism: all-or-nothing PAM recognition gating."
+      : "Binary discrimination \u2014 the resistance SNP disrupts the PAM consensus in the mutant sequence. Cas12a cannot bind MUT DNA at this locus. This inverts the expected detection logic \u2014 signal absence indicates resistance.";
+    lines.push(disruptionDetail);
+  }
+
   // Discrimination
   const discModelName = r.discrimination?.model_name || "";
   const isNeuralDisc = r.discMethod === "neural";
   const isLearnedDisc = discModelName.includes("learned") || r.discMethod === "feature";
   const discSource = isNeuralDisc ? "neural discrimination head (GUARD-Net multi-task, trained on 6,136 EasyDesign pairs)" : isLearnedDisc ? "learned model (XGBoost, 15 thermodynamic features)" : "heuristic model (position \u00D7 destabilisation)";
-  if (r.strategy === "Proximity") {
+  if (r.pamDisrupted) {
+    // Skip normal discrimination analysis — already covered above
+  } else if (r.strategy === "Proximity") {
     lines.push(`Proximity detection \u2014 the resistance SNP falls outside the crRNA spacer${r.proximityDistance ? ` (${r.proximityDistance} bp away)` : ""}. Allele discrimination relies on AS-RPA primers (10\u2013100\u00D7 selectivity), not Cas12a mismatch intolerance. The Cas12a disc ratio (~${disc.toFixed(1)}\u00D7) is not relevant for this strategy.`);
   } else if (snpPos) {
     // Mismatch chemistry context
@@ -3752,8 +3769,8 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                     {/* Activity — single ensemble score, plain ink */}
                     <td style={{ padding: "10px 12px", fontFamily: FONT, fontWeight: 600, fontSize: "11px", color: T.text }}>{activityVal.toFixed(3)}</td>
                     {/* Disc — colored by threshold (the one meaningful color) */}
-                    <td style={{ padding: "10px 12px", fontFamily: FONT, fontWeight: 600, fontSize: "11px", color: discColor }}>
-                      {r.gene === "IS6110" ? <span style={{ fontSize: "10px" }}>N/A</span> : r.strategy === "Proximity" ? <span style={{ fontSize: "10px" }}>AS-RPA</span> : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×`}
+                    <td style={{ padding: "10px 12px", fontFamily: FONT, fontWeight: 600, fontSize: "11px", color: r.pamDisrupted ? "#7c3aed" : discColor }}>
+                      {r.pamDisrupted ? <span style={{ display: "inline-block", padding: "1px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: "#7c3aed18", color: "#7c3aed", border: "1px solid #7c3aed33", letterSpacing: "0.04em" }}>PAM</span> : r.gene === "IS6110" ? <span style={{ fontSize: "10px" }}>N/A</span> : r.strategy === "Proximity" ? <span style={{ fontSize: "10px" }}>AS-RPA</span> : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×`}
                     </td>
                     {/* Readiness — gradient fill (keep strongest visual element) */}
                     {hasReadiness && (
@@ -4005,15 +4022,21 @@ const DiscriminationTab = ({ results }) => {
                 <td style={{ padding: "10px 14px", fontFamily: FONT, fontWeight: 600, color: T.textTer }}>{i + 1}</td>
                 <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 600, fontSize: "11px" }}>{r.label}</td>
                 <td style={{ padding: "10px 14px" }}><DrugBadge drug={r.drug} /></td>
-                <td style={{ padding: "10px 14px", fontFamily: FONT, fontWeight: 700, color: r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger }}>{typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×</td>
-                <td style={{ padding: "10px 14px", fontSize: "10px", color: r.discMethod === "neural" ? "#3b82f6" : (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature" ? T.success : T.textTer }}>
-                  {r.discMethod === "neural" ? "Neural" : (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature" ? "Learned" : "Heuristic"}
+                <td style={{ padding: "10px 14px", fontFamily: FONT, fontWeight: 700, color: r.pamDisrupted ? "#7c3aed" : r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger }}>
+                  {r.pamDisrupted ? <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}><span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: "#7c3aed18", color: "#7c3aed", border: "1px solid #7c3aed33" }}>PAM \u221e</span></span> : <>{typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}×</>}
+                </td>
+                <td style={{ padding: "10px 14px", fontSize: "10px", color: r.pamDisrupted ? "#7c3aed" : r.discMethod === "neural" ? "#3b82f6" : (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature" ? T.success : T.textTer }}>
+                  {r.pamDisrupted ? "PAM gating" : r.discMethod === "neural" ? "Neural" : (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature" ? "Learned" : "Heuristic"}
                 </td>
                 <td style={{ padding: "10px 14px", fontFamily: FONT }}>{(r.ensembleScore || r.score).toFixed(3)}</td>
                 <td style={{ padding: "10px 14px" }}>
-                  <Badge variant={r.disc >= 3 ? "success" : r.disc >= 2 ? "warning" : "danger"}>
-                    {r.disc >= 10 ? "Excellent" : r.disc >= 3 ? "Good" : r.disc >= 2 ? "Acceptable" : "Insufficient"}
-                  </Badge>
+                  {r.pamDisrupted ? (
+                    <Badge variant="success">PAM-disrupted</Badge>
+                  ) : (
+                    <Badge variant={r.disc >= 3 ? "success" : r.disc >= 2 ? "warning" : "danger"}>
+                      {r.disc >= 10 ? "Excellent" : r.disc >= 3 ? "Good" : r.disc >= 2 ? "Acceptable" : "Insufficient"}
+                    </Badge>
+                  )}
                 </td>
               </tr>
             ))}

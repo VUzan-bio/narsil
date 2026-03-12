@@ -53,6 +53,7 @@ from guard.core.types import (
     MismatchPair,
     OffTargetReport,
     ScoredCandidate,
+    Target,
 )
 from guard.scoring.base import Scorer
 
@@ -346,3 +347,105 @@ class HeuristicDiscriminationScorer(Scorer):
             }
 
         return summary
+
+
+# ======================================================================
+# PAM-disruption binary discrimination
+# ======================================================================
+
+# Canonical TTTV PAM consensus: positions 0-2 must be T, position 3 must be A/C/G
+_PAM_CONSENSUS = [{"T"}, {"T"}, {"T"}, {"A", "C", "G"}]
+
+
+def check_pam_disruption(
+    candidate: CrRNACandidate,
+    target: Target,
+) -> dict:
+    """Check whether the resistance SNP falls within the crRNA's PAM.
+
+    If the SNP disrupts the PAM consensus for the wildtype allele, Cas12a
+    physically cannot bind WT DNA at this locus — giving binary (infinite)
+    discrimination without relying on mismatch intolerance.
+
+    This is the strongest possible discrimination mechanism: all-or-nothing
+    PAM recognition gating. However, it is extremely rare in GC-rich genomes
+    like M. tuberculosis (65.6% GC) because TTTV PAMs require three
+    consecutive thymines.
+
+    Returns:
+        dict with keys:
+          - pam_disrupted: bool
+          - pam_disruption_type: "wt_pam_broken" | "mut_pam_broken" | None
+    """
+    result = {"pam_disrupted": False, "pam_disruption_type": None}
+
+    # Only meaningful for DIRECT candidates with known PAM
+    if candidate.detection_strategy != DetectionStrategy.DIRECT:
+        return result
+    if not candidate.pam_seq or len(candidate.pam_seq) != 4:
+        return result
+
+    # Determine PAM genomic window.
+    # Cas12a PAM is upstream (5') of the spacer on the target strand.
+    # Plus strand: PAM is at [genomic_start - 4, genomic_start)
+    # Minus strand: PAM is at [genomic_end, genomic_end + 4)
+    from guard.core.types import Strand
+
+    if candidate.strand == Strand.PLUS:
+        pam_start = candidate.genomic_start - 4
+    else:
+        pam_start = candidate.genomic_end
+
+    pam_end = pam_start + 4
+
+    # Check if the SNP falls within the PAM window
+    snp_pos = target.genomic_pos
+    snp_footprint = target.mutation_footprint_bp
+
+    # For codon mutations, check all positions in the footprint
+    snp_positions = list(range(snp_pos, snp_pos + snp_footprint))
+    overlap = [p for p in snp_positions if pam_start <= p < pam_end]
+
+    if not overlap:
+        return result
+
+    # SNP falls in PAM — check if it breaks the consensus
+    pam_seq = candidate.pam_seq.upper()
+    ref_codon = target.ref_codon.upper()
+    alt_codon = target.alt_codon.upper()
+
+    # For each overlapping position, determine WT and MUT bases
+    for pos in overlap:
+        pam_offset = pos - pam_start  # 0-3 within PAM
+        codon_offset = pos - snp_pos   # offset within codon
+
+        if codon_offset >= len(ref_codon) or codon_offset >= len(alt_codon):
+            continue
+
+        # Get the WT and MUT bases at this PAM position
+        # For minus strand, we need to complement since PAM is read 5'→3'
+        wt_base = ref_codon[codon_offset].upper()
+        mut_base = alt_codon[codon_offset].upper()
+
+        if candidate.strand == Strand.MINUS:
+            _comp = {"A": "T", "T": "A", "G": "C", "C": "G"}
+            wt_base = _comp.get(wt_base, wt_base)
+            mut_base = _comp.get(mut_base, mut_base)
+
+        # Check PAM consensus at this position
+        consensus = _PAM_CONSENSUS[pam_offset] if pam_offset < 4 else set()
+        wt_valid = wt_base in consensus
+        mut_valid = mut_base in consensus
+
+        if wt_valid != mut_valid:
+            # One allele satisfies PAM, the other doesn't → binary discrimination
+            result["pam_disrupted"] = True
+            if not wt_valid:
+                # WT breaks PAM → Cas12a can't bind WT → infinite discrimination
+                result["pam_disruption_type"] = "wt_pam_broken"
+            else:
+                # MUT breaks PAM → Cas12a can't bind MUT → inverted discrimination
+                result["pam_disruption_type"] = "mut_pam_broken"
+            break
+
+    return result

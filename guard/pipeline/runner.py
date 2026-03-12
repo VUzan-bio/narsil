@@ -72,7 +72,7 @@ from guard.multiplex.optimizer import MultiplexOptimizer, OptimizationConfig
 from guard.offtarget.screener import OffTargetScreener
 from guard.primers.coselection import CoselectionValidator
 from guard.scoring.base import Scorer
-from guard.scoring.discrimination import HeuristicDiscriminationScorer
+from guard.scoring.discrimination import HeuristicDiscriminationScorer, check_pam_disruption
 from guard.scoring.heuristic import HeuristicScorer
 from guard.scoring.learned_discrimination import LearnedDiscriminationScorer
 from guard.scoring.sequence_ml import SequenceMLScorer
@@ -883,6 +883,25 @@ class GUARDPipeline:
                     break
         if n_sm_attached:
             logger.info("SM enhancement: %d/%d panel members enhanced", n_sm_attached, panel.plex)
+
+        # --- PAM-disruption binary discrimination flag ---
+        n_pam_disrupted = 0
+        for member in panel.members:
+            pam_result = check_pam_disruption(
+                member.selected_candidate.candidate,
+                member.target,
+            )
+            # Store on the ScoredCandidate for downstream serialization
+            member.selected_candidate.pam_disrupted = pam_result["pam_disrupted"]
+            member.selected_candidate.pam_disruption_type = pam_result["pam_disruption_type"]
+            if pam_result["pam_disrupted"]:
+                n_pam_disrupted += 1
+                logger.info(
+                    "  PAM-disrupted: %s (%s)",
+                    member.label, pam_result["pam_disruption_type"],
+                )
+        if n_pam_disrupted:
+            logger.info("PAM disruption: %d/%d panel members", n_pam_disrupted, panel.plex)
 
         # --- Module 8: RPA primer design ---
         t0 = time.perf_counter_ns()

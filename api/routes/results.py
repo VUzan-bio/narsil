@@ -143,6 +143,8 @@ def _build_target_result(member: dict[str, Any]) -> TargetResult:
         pam_penalty=heuristic.get("pam_penalty", candidate.get("pam_activity_weight")),
         is_canonical_pam=candidate.get("pam_variant") == "TTTV" if candidate.get("pam_variant") else None,
         enzyme_id=candidate.get("enzyme_id") or member.get("enzyme_id"),
+        pam_disrupted=selected.get("pam_disrupted", False),
+        pam_disruption_type=selected.get("pam_disruption_type"),
         ml_scores=selected.get("ml_scores", []),
         rank=selected.get("rank"),
     ) if candidate.get("candidate_id") else None

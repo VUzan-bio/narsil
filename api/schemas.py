@@ -98,6 +98,8 @@ class CandidateSummary(BaseModel):
     pam_penalty: Optional[float] = None       # PAM activity penalty (1.0 = canonical, <1.0 = expanded)
     is_canonical_pam: Optional[bool] = None   # True if TTTV
     enzyme_id: Optional[str] = None           # Cas12a variant used
+    pam_disrupted: Optional[bool] = None       # SNP disrupts PAM consensus → binary discrimination
+    pam_disruption_type: Optional[str] = None  # "wt_pam_broken" | "mut_pam_broken" | None
     ml_scores: list[dict] = Field(default_factory=list)
     rank: Optional[int] = None
 

@@ -524,6 +524,8 @@ class ScoredCandidate(BaseModel):
     discrimination: Optional[DiscriminationScore] = None
     rank: Optional[int] = None
     validation_status: ValidationStatus = ValidationStatus.UNTESTED
+    pam_disrupted: bool = False                          # SNP disrupts PAM → binary discrimination
+    pam_disruption_type: Optional[str] = None            # "wt_pam_broken" | "mut_pam_broken"
 
     @property
     def best_ml_score(self) -> Optional[float]:
