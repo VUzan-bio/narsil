@@ -5887,7 +5887,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
   // Load presets on mount — try API first, fall back to hardcoded
   useEffect(() => {
     const fallbackPresets = [
-      { name: "high_sensitivity", description: "Field screening — maximise coverage, tolerate lower discrimination.", efficiency_threshold: 0.3, discrimination_threshold: 2.0 },
+      { name: "high_sensitivity", description: "Field screening — maximise coverage, tolerate lower discrimination.", efficiency_threshold: 0.2, discrimination_threshold: 1.5 },
       { name: "balanced", description: "WHO TPP-aligned — clinical diagnostic deployment.", efficiency_threshold: 0.4, discrimination_threshold: 3.0 },
       { name: "high_specificity", description: "Confirmatory — minimise false calls, reference lab use.", efficiency_threshold: 0.6, discrimination_threshold: 5.0 },
     ];
@@ -6158,7 +6158,14 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             const mutScores = plotResults.map(r => r.cnnCalibrated ?? r.score);
             const wtScores = plotResults.map(r => {
               const eff = r.cnnCalibrated ?? r.score;
-              const disc = r.disc > 0 && r.disc < 900 ? r.disc : 0.9;
+              if (r.strategy === "Proximity") {
+                // Proximity: discrimination comes from AS-RPA primers, not Cas12a
+                // WT sample → AS-RPA primers don't extend → no amplicon → no Cas12a cleavage → ΔI ≈ 0
+                const asrpaSpec = r.asrpaDiscrimination?.estimated_specificity;
+                const asrpaDisc = asrpaSpec != null ? 1 / Math.max(1 - asrpaSpec, 0.001) : 100;
+                return eff / asrpaDisc; // typically ≈ 0.008 (near zero)
+              }
+              const disc = r.disc > 0 && r.disc < 900 ? r.disc : 1.5;
               return eff / disc;
             });
             const kdeMut = gaussianKDE(mutScores, 0.05, 100);
@@ -6181,7 +6188,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <div>
                     <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>MUT vs WT Predicted Activity</div>
                     <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5, maxWidth: "540px" }}>
-                      Density from <strong>{plotResults.length}</strong>/{results.filter(r => r.gene !== "IS6110").length} candidates passing <strong>{PRESET_LABELS[activePreset] || activePreset}</strong> thresholds (eff ≥ {effT}, disc ≥ {discT}×). Greater separation = better discrimination. WT activity derived from discrimination ratios (A<sub>WT</sub> = A<sub>MUT</sub> / disc). SWV signal decrease is proportional to predicted activity.
+                      Density from <strong>{plotResults.length}</strong>/{results.filter(r => r.gene !== "IS6110").length} candidates passing <strong>{PRESET_LABELS[activePreset] || activePreset}</strong> thresholds (eff ≥ {effT}, disc ≥ {discT}×). Greater separation = better discrimination. Direct targets: A<sub>WT</sub> = A<sub>MUT</sub> / Cas12a disc. Proximity targets: A<sub>WT</sub> = A<sub>MUT</sub> / AS-RPA disc (WT not amplified → near-zero signal).
                     </div>
                   </div>
                   <Badge variant={separation >= 0.15 ? "success" : separation >= 0.08 ? "warning" : "danger"}>
@@ -6272,6 +6279,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                       {separation >= 0.15 ? " Good separation — the panel reliably distinguishes resistant from susceptible samples at the aggregate level." : separation >= 0.08 ? " Moderate separation — borderline samples may produce ambiguous calls; consider tightening the panel to high-discrimination targets only." : " Poor separation — the panel cannot reliably distinguish MUT from WT; review target selection and consider dropping low-discrimination candidates."}
                       {` Overlap zone: ${overlapPct}% — this is the aggregate overlap; individual targets with high discrimination (e.g., disc ≥10×) have near-zero overlap. In practice each target is read independently, so per-target separation matters more than panel-level aggregate.`}
                       {` Strongest MUT signal: ${bestMutLabel} (${mutSorted[0].toFixed(3)}). Weakest: ${worstMutLabel} (${mutSorted[mutSorted.length - 1].toFixed(3)}).`}
+                      {plotResults.length === results.filter(r => r.gene !== "IS6110").length && activePreset !== "balanced" && ` Note: all candidates exceed the ${PRESET_LABELS[activePreset] || activePreset} thresholds — this profile produces identical results to a less stringent profile for the current panel.`}
                     </div>
                   );
                 })()}
@@ -6284,7 +6292,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7 }}>
               <div style={{ marginBottom: "14px" }}>
                 <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, marginBottom: "4px" }}>Mismatch position matters most</div>
-                Cas12a reads DNA directionally from PAM toward the spacer end. Mismatches near the PAM (seed positions 1–4) block R-loop formation almost completely, giving discrimination ratios of 10–50×. Mismatches far from the PAM (positions 15–20) are tolerated, giving ratios of 1–2×. Each mutation's position in the spacer determines its baseline discrimination.
+                Cas12a reads DNA directionally from PAM toward the spacer end. The seed region spans positions 1–8 (PAM-proximal). Mismatches at positions 1–4 block R-loop formation almost completely, giving discrimination ratios of 10–50×. Positions 5–8 give 3–10×. Mismatches far from the PAM (positions 15–20) are tolerated, giving ratios of 1–2×. Each mutation's position in the spacer determines its baseline discrimination.
               </div>
               <div style={{ marginBottom: "14px" }}>
                 <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, marginBottom: "4px" }}>Not all mismatches are equal</div>
@@ -6408,6 +6416,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                     {" "}<strong>Specificity:</strong> {specPassing}/{whoEntries.length} classes meet the ≥98% threshold (approximate in silico proxy — actual specificity requires experimental determination with clinical samples).
                     {specFailing.length > 0 && ` ${specFailing.length} class${specFailing.length > 1 ? "es" : ""} pending — specificity estimates require experimental validation on the electrochemical platform.`}
                     {specPassing === whoEntries.length && " All classes pass specificity."}
+                    {" "}<em>Note: coverage denominators reflect panel targets only, not the full WHO mutation catalogue. Clinical sensitivity for a drug class depends on the epidemiological frequency of included mutations (e.g., INH: katG S315T covers ~60% of INH-resistant isolates; adding fabG1 C-15T raises coverage to ~85%).</em>
                   </div>
                 );
               })()}
