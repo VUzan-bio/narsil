@@ -1219,20 +1219,20 @@ const HomePage = ({ goTo, connected }) => {
         <div style={{ marginBottom: "28px" }}>
           <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "10px" }}>Diagnostic Panel</div>
 
-          {/* Preset cards */}
-          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "10px", marginBottom: "16px" }}>
+          {/* Preset cards — 2×2 */}
+          <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px", marginBottom: "16px" }}>
             {[
               { id: "mdr14", name: "MDR-TB 14-plex", targets: ALL_INDICES.length + " targets",
-                desc: "Full WHO-catalogued first- and second-line resistance panel covering RIF, INH, EMB, PZA, FQ, and aminoglycosides.",
-                meta: [["6 drug classes", ""], ["Tier 1–2", ""], ["High + Moderate", ""]] },
+                desc: "Full WHO-catalogued first- and second-line resistance panel.",
+                meta: ["6 drug classes", "Tier 1–2", "High + Moderate"] },
               { id: "mdr14_rnasep", name: "MDR-TB 14-plex + RNaseP", targets: (ALL_INDICES.length + 1) + " targets",
-                desc: "Full MDR panel plus human RNaseP (RPPH1) extraction control. Confirms DNA extraction succeeded and sample contains human material.",
-                meta: [["6 drug classes", ""], ["+ extraction ctrl", ""], ["CDC standard", ""]] },
+                desc: "Full MDR panel plus human RNaseP (RPPH1) extraction control.",
+                meta: ["6 drug classes", "+ extraction ctrl", "CDC standard"] },
               { id: "core5", name: "Core 5-plex", targets: "5 targets",
-                desc: "High-confidence tier-1 mutations only. Suitable for point-of-care screening with limited multiplexing capacity.",
-                meta: [["4 drug classes", ""], ["Tier 1", ""], ["High", ""]] },
+                desc: "High-confidence tier-1 mutations only. Point-of-care screening.",
+                meta: ["4 drug classes", "Tier 1", "High confidence"] },
               { id: "custom", name: "Custom Panel", targets: panel === "custom" ? selected.size + " targets" : "",
-                desc: "Select individual mutations. For targeted re-design, single-drug panels, or validation studies.",
+                desc: "Select individual mutations for targeted re-design or validation.",
                 meta: [] },
             ].map(p => (
               <div key={p.id} onClick={() => selectPanel(p.id)} style={{
@@ -1241,14 +1241,14 @@ const HomePage = ({ goTo, connected }) => {
                 background: panel === p.id ? T.primaryLight : T.bg,
                 display: "flex", flexDirection: "column", transition: "border-color 0.12s, background 0.12s",
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                   <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>{p.name}</span>
                   {p.targets && <span style={{ fontSize: "11px", fontWeight: 600, color: T.primary }}>{p.targets}</span>}
                 </div>
-                <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, flex: 1, marginBottom: p.meta.length ? "12px" : "0" }}>{p.desc}</div>
+                <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.5, flex: 1, marginBottom: p.meta.length ? "10px" : "0" }}>{p.desc}</div>
                 {p.meta.length > 0 && (
-                  <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: T.textTer, borderTop: `1px solid ${panel === p.id ? T.primary + "30" : T.borderLight}`, paddingTop: "10px" }}>
-                    {p.meta.map(([label], j) => <span key={j}>{label}</span>)}
+                  <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: T.textTer, borderTop: `1px solid ${panel === p.id ? T.primary + "30" : T.borderLight}`, paddingTop: "8px" }}>
+                    {p.meta.map((label, j) => <span key={j}>{label}</span>)}
                   </div>
                 )}
               </div>
@@ -1635,22 +1635,28 @@ const HomePage = ({ goTo, connected }) => {
 
       {/* ═══ HOW IT WORKS — 4-step simplified pipeline ═══ */}
       {sectionTitle("How It Works")}
-      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "12px", marginBottom: "32px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr 1fr", gap: "0", marginBottom: "32px" }}>
         {[
-          { step: "1", icon: Target, title: "Define Targets", desc: "Input WHO resistance mutations. The pipeline resolves each mutation to its exact genomic position on the M. tuberculosis H37Rv reference genome, identifies the codon context, and determines which drug class it confers resistance to." },
-          { step: "2", icon: Search, title: "Generate & Score Candidates", desc: "For each target, GUARD scans for Cas12a-compatible PAM sites, generates crRNA candidates, filters by biophysical criteria (GC content, homopolymer runs, self-complementarity, off-targets), and scores them using GUARD-Net for cleavage efficiency (trained on 25,000+ cis- and trans-cleavage measurements from Kim et al. 2018 and Huang et al. 2024) and GUARD-Net's neural discrimination head for MUT/WT selectivity (r = 0.44 on held-out validation, trained end-to-end on 6,136 paired measurements) with a standalone feature-based model (XGBoost, 15 thermodynamic features, r = 0.46) as fallback." },
-          { step: "3", icon: Grid3x3, title: "Optimise the Panel", desc: "Panel composition is optimised via simulated annealing (10,000 iterations) over the combinatorial space of candidate assignments, maximising a weighted objective of efficiency, discrimination, and cross-reactivity avoidance. RPA primers are co-designed for each guide, with allele-specific primers for proximity targets." },
-          { step: "4", icon: Shield, title: "Assess Clinical Performance", desc: "The clinical assessment module evaluates the panel against WHO Target Product Profiles: per-drug-class sensitivity, specificity estimates, and ranked backup alternatives for each target. Three operating modes (field screening, clinical deployment, reference lab) adjust thresholds automatically. Output is compatible with electrochemical (SWV on LIG), fluorescence (DETECTR-style), and lateral flow readout platforms." },
-        ].map(c => (
-          <div key={c.title} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px", padding: "24px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-              <div style={{ width: 32, height: 32, borderRadius: "8px", background: T.primaryLight, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <span style={{ fontSize: "14px", fontWeight: 800, color: T.primaryDark, fontFamily: FONT }}>{c.step}</span>
+          { step: "1", icon: Target, title: "Define Targets", summary: "Resolve WHO mutations to genomic positions", detail: "H37Rv reference genome, codon context, drug class mapping" },
+          { step: "2", icon: Search, title: "Score Candidates", summary: "Scan PAM sites, generate and rank crRNAs", detail: "GUARD-Net activity (25K+ measurements) + neural discrimination head (6,136 pairs)" },
+          { step: "3", icon: Grid3x3, title: "Optimise Panel", summary: "Simulated annealing over candidate assignments", detail: "Weighted objective: efficiency, discrimination, cross-reactivity. AS-RPA primers co-designed" },
+          { step: "4", icon: Shield, title: "Clinical Assessment", summary: "Evaluate against WHO Target Product Profiles", detail: "Per-drug sensitivity/specificity. Three operating modes. SWV, fluorescence, or lateral flow" },
+        ].map((c, i) => (
+          <div key={c.title} style={{ position: "relative", padding: mobile ? "20px" : "28px 24px", textAlign: "center" }}>
+            {/* Connector line */}
+            {!mobile && i < 3 && <div style={{ position: "absolute", top: "28px", right: 0, width: "50%", height: "1px", background: T.borderLight, zIndex: 0 }} />}
+            {!mobile && i > 0 && <div style={{ position: "absolute", top: "28px", left: 0, width: "50%", height: "1px", background: T.borderLight, zIndex: 0 }} />}
+            <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "10px" }}>
+              <div style={{ width: 44, height: 44, borderRadius: "50%", background: T.primaryLight, border: `2px solid ${T.primary}30`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <c.icon size={20} color={T.primary} strokeWidth={1.8} />
               </div>
-              <c.icon size={20} color={T.primary} strokeWidth={1.8} />
-              <span style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>{c.title}</span>
+              <div>
+                <div style={{ fontSize: "10px", fontWeight: 700, color: T.primary, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "2px" }}>Step {c.step}</div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>{c.title}</div>
+              </div>
+              <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.5 }}>{c.summary}</div>
+              <div style={{ fontSize: "11px", color: T.textTer, lineHeight: 1.45 }}>{c.detail}</div>
             </div>
-            <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.65 }}>{c.desc}</div>
           </div>
         ))}
       </div>
