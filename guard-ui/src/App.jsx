@@ -1643,70 +1643,190 @@ const HomePage = ({ goTo, connected }) => {
 const MethodsPage = () => {
   const mobile = useIsMobile();
   const [archOpen, setArchOpen] = useState(false);
+  const [hoveredStep, setHoveredStep] = useState(null);
 
-  const sectionHeading = (text, sub) => (
-    <div style={{ marginBottom: "20px", marginTop: "48px" }}>
-      <div style={{ fontSize: mobile ? "18px" : "22px", fontWeight: 800, color: T.text, letterSpacing: "-0.02em", fontFamily: HEADING }}>{text}</div>
-      {sub && <div style={{ fontSize: "13px", color: T.textTer, marginTop: "4px", lineHeight: 1.5 }}>{sub}</div>}
+  /* ── Section heading with thin accent line ── */
+  const sectionBlock = (label, title, sub) => (
+    <div style={{ marginTop: "72px", marginBottom: "32px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+        <div style={{ width: "28px", height: "2px", background: T.primary, borderRadius: "1px" }} />
+        <span style={{ fontSize: "11px", fontWeight: 700, color: T.primary, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT }}>{label}</span>
+      </div>
+      <h2 style={{ fontSize: mobile ? "22px" : "28px", fontWeight: 800, color: T.text, fontFamily: HEADING, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>{title}</h2>
+      {sub && <p style={{ fontSize: "14px", color: T.textSec, marginTop: "8px", lineHeight: 1.6, maxWidth: "640px", margin: "8px 0 0" }}>{sub}</p>}
+    </div>
+  );
+
+  /* ── Spec pill for inline metrics ── */
+  const specPill = (label, value) => (
+    <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+      <span style={{ fontSize: "22px", fontWeight: 700, color: T.text, fontFamily: FONT, letterSpacing: "-0.02em" }}>{value}</span>
+      <span style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</span>
     </div>
   );
 
   return (
-    <div style={{ padding: mobile ? "24px 16px" : "48px 40px", maxWidth: "1100px" }}>
-      {/* Page header */}
-      <div style={{ marginBottom: "40px" }}>
-        <h1 style={{ fontSize: mobile ? "24px" : "32px", fontWeight: 800, color: T.text, fontFamily: HEADING, letterSpacing: "-0.03em", margin: 0 }}>Methods</h1>
-        <p style={{ fontSize: "14px", color: T.textSec, marginTop: "8px", lineHeight: 1.6, maxWidth: "700px" }}>
+    <div style={{ padding: mobile ? "24px 16px" : "56px 48px", maxWidth: "1200px" }}>
+
+      {/* ═══ Page Header ═══ */}
+      <div style={{ marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
+          <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: T.primary }} />
+          <span style={{ fontSize: "12px", fontWeight: 600, color: T.primary, textTransform: "uppercase", letterSpacing: "0.1em", fontFamily: FONT }}>Technical Documentation</span>
+        </div>
+        <h1 style={{ fontSize: mobile ? "28px" : "40px", fontWeight: 800, color: T.text, fontFamily: HEADING, letterSpacing: "-0.04em", margin: 0, lineHeight: 1.1 }}>
+          Methods
+        </h1>
+        <p style={{ fontSize: "15px", color: T.textSec, marginTop: "12px", lineHeight: 1.7, maxWidth: "680px" }}>
           How GUARD designs, scores, and validates CRISPR-Cas12a diagnostic panels for drug-resistant tuberculosis.
         </p>
       </div>
 
-      {/* ── Pipeline Steps ── */}
-      {sectionHeading("Pipeline")}
-      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr 1fr", gap: "12px", marginBottom: "32px" }}>
+      {/* ═══ Pipeline — Adaptyv-style cards ═══ */}
+      {sectionBlock("Pipeline", "How GUARD works", "End-to-end computational pipeline from WHO mutation catalogue to validated diagnostic panel.")}
+
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(4, 1fr)", gap: mobile ? "16px" : "20px" }}>
         {[
-          { step: "01", icon: Crosshair, title: "Define Targets", desc: "Resolve WHO mutations to H37Rv genomic positions, codon context, and drug class." },
-          { step: "02", icon: Search, title: "Score Candidates", desc: "Scan PAM sites, generate crRNAs, score with GUARD-Net (25K+ measurements)." },
-          { step: "03", icon: Zap, title: "Optimise Panel", desc: "Simulated annealing over candidate assignments with co-designed AS-RPA primers." },
-          { step: "04", icon: Shield, title: "Assess Clinically", desc: "Evaluate against WHO TPP: per-drug sensitivity, specificity, three operating modes." },
-        ].map(c => (
-          <div key={c.title} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "20px", display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div style={{ width: 36, height: 36, borderRadius: "10px", background: T.primaryLight, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <c.icon size={18} color={T.primary} strokeWidth={1.8} />
+          { step: "001", icon: Target, title: "Define targets", desc: "Resolve WHO catalogue mutations to H37Rv genomic coordinates, codon context, and drug class annotations.", color: "#2563EB" },
+          { step: "002", icon: Brain, title: "Score candidates", desc: "Scan PAM sites, generate crRNAs, and predict activity with GUARD-Net trained on 25K+ measurements.", color: "#0d9488" },
+          { step: "003", icon: Zap, title: "Optimise panel", desc: "Simulated annealing over candidate assignments with co-designed AS-RPA primers and multiplex constraints.", color: "#7c3aed" },
+          { step: "004", icon: Shield, title: "Assess clinically", desc: "Evaluate against WHO TPP thresholds for per-drug sensitivity, specificity, and three operating modes.", color: "#e11d48" },
+        ].map((c, idx) => (
+          <div
+            key={c.title}
+            onMouseEnter={() => setHoveredStep(idx)}
+            onMouseLeave={() => setHoveredStep(null)}
+            style={{
+              background: T.bg,
+              border: `1px solid ${hoveredStep === idx ? `${c.color}40` : T.border}`,
+              borderRadius: "16px",
+              overflow: "hidden",
+              transition: "all 0.3s ease",
+              transform: hoveredStep === idx ? "translateY(-2px)" : "none",
+              boxShadow: hoveredStep === idx ? `0 8px 32px ${c.color}12` : "none",
+            }}
+          >
+            {/* Icon illustration area */}
+            <div style={{
+              height: mobile ? "140px" : "160px",
+              background: `linear-gradient(135deg, ${T.bgSub} 0%, ${c.color}06 100%)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              {/* Decorative grid dots */}
+              <div style={{ position: "absolute", inset: 0, opacity: 0.3 }}>
+                {[...Array(6)].map((_, row) =>
+                  [...Array(6)].map((_, col) => (
+                    <div key={`${row}-${col}`} style={{
+                      position: "absolute",
+                      left: `${15 + col * 16}%`,
+                      top: `${10 + row * 18}%`,
+                      width: "2px", height: "2px",
+                      borderRadius: "50%",
+                      background: T.textTer,
+                      opacity: 0.4,
+                    }} />
+                  ))
+                )}
               </div>
-              <span style={{ fontSize: "11px", fontWeight: 700, color: T.primary, fontFamily: FONT, opacity: 0.5 }}>{c.step}</span>
+              {/* Main icon */}
+              <div style={{
+                width: "64px", height: "64px",
+                borderRadius: "16px",
+                background: T.bg,
+                border: `1px solid ${T.border}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: `0 4px 16px ${c.color}10`,
+                position: "relative",
+                zIndex: 1,
+              }}>
+                <c.icon size={28} color={c.color} strokeWidth={1.5} />
+              </div>
+              {/* Connector line to next card (not on last) */}
+              {idx < 3 && !mobile && (
+                <div style={{
+                  position: "absolute", right: "-12px", top: "50%", transform: "translateY(-50%)",
+                  width: "24px", height: "1px",
+                  background: `linear-gradient(90deg, ${T.border}, transparent)`,
+                  zIndex: 2,
+                }} />
+              )}
             </div>
-            <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>{c.title}</div>
-            <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.55 }}>{c.desc}</div>
+            {/* Text content */}
+            <div style={{ padding: "24px 24px 28px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: c.color, fontFamily: FONT, marginBottom: "12px", letterSpacing: "0.02em" }}>{c.step}</div>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "8px", letterSpacing: "-0.01em" }}>
+                {c.title.charAt(0).toUpperCase() + c.title.slice(1)}
+              </div>
+              <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.65 }}>{c.desc}</div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* ── GUARD-Net ── */}
-      {sectionHeading("GUARD-Net", "Dual-branch neural network for predicting Cas12a guide performance")}
-      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+      {/* ═══ GUARD-Net ═══ */}
+      {sectionBlock("Neural Network", "GUARD-Net", "Dual-branch architecture predicting Cas12a guide efficiency and mismatch discrimination jointly.")}
+
+      {/* Bento grid: 3 feature cards */}
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
         {[
-          { icon: Cpu, title: "Target DNA", tag: "CNN", desc: "Multi-scale convolutions (k=3,5,7) scan the 34-nt target context for PAM quality, seed composition, and dinucleotide patterns." },
-          { icon: Layers, title: "Guide RNA", tag: "RNA-FM", desc: "Pre-trained foundation model (23M sequences) captures folding stability and accessibility governing Cas12a loading." },
-          { icon: TrendingUp, title: "R-loop Propagation", tag: "RLPA", desc: "Causal attention encodes PAM-proximal → distal directionality. +6.7% cross-dataset generalisation vs bidirectional." },
+          { icon: Cpu, title: "Target DNA Branch", tag: "CNN", desc: "Multi-scale convolutions (k=3,5,7) scan the 34-nt target context for PAM quality, seed composition, and dinucleotide patterns.", accent: "#2563EB" },
+          { icon: Layers, title: "Guide RNA Branch", tag: "RNA-FM", desc: "Pre-trained foundation model (23M sequences) captures folding stability and accessibility governing Cas12a loading.", accent: "#0d9488" },
+          { icon: TrendingUp, title: "R-Loop Propagation", tag: "RLPA", desc: "Causal attention encodes PAM-proximal to distal directionality. +6.7% cross-dataset generalisation vs bidirectional.", accent: "#7c3aed" },
         ].map(c => (
-          <div key={c.title} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "12px", padding: "20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-              <c.icon size={16} color={T.primary} strokeWidth={1.8} />
-              <span style={{ fontSize: "13px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>{c.title}</span>
-              <span style={{ fontSize: "9px", fontWeight: 700, color: T.primary, padding: "2px 6px", borderRadius: "4px", background: `${T.primary}10`, marginLeft: "auto" }}>{c.tag}</span>
+          <div key={c.title} style={{
+            background: T.bg,
+            border: `1px solid ${T.border}`,
+            borderRadius: "16px",
+            padding: "28px 24px",
+            display: "flex", flexDirection: "column", gap: "16px",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{
+                width: "40px", height: "40px", borderRadius: "12px",
+                background: `${c.accent}08`, border: `1px solid ${c.accent}20`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <c.icon size={20} color={c.accent} strokeWidth={1.6} />
+              </div>
+              <span style={{
+                fontSize: "10px", fontWeight: 700, color: c.accent,
+                padding: "3px 8px", borderRadius: "6px",
+                background: `${c.accent}08`, border: `1px solid ${c.accent}15`,
+                fontFamily: FONT, letterSpacing: "0.04em",
+              }}>{c.tag}</span>
             </div>
-            <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6 }}>{c.desc}</div>
+            <div>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING, marginBottom: "6px" }}>{c.title}</div>
+              <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.65 }}>{c.desc}</div>
+            </div>
           </div>
         ))}
       </div>
-      <div style={{ background: T.bgSub, borderRadius: "10px", padding: "16px 20px", fontSize: "12px", color: T.textSec, lineHeight: 1.6, marginBottom: "12px", border: `1px solid ${T.borderLight}` }}>
-        Efficiency and discrimination are predicted jointly via multi-task learning. Discrimination — the MUT/WT cleavage ratio — determines whether a guide can distinguish resistant from susceptible bacteria at single-nucleotide resolution.
+
+      {/* Multi-task callout */}
+      <div style={{
+        background: `linear-gradient(135deg, ${T.primary}06 0%, ${T.bgSub} 100%)`,
+        borderRadius: "14px", padding: "20px 24px",
+        fontSize: "13px", color: T.textSec, lineHeight: 1.7,
+        marginBottom: "24px",
+        border: `1px solid ${T.border}`,
+        position: "relative",
+      }}>
+        <div style={{ position: "absolute", left: "24px", top: 0, width: "2px", height: "20px", background: T.primary, borderRadius: "0 0 1px 1px", transform: "translateY(-100%)" }} />
+        <strong style={{ color: T.text }}>Multi-task learning</strong> — Efficiency and discrimination are predicted jointly. Discrimination (the MUT/WT cleavage ratio) determines whether a guide can distinguish resistant from susceptible bacteria at single-nucleotide resolution.
       </div>
 
-      {/* Key specs — compact grid */}
-      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(5, 1fr)", gap: "8px", marginBottom: "12px" }}>
+      {/* Key specs — large metric strip */}
+      <div style={{
+        display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(5, 1fr)",
+        gap: "1px", marginBottom: "24px",
+        background: T.border, borderRadius: "14px", overflow: "hidden",
+        border: `1px solid ${T.border}`,
+      }}>
         {[
           { label: "Parameters", value: "235K" },
           { label: "Trans ρ", value: "0.55" },
@@ -1714,15 +1834,15 @@ const MethodsPage = () => {
           { label: "Disc r", value: "0.44" },
           { label: "Inference", value: "<1ms" },
         ].map(s => (
-          <div key={s.label} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "8px", padding: "12px 14px", textAlign: "center" }}>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>{s.label}</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: T.text, fontFamily: FONT }}>{s.value}</div>
+          <div key={s.label} style={{ background: T.bg, padding: "20px 16px", textAlign: "center" }}>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>{s.label}</div>
+            <div style={{ fontSize: "20px", fontWeight: 700, color: T.text, fontFamily: FONT, letterSpacing: "-0.02em" }}>{s.value}</div>
           </div>
         ))}
       </div>
 
-      <CollapsibleSection title="Technical Details — GUARD-Net Architecture">
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "6px", marginBottom: "12px" }}>
+      <CollapsibleSection title="Technical Details">
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
           {[
             ["Architecture", "Dual-branch CNN + RNA-FM with RLPA"],
             ["Training data", "Kim 2018 (15K cis) + Huang 2024 EasyDesign (10K trans)"],
@@ -1731,40 +1851,50 @@ const MethodsPage = () => {
             ["Multi-task heads", "Efficiency (sigmoid) + Discrimination (Softplus)"],
             ["Attention", "R-Loop Propagation Attention (RLPA), causal mask"],
           ].map(([k, v]) => (
-            <div key={k} style={{ display: "flex", gap: "8px", padding: "8px 12px", background: T.bgSub, borderRadius: "6px" }}>
-              <span style={{ fontSize: "11px", color: T.textTer, fontWeight: 600, minWidth: 130, flexShrink: 0 }}>{k}</span>
+            <div key={k} style={{ display: "flex", gap: "10px", padding: "10px 14px", background: T.bgSub, borderRadius: "8px" }}>
+              <span style={{ fontSize: "11px", color: T.textTer, fontWeight: 600, minWidth: 120, flexShrink: 0 }}>{k}</span>
               <span style={{ fontSize: "12px", fontWeight: 600, color: T.text }}>{v}</span>
             </div>
           ))}
         </div>
-        <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "8px", padding: "12px 16px", fontSize: "12px", color: T.primaryDark, lineHeight: 1.65 }}>
+        <div style={{ background: `${T.primary}08`, border: `1px solid ${T.primary}20`, borderRadius: "10px", padding: "14px 18px", fontSize: "12.5px", color: T.primaryDark, lineHeight: 1.7 }}>
           <strong>Benchmark:</strong> Models trained only on cis-cleavage data show ρ = 0.04 for diagnostic trans-cleavage. The production model with trans-cleavage training achieves ρ = 0.55 — an order-of-magnitude improvement.
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Architecture Detail — Branches & Fusion">
-        <button onClick={() => setArchOpen(!archOpen)} style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: "6px", padding: "6px 12px", cursor: "pointer", fontSize: "11px", color: T.primary, fontWeight: 600, display: "flex", alignItems: "center", gap: "6px", fontFamily: FONT, marginBottom: archOpen ? "16px" : 0 }}>
-          {archOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          {archOpen ? "Hide" : "Show"} full architecture details
+      <CollapsibleSection title="Architecture Detail">
+        <button onClick={() => setArchOpen(!archOpen)} style={{
+          background: "none", border: `1px solid ${T.border}`, borderRadius: "8px",
+          padding: "8px 14px", cursor: "pointer", fontSize: "12px", color: T.primary,
+          fontWeight: 600, display: "flex", alignItems: "center", gap: "6px",
+          fontFamily: FONT, marginBottom: archOpen ? "20px" : 0,
+          transition: "all 0.2s ease",
+        }}>
+          {archOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {archOpen ? "Hide" : "Show"} full architecture
         </button>
         {archOpen && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0px" }}>
             {[
-              { label: "Branch 1", title: "Multi-Scale CNN", accent: T.primary, input: "34-nt one-hot encoded target (4 PAM + 20 protospacer + 10 flanking).", process: "Three parallel conv paths (k=3,5,7), 32 channels each, BN + dropout(0.3). Projected to 64-dim via 1×1 conv.", output: "64-dim per position: dinucleotide preferences, seed complementarity, PAM patterns." },
-              { label: "Branch 2", title: "RNA-FM Projection", accent: "#2563EB", input: "Guide RNA (20–23 nt). Processed by frozen RNA-FM (23M sequences, masked LM).", process: "640-dim per-nucleotide embeddings → trainable linear → 64-dim. Zero-padded to 34 positions.", output: "64-dim structural embedding: folding, stability, 5' accessibility." },
-              { label: "Fusion", title: "R-Loop Propagation Attention", accent: "#0d9488", input: "Concatenated 128-dim (64 CNN + 64 RNA-FM) at each of 34 positions.", process: "Single-head attention, 32-dim Q/K/V, causal mask (PAM-proximal → distal), learnable 34×34 positional bias.", output: "Attention-weighted 128-dim features re-weighted by positional importance." },
+              { label: "Branch 1", title: "Multi-Scale CNN", accent: "#2563EB", input: "34-nt one-hot encoded target (4 PAM + 20 protospacer + 10 flanking).", process: "Three parallel conv paths (k=3,5,7), 32 channels each, BN + dropout(0.3). Projected to 64-dim via 1×1 conv.", output: "64-dim per position: dinucleotide preferences, seed complementarity, PAM patterns." },
+              { label: "Branch 2", title: "RNA-FM Projection", accent: "#0d9488", input: "Guide RNA (20–23 nt). Processed by frozen RNA-FM (23M sequences, masked LM).", process: "640-dim per-nucleotide embeddings → trainable linear → 64-dim. Zero-padded to 34 positions.", output: "64-dim structural embedding: folding, stability, 5' accessibility." },
+              { label: "Fusion", title: "R-Loop Propagation Attention", accent: "#7c3aed", input: "Concatenated 128-dim (64 CNN + 64 RNA-FM) at each of 34 positions.", process: "Single-head attention, 32-dim Q/K/V, causal mask (PAM-proximal → distal), learnable 34×34 positional bias.", output: "Attention-weighted 128-dim features re-weighted by positional importance." },
               { label: "Output", title: "Multi-Task Heads", accent: "#e11d48", input: "RLPA-weighted representation, globally pooled.", process: "Efficiency: 128→64→32→1 (sigmoid). Discrimination: 547→64→32→1 (Softplus).", output: "Two scalars: efficiency (0–1) and discrimination ratio (fold-change MUT/WT)." },
             ].map((block, idx, arr) => (
-              <div key={block.title} style={{ padding: "16px 0", borderBottom: idx < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                  <span style={{ fontSize: "10px", fontWeight: 700, color: block.accent, background: block.accent + "14", padding: "2px 8px", borderRadius: "4px", textTransform: "uppercase" }}>{block.label}</span>
-                  <span style={{ fontSize: "14px", fontWeight: 700, color: T.text }}>{block.title}</span>
+              <div key={block.title} style={{ padding: "18px 0", borderBottom: idx < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+                  <span style={{
+                    fontSize: "10px", fontWeight: 700, color: block.accent,
+                    background: block.accent + "10", padding: "3px 10px", borderRadius: "6px",
+                    textTransform: "uppercase", letterSpacing: "0.04em",
+                  }}>{block.label}</span>
+                  <span style={{ fontSize: "15px", fontWeight: 700, color: T.text, fontFamily: HEADING }}>{block.title}</span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "16px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "20px" }}>
                   {[{ label: "Input", text: block.input }, { label: "Process", text: block.process }, { label: "Output", text: block.output }].map(col => (
                     <div key={col.label}>
-                      <div style={{ fontSize: "10px", fontWeight: 700, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>{col.label}</div>
-                      <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6 }}>{col.text}</div>
+                      <div style={{ fontSize: "10px", fontWeight: 700, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>{col.label}</div>
+                      <div style={{ fontSize: "12.5px", color: T.textSec, lineHeight: 1.65 }}>{col.text}</div>
                     </div>
                   ))}
                 </div>
@@ -1774,62 +1904,86 @@ const MethodsPage = () => {
         )}
       </CollapsibleSection>
 
-      {/* ── Clinical Assessment ── */}
-      {sectionHeading("Clinical Assessment", "WHO Target Product Profile compliance for drug susceptibility testing")}
-      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+      {/* ═══ Clinical Assessment ═══ */}
+      {sectionBlock("Validation", "Clinical Assessment", "WHO Target Product Profile compliance for drug susceptibility testing.")}
+
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
         {[
-          { icon: TrendingUp, title: "Per-drug sensitivity", desc: "WHO TPP minimums: ≥95% RIF, ≥90% INH/FQ, ≥80% EMB/PZA/AG." },
-          { icon: Shield, title: "Specificity estimate", desc: "Discrimination ratio predicts false-positive rates. ≥3× diagnostic-grade, ≥10× reference-lab." },
-          { icon: Settings, title: "Three operating modes", desc: "High Sensitivity (field), Balanced (WHO TPP), High Specificity (reference lab)." },
-          { icon: Layers, title: "Ranked alternatives", desc: "3–5 backup candidates per target with documented efficiency-discrimination tradeoffs." },
+          { icon: TrendingUp, title: "Per-drug sensitivity", desc: "WHO TPP minimums: ≥95% RIF, ≥90% INH/FQ, ≥80% EMB/PZA/AG.", accent: "#2563EB" },
+          { icon: Shield, title: "Specificity estimate", desc: "Discrimination ratio predicts false-positive rates. ≥3× diagnostic-grade, ≥10× reference-lab.", accent: "#0d9488" },
+          { icon: Settings, title: "Three operating modes", desc: "High Sensitivity (field), Balanced (WHO TPP), High Specificity (reference lab).", accent: "#7c3aed" },
+          { icon: Layers, title: "Ranked alternatives", desc: "3–5 backup candidates per target with documented efficiency-discrimination tradeoffs.", accent: "#e11d48" },
         ].map(c => (
-          <div key={c.title} style={{ display: "flex", gap: "14px", padding: "16px 20px", background: T.bg, border: `1px solid ${T.border}`, borderRadius: "10px" }}>
-            <c.icon size={18} color={T.primary} strokeWidth={1.8} style={{ flexShrink: 0, marginTop: 1 }} />
+          <div key={c.title} style={{
+            display: "flex", gap: "16px", padding: "22px 24px",
+            background: T.bg, border: `1px solid ${T.border}`, borderRadius: "14px",
+          }}>
+            <div style={{
+              width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
+              background: `${c.accent}08`, border: `1px solid ${c.accent}18`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <c.icon size={18} color={c.accent} strokeWidth={1.6} />
+            </div>
             <div>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: T.text, marginBottom: "3px" }}>{c.title}</div>
-              <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.55 }}>{c.desc}</div>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: T.text, marginBottom: "4px", fontFamily: HEADING }}>{c.title}</div>
+              <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.6 }}>{c.desc}</div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* ── Discrimination ── */}
-      {sectionHeading("Discrimination Analysis")}
-      <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.65, margin: "0 0 16px", maxWidth: "800px" }}>
+      {/* ═══ Discrimination ═══ */}
+      {sectionBlock("Analysis", "Discrimination Thresholds", "Mismatch discrimination determines clinical deployment tier.")}
+
+      <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 24px", maxWidth: "800px" }}>
         For Direct candidates: Cas12a cleavage ratio (MUT/WT) predicted by GUARD-Net's neural head (r=0.44) or XGBoost fallback (r=0.46, 15 features). For Proximity candidates: AS-RPA primer selectivity.
       </p>
-      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "8px", marginBottom: "16px" }}>
+
+      <div style={{
+        display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)",
+        gap: "1px", marginBottom: "24px",
+        background: T.border, borderRadius: "14px", overflow: "hidden",
+        border: `1px solid ${T.border}`,
+      }}>
         {[
-          { label: "Excellent", val: "≥ 10×", desc: "Single-plex clinical. Robust across sample types." },
-          { label: "Good", val: "≥ 3×", desc: "Multiplex panel. Electrochemical & lateral flow." },
-          { label: "Acceptable", val: "≥ 2×", desc: "Requires confirmatory readout." },
-          { label: "Insufficient", val: "< 2×", desc: "Synthetic mismatch enhancement needed." },
+          { label: "Excellent", val: "≥ 10×", desc: "Single-plex clinical use. Robust across sample types.", accent: "#16A34A" },
+          { label: "Good", val: "≥ 3×", desc: "Multiplex panel. Electrochemical and lateral flow.", accent: "#2563EB" },
+          { label: "Acceptable", val: "≥ 2×", desc: "Requires confirmatory readout or dual-target.", accent: "#D97706" },
+          { label: "Insufficient", val: "< 2×", desc: "Synthetic mismatch enhancement needed.", accent: "#DC2626" },
         ].map(t => (
-          <div key={t.label} style={{ background: T.bg, borderRadius: "10px", padding: "16px", border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: "20px", fontWeight: 500, color: T.text, fontFamily: FONT, marginBottom: "4px" }}>{t.val}</div>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: T.textSec, marginBottom: "4px" }}>{t.label}</div>
-            <div style={{ fontSize: "11px", color: T.textTer, lineHeight: 1.45 }}>{t.desc}</div>
+          <div key={t.label} style={{ background: T.bg, padding: "24px 20px" }}>
+            <div style={{ fontSize: "28px", fontWeight: 700, color: T.text, fontFamily: FONT, letterSpacing: "-0.03em", marginBottom: "2px" }}>{t.val}</div>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: t.accent, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t.label}</div>
+            <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.55 }}>{t.desc}</div>
           </div>
         ))}
       </div>
 
       <CollapsibleSection title="Synthetic Mismatch Enhancement">
-        <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-          <Zap size={18} color={T.primary} strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
-          <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: 0 }}>
+        <div style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
+          <div style={{
+            width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
+            background: `${T.primary}08`, border: `1px solid ${T.primary}18`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <Zap size={16} color={T.primary} strokeWidth={1.8} />
+          </div>
+          <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: 0 }}>
             For candidates with insufficient discrimination, deliberate mismatches within the seed region (positions 1–8) destabilize wildtype binding
             while preserving mutant recognition. Published improvements range from 2× to {">"}50× (Kohabir et al. 2024).
           </p>
         </div>
       </CollapsibleSection>
 
-      {/* ── Nuclease Reference ── */}
-      {sectionHeading("Nuclease & Defaults")}
+      {/* ═══ Nuclease & Defaults ═══ */}
+      {sectionBlock("Reference", "Nuclease & Configuration")}
+
       <CollapsibleSection title="Cas12a (Cpf1) Reference">
-        <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: "0 0 12px" }}>
+        <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 16px" }}>
           Class 2, Type V-A CRISPR effector. Recognises T-rich PAM upstream, generates staggered DSBs, and activates non-specific ssDNase (<em>trans</em>-cleavage) for isothermal reporter-based detection at 37°C.
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "6px", marginBottom: "12px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "8px", marginBottom: "12px" }}>
           {[
             ["Variant", "WT AsCas12a / enAsCas12a (selectable)"],
             ["PAM", "TTTV (WT) + 8 expanded motifs (enAsCas12a)"],
@@ -1838,7 +1992,7 @@ const MethodsPage = () => {
             ["Temperature", "37°C (RPA-compatible)"],
             ["Readouts", "Electrochemical (SWV on LIG) · lateral flow · fluorescence"],
           ].map(([k, v]) => (
-            <div key={k} style={{ display: "flex", gap: "8px", padding: "8px 12px", background: T.bgSub, borderRadius: "6px" }}>
+            <div key={k} style={{ display: "flex", gap: "10px", padding: "10px 14px", background: T.bgSub, borderRadius: "8px" }}>
               <span style={{ fontSize: "11px", color: T.textTer, fontWeight: 600, minWidth: 100, flexShrink: 0 }}>{k}</span>
               <span style={{ fontSize: "12px", fontWeight: 600, color: T.text }}>{v}</span>
             </div>
@@ -1847,71 +2001,92 @@ const MethodsPage = () => {
       </CollapsibleSection>
 
       <CollapsibleSection title="Pipeline Defaults">
-        {[
-          ["PAM", "TTTV + 8 expanded", "enAsCas12a: 9 PAM variants with activity penalties"],
-          ["Spacer length", "20–23 nt", "20 canonical; 21–23 for high-GC targets"],
-          ["GC range", "40–85%", "TB-adjusted (genome 65.6% GC)"],
-          ["Max homopolymer", "4 nt", "Poly-T ≥5 causes R-loop stalling"],
-          ["Off-target", "≤3 mismatches", "Bowtie2 against full genome"],
-          ["RPA amplicon", "80–120 bp", "Optimised for blood cfDNA (~140 bp median)"],
-          ["Discrimination min", "2.0×", "≥3.0× for electrochemical/LFA"],
-        ].map(([param, value, rationale], i, arr) => (
-          <div key={param} style={{ display: "flex", alignItems: "baseline", gap: "16px", padding: "8px 0", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
-            <span style={{ fontSize: "12px", fontWeight: 600, color: T.text, minWidth: 130, flexShrink: 0 }}>{param}</span>
-            <span style={{ fontSize: "12px", fontWeight: 700, color: T.primary, minWidth: 80, flexShrink: 0 }}>{value}</span>
-            <span style={{ fontSize: "11px", color: T.textTer, flex: 1 }}>{rationale}</span>
-          </div>
-        ))}
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {[
+            ["PAM", "TTTV + 8 expanded", "enAsCas12a: 9 PAM variants with activity penalties"],
+            ["Spacer length", "20–23 nt", "20 canonical; 21–23 for high-GC targets"],
+            ["GC range", "40–85%", "TB-adjusted (genome 65.6% GC)"],
+            ["Max homopolymer", "4 nt", "Poly-T ≥5 causes R-loop stalling"],
+            ["Off-target", "≤3 mismatches", "Bowtie2 against full genome"],
+            ["RPA amplicon", "80–120 bp", "Optimised for blood cfDNA (~140 bp median)"],
+            ["Discrimination min", "2.0×", "≥3.0× for electrochemical/LFA"],
+          ].map(([param, value, rationale], i, arr) => (
+            <div key={param} style={{
+              display: "flex", alignItems: "baseline", gap: "16px", padding: "10px 0",
+              borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none",
+            }}>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: T.text, minWidth: 130, flexShrink: 0 }}>{param}</span>
+              <span style={{ fontSize: "12px", fontWeight: 700, color: T.primary, minWidth: 90, flexShrink: 0, fontFamily: FONT }}>{value}</span>
+              <span style={{ fontSize: "11.5px", color: T.textTer, flex: 1 }}>{rationale}</span>
+            </div>
+          ))}
+        </div>
       </CollapsibleSection>
 
-      {/* ── Limitations ── */}
-      {sectionHeading("Limitations & Scope")}
-      <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: "0 0 12px", maxWidth: "800px" }}>
-        All predictions are in silico estimates. Experimental validation on the target electrochemical platform is required before diagnostic deployment.
-      </p>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "24px" }}>
+      {/* ═══ Limitations ═══ */}
+      {sectionBlock("Scope", "Limitations", "All predictions are in silico estimates. Experimental validation is required before diagnostic deployment.")}
+
+      <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "12px", marginBottom: "32px" }}>
         {[
-          { title: "Discrimination prediction", text: "Neural head r=0.44 (6,136 pairs), XGBoost fallback r=0.46 (15 thermodynamic features). Position-dependent heuristic baseline r≈0.30." },
-          { title: "Training domain shift", text: "Trained on WT AsCas12a/LbCas12a, deployed on enAsCas12a. Training data from human cell lines, deployed on M.tb (65.6% GC). Active learning will calibrate." },
+          { title: "Discrimination prediction", text: "Neural head r=0.44 (6,136 pairs), XGBoost fallback r=0.46. Position-dependent heuristic baseline r≈0.30." },
+          { title: "Training domain shift", text: "Trained on WT AsCas12a/LbCas12a, deployed on enAsCas12a. Human cell lines → M.tb (65.6% GC)." },
           { title: "AS-RPA specificity", text: "Boltzmann thermodynamic estimates, not experimentally validated. Ratios >100× are capped." },
           { title: "Multiplex compatibility", text: "Cross-reactivity by sequence homology. Primer dimer stability predicted but not yet in SA cost function." },
-          { title: "Shared amplicons", text: "Targets in the same gene region may share amplicons. Specific amino acid changes cannot be resolved without distinct crRNA reporters." },
-          { title: "Amplicon folding", text: "No ΔG_fold calculation performed. GC-rich M.tb amplicons risk stable hairpins blocking recombinase invasion." },
+          { title: "Shared amplicons", text: "Targets in same gene region may share amplicons. Cannot resolve specific amino acid changes without distinct crRNA reporters." },
+          { title: "Amplicon folding", text: "No ΔG_fold calculation. GC-rich M.tb amplicons risk stable hairpins blocking recombinase invasion." },
           { title: "Specificity estimates", text: "Proxy formula (1−1/disc) assumes separated distributions. Real specificity depends on signal variance." },
-          { title: "Reporter independence", text: "GUARD-Net predicts Cas12a trans-cleavage, not reporter chemistry. Absolute signal depends on the specific platform." },
+          { title: "Reporter independence", text: "GUARD-Net predicts Cas12a trans-cleavage, not reporter chemistry. Absolute signal is platform-dependent." },
         ].map((item, i) => (
-          <div key={i} style={{ background: T.bgSub, borderRadius: "8px", padding: "12px 16px", border: `1px solid ${T.borderLight}` }}>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: T.text, marginBottom: "3px" }}>{item.title}</div>
-            <div style={{ fontSize: "11.5px", color: T.textSec, lineHeight: 1.6 }}>{item.text}</div>
+          <div key={i} style={{
+            background: T.bgSub, borderRadius: "12px", padding: "16px 20px",
+            border: `1px solid ${T.borderLight}`,
+          }}>
+            <div style={{ fontSize: "12.5px", fontWeight: 700, color: T.text, marginBottom: "4px" }}>{item.title}</div>
+            <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.65 }}>{item.text}</div>
           </div>
         ))}
       </div>
 
-      {/* ── References ── */}
-      <CollapsibleSection title={`References (${BIBLIOGRAPHY.length})`}>
+      {/* ═══ References ═══ */}
+      {sectionBlock("Literature", `References (${BIBLIOGRAPHY.length})`)}
+
+      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "14px", overflow: "hidden" }}>
         {(() => {
           const categories = [...new Set(BIBLIOGRAPHY.map(b => b.category))];
-          return categories.map(cat => (
-            <div key={cat} style={{ marginBottom: "16px" }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: T.primary, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px", paddingTop: "8px" }}>{cat}</div>
+          return categories.map((cat, catIdx) => (
+            <div key={cat} style={{ borderBottom: catIdx < categories.length - 1 ? `1px solid ${T.border}` : "none" }}>
+              <div style={{
+                fontSize: "11px", fontWeight: 700, color: T.primary,
+                textTransform: "uppercase", letterSpacing: "0.08em",
+                padding: "14px 24px 8px", background: T.bgSub,
+              }}>{cat}</div>
               {BIBLIOGRAPHY.filter(b => b.category === cat).map((b, i, arr) => (
-                <div key={b.id} style={{ padding: "6px 0", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none", display: "flex", justifyContent: "space-between", alignItems: mobile ? "flex-start" : "center", gap: "12px", flexDirection: mobile ? "column" : "row" }}>
-                  <div style={{ flex: 1, fontSize: "12px", lineHeight: 1.5 }}>
+                <div key={b.id} style={{
+                  padding: "10px 24px",
+                  borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none",
+                  display: "flex", justifyContent: "space-between",
+                  alignItems: mobile ? "flex-start" : "center",
+                  gap: "16px", flexDirection: mobile ? "column" : "row",
+                }}>
+                  <div style={{ flex: 1, fontSize: "12.5px", lineHeight: 1.55, color: T.textSec }}>
                     <strong style={{ color: T.text }}>{b.authors} ({b.year}).</strong>{" "}
                     {b.title}.{" "}
                     <em style={{ color: T.textTer }}>{b.journal}.</em>
                   </div>
                   <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                    {b.doi && <a href={`https://doi.org/${b.doi}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: "10px", color: T.primary, textDecoration: "none", fontWeight: 600 }}>DOI <ExternalLink size={8} style={{ verticalAlign: "middle" }} /></a>}
-                    {b.pmid && <a href={`https://pubmed.ncbi.nlm.nih.gov/${b.pmid}/`} target="_blank" rel="noopener noreferrer" style={{ fontSize: "10px", color: T.primary, textDecoration: "none", fontWeight: 600 }}>PubMed <ExternalLink size={8} style={{ verticalAlign: "middle" }} /></a>}
-                    {!b.doi && !b.pmid && b.url && <a href={b.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "10px", color: T.primary, textDecoration: "none", fontWeight: 600 }}>Link <ExternalLink size={8} style={{ verticalAlign: "middle" }} /></a>}
+                    {b.doi && <a href={`https://doi.org/${b.doi}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: "10px", color: T.primary, textDecoration: "none", fontWeight: 600, padding: "2px 6px", borderRadius: "4px", background: `${T.primary}08` }}>DOI <ExternalLink size={8} style={{ verticalAlign: "middle" }} /></a>}
+                    {b.pmid && <a href={`https://pubmed.ncbi.nlm.nih.gov/${b.pmid}/`} target="_blank" rel="noopener noreferrer" style={{ fontSize: "10px", color: T.primary, textDecoration: "none", fontWeight: 600, padding: "2px 6px", borderRadius: "4px", background: `${T.primary}08` }}>PubMed <ExternalLink size={8} style={{ verticalAlign: "middle" }} /></a>}
+                    {!b.doi && !b.pmid && b.url && <a href={b.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: "10px", color: T.primary, textDecoration: "none", fontWeight: 600, padding: "2px 6px", borderRadius: "4px", background: `${T.primary}08` }}>Link <ExternalLink size={8} style={{ verticalAlign: "middle" }} /></a>}
                   </div>
                 </div>
               ))}
             </div>
           ));
         })()}
-      </CollapsibleSection>
+      </div>
+
+      {/* Bottom spacer */}
+      <div style={{ height: "48px" }} />
     </div>
   );
 };
