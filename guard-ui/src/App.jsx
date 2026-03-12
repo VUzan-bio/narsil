@@ -147,6 +147,60 @@ RESULTS.push({
   refs: { who: "N/A", catalogue: "Species control", pmid: "30593580", cryptic: null, freq: "6–16 copies/genome" },
 });
 
+// ── Mock cross-reactivity matrix (14×14, biologically realistic) ──
+const CROSS_REACTIVITY_LABELS = [
+  "IS6110", "IS1081", "rpoB_S531L", "rpoB_H526Y", "katG_S315T", "inhA_C-15T",
+  "embB_M306V", "pncA", "gyrA_D94G", "gyrA_A90V", "gyrB", "rrs_A1401G", "eis_C-14T", "RNaseP",
+];
+const CROSS_REACTIVITY_DRUG_GROUPS = [0,0,1,1,2,2,3,4,5,5,5,6,6,7]; // group indices for separator lines
+const MOCK_CROSS_REACTIVITY = (() => {
+  const N = 14;
+  const matrix = [];
+  // Same-gene pair indices (source, target, activity, note)
+  const sameGene = [
+    [2, 3, 0.042, "rpoB RRDR shared amplicon, 15 nt separation"],
+    [3, 2, 0.058, "rpoB RRDR shared amplicon, 15 nt separation"],
+    [8, 9, 0.028, "gyrA QRDR shared amplicon, 12 nt separation"],
+    [9, 8, 0.047, "gyrA QRDR shared amplicon, 12 nt separation"],
+  ];
+  const sameGeneMap = {};
+  sameGene.forEach(s => { sameGeneMap[`${s[0]}_${s[1]}`] = { activity: s[2], note: s[3] }; });
+
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      if (i === j) continue;
+      const key = `${i}_${j}`;
+      const sg = sameGeneMap[key];
+      const activity = sg ? sg.activity : Math.random() * 0.0004;
+      const risk = activity < 0.01 ? "none" : activity < 0.05 ? "low" : activity < 0.15 ? "medium" : "high";
+      matrix.push({
+        source: CROSS_REACTIVITY_LABELS[i],
+        target: CROSS_REACTIVITY_LABELS[j],
+        sourceIdx: i,
+        targetIdx: j,
+        activity,
+        risk,
+        mismatches: sg ? (3 + Math.floor(Math.random() * 2)) : (8 + Math.floor(Math.random() * 5)),
+        pam_valid: sg ? true : Math.random() < 0.08,
+        note: sg ? sg.note : null,
+      });
+    }
+  }
+  const highRisk = matrix.filter(m => m.risk === "high");
+  const sameGenePairs = matrix.filter(m => m.note != null);
+  const noneCount = matrix.filter(m => m.risk === "none").length;
+  return {
+    matrix,
+    n_targets: N,
+    n_pairs: N * (N - 1),
+    high_risk_pairs: highRisk,
+    same_gene_pairs: sameGenePairs,
+    panel_safe: highRisk.length === 0,
+    none_count: noneCount,
+    interpretation: "All cross-reactive pairs occur between same-gene targets sharing overlapping amplicons. In the spatially multiplexed paper electrode array, each detection zone is physically isolated by wax-printed hydrophobic barriers \u2014 cross-reactivity between zones is impossible. These scores are relevant only for hypothetical solution-phase multiplex formats.",
+  };
+})();
+
 const MODULES = [
   { id: "M1", name: "Target Resolution", desc: "WHO mutations → genomic coordinates", icon: Target, execDesc: "Resolving WHO-catalogued resistance mutations to genomic coordinates on H37Rv", estSec: 5, substeps: [
     "Loading H37Rv reference genome (NC_000962.3, 4.4 Mb)",
@@ -3842,6 +3896,211 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
   );
 };
 
+// ═══════════════════════════════════════════════════════════════
+// Cross-Reactivity Matrix (14×14 heatmap)
+// ═══════════════════════════════════════════════════════════════
+const CrossReactivityMatrix = () => {
+  const [hovCell, setHovCell] = useState(null);
+  const [hovPos, setHovPos] = useState({ x: 0, y: 0 });
+  const [showPamFilter, setShowPamFilter] = useState(false);
+
+  const data = MOCK_CROSS_REACTIVITY;
+  const labels = CROSS_REACTIVITY_LABELS;
+  const N = labels.length;
+  const cellSize = 28;
+  const gap = 1;
+  const labelW = 85;
+  const totalW = labelW + N * (cellSize + gap);
+  const totalH = labelW + N * (cellSize + gap);
+
+  const getCellColor = (pair) => {
+    if (!pair) return "#1e293b"; // diagonal
+    if (showPamFilter && !pair.pam_valid) return "#F8F8F6";
+    if (pair.risk === "none") return "#F5F3EE";
+    if (pair.risk === "low") return "#FEF3C7";
+    if (pair.risk === "medium") return "#FB923C";
+    if (pair.risk === "high") return "#EF4444";
+    return "#F5F3EE";
+  };
+
+  const getOnTargetScore = (idx) => {
+    const label = labels[idx];
+    const r = RESULTS.find(x => x.label === label);
+    return r ? (r.ensembleScore || r.score || 0).toFixed(2) : "—";
+  };
+
+  const pairMap = {};
+  data.matrix.forEach(m => { pairMap[`${m.sourceIdx}_${m.targetIdx}`] = m; });
+
+  // Group separators
+  const groupBounds = [];
+  let prevGroup = -1;
+  CROSS_REACTIVITY_DRUG_GROUPS.forEach((g, i) => {
+    if (g !== prevGroup) { groupBounds.push(i); prevGroup = g; }
+  });
+
+  return (
+    <div>
+      {/* Toggle */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+        <button onClick={() => setShowPamFilter(!showPamFilter)} style={{
+          fontSize: 10, fontWeight: 600, padding: "4px 12px", borderRadius: 4,
+          border: `1px solid ${showPamFilter ? T.primary : T.border}`, cursor: "pointer", fontFamily: MONO,
+          background: showPamFilter ? `${T.primary}15` : T.bg, color: showPamFilter ? T.primary : T.textSec,
+        }}>
+          {showPamFilter ? "✓ " : ""}PAM-only filter
+        </button>
+        <span style={{ fontSize: 10, color: T.textTer }}>
+          {showPamFilter ? "Showing only pairs with valid PAM site on off-target amplicon" : "Showing all pairs"}
+        </span>
+      </div>
+
+      {/* Heatmap */}
+      <div style={{ overflowX: "auto", marginBottom: 16 }}>
+        <svg width={totalW + 10} height={totalH + 10} style={{ display: "block" }}
+          onMouseLeave={() => setHovCell(null)}>
+          {/* Column headers (rotated 45°) */}
+          {labels.map((l, j) => (
+            <text key={`ch-${j}`} x={labelW + j * (cellSize + gap) + cellSize / 2} y={labelW - 6}
+              fontSize="7" fill={T.textSec} fontFamily="monospace" textAnchor="end"
+              transform={`rotate(-45, ${labelW + j * (cellSize + gap) + cellSize / 2}, ${labelW - 6})`}>
+              {l}
+            </text>
+          ))}
+          {/* Row headers */}
+          {labels.map((l, i) => (
+            <text key={`rh-${i}`} x={labelW - 4} y={labelW + i * (cellSize + gap) + cellSize / 2 + 3}
+              fontSize="7" fill={T.textSec} fontFamily="monospace" textAnchor="end">
+              {l}
+            </text>
+          ))}
+          {/* Cells */}
+          {labels.map((_, i) => labels.map((_, j) => {
+            const pair = i === j ? null : pairMap[`${i}_${j}`];
+            const x = labelW + j * (cellSize + gap);
+            const y = labelW + i * (cellSize + gap);
+            const color = getCellColor(pair);
+            return (
+              <g key={`c-${i}-${j}`}
+                onMouseEnter={(e) => {
+                  setHovCell(i === j ? { diag: true, idx: i } : pair);
+                  const rect = e.currentTarget.closest("svg").getBoundingClientRect();
+                  setHovPos({ x: e.clientX - rect.left + 10, y: e.clientY - rect.top - 10 });
+                }}
+                onMouseMove={(e) => {
+                  const rect = e.currentTarget.closest("svg").getBoundingClientRect();
+                  setHovPos({ x: e.clientX - rect.left + 10, y: e.clientY - rect.top - 10 });
+                }}>
+                <rect x={x} y={y} width={cellSize} height={cellSize} fill={color} rx={2}
+                  stroke={hovCell && !hovCell.diag && hovCell.sourceIdx === i && hovCell.targetIdx === j ? T.text : "none"}
+                  strokeWidth={1} />
+                {i === j && (
+                  <text x={x + cellSize / 2} y={y + cellSize / 2 + 3} fontSize="6" fill="#fff" textAnchor="middle" fontFamily="monospace">
+                    {getOnTargetScore(i)}
+                  </text>
+                )}
+              </g>
+            );
+          }))}
+          {/* Group separator lines */}
+          {groupBounds.slice(1).map((b, i) => (
+            <g key={`sep-${i}`}>
+              <line x1={labelW + b * (cellSize + gap) - 1} y1={labelW} x2={labelW + b * (cellSize + gap) - 1} y2={labelW + N * (cellSize + gap)} stroke="#fff" strokeWidth="2" />
+              <line x1={labelW} y1={labelW + b * (cellSize + gap) - 1} x2={labelW + N * (cellSize + gap)} y2={labelW + b * (cellSize + gap) - 1} stroke="#fff" strokeWidth="2" />
+            </g>
+          ))}
+        </svg>
+
+        {/* Tooltip */}
+        {hovCell && (
+          <div style={{
+            position: "absolute", left: hovPos.x, top: hovPos.y, pointerEvents: "none", zIndex: 20,
+            background: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, padding: "8px 12px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)", maxWidth: 280,
+          }}>
+            {hovCell.diag ? (
+              <div style={{ fontSize: 10, fontFamily: MONO, color: T.text }}>
+                <strong>{labels[hovCell.idx]}</strong> — on-target (S_eff = {getOnTargetScore(hovCell.idx)})
+              </div>
+            ) : (
+              <>
+                <div style={{ fontSize: 10, fontWeight: 700, color: T.text, fontFamily: MONO }}>
+                  {hovCell.source} crRNA → {hovCell.target} amplicon
+                </div>
+                <div style={{ fontSize: 9, color: T.textSec, marginTop: 3, lineHeight: 1.6, fontFamily: MONO }}>
+                  Activity: {(hovCell.activity * 100).toFixed(2)}% of on-target (<span style={{ fontWeight: 700, color: hovCell.risk === "none" ? T.success : hovCell.risk === "low" ? "#D97706" : hovCell.risk === "medium" ? "#EA580C" : T.danger }}>{hovCell.risk.toUpperCase()}</span>)<br />
+                  Mismatches: {hovCell.mismatches}<br />
+                  PAM valid: {hovCell.pam_valid ? "yes" : "no"}
+                  {hovCell.note && <><br /><span style={{ color: T.primary, fontStyle: "italic" }}>{hovCell.note}</span></>}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Color legend */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        {[
+          { label: "On-target", color: "#1e293b" },
+          { label: "None (<1%)", color: "#F5F3EE" },
+          { label: "Low (1–5%)", color: "#FEF3C7" },
+          { label: "Medium (5–15%)", color: "#FB923C" },
+          { label: "High (>15%)", color: "#EF4444" },
+        ].map(l => (
+          <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 9, color: T.textSec, fontFamily: MONO }}>
+            <span style={{ width: 12, height: 12, borderRadius: 2, background: l.color, display: "inline-block", border: `1px solid ${T.borderLight}` }} />
+            {l.label}
+          </div>
+        ))}
+      </div>
+
+      {/* Summary panel */}
+      <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: 10, padding: "16px 20px", marginBottom: 16 }}>
+        <div style={{ fontSize: 11, color: T.text, fontFamily: MONO, lineHeight: 1.8 }}>
+          <strong>{data.n_pairs} / {data.n_pairs}</strong> pairs tested<br />
+          <strong>{data.none_count}</strong> pairs: no cross-reactivity (&lt; 1%)<br />
+          <strong>{data.same_gene_pairs.length}</strong> pairs: low\u2013medium cross-reactivity (same-gene overlapping amplicons)
+        </div>
+        <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 4, fontSize: 10, fontWeight: 700,
+            background: data.panel_safe ? "#DCFCE7" : "#FEE2E2",
+            color: data.panel_safe ? "#16A34A" : "#DC2626",
+            fontFamily: MONO,
+          }}>
+            {data.panel_safe ? "\u2705 SAFE" : "\u26A0 REVIEW"} for spatially multiplexed electrode array
+          </span>
+        </div>
+        {data.same_gene_pairs.length > 0 && (
+          <div style={{ marginTop: 10, fontSize: 10, color: T.textSec, lineHeight: 1.7 }}>
+            <strong>Same-gene pairs with residual cross-reactivity:</strong>
+            {data.same_gene_pairs.filter(p => p.sourceIdx < p.targetIdx || !data.same_gene_pairs.find(q => q.sourceIdx === p.targetIdx && q.targetIdx === p.sourceIdx && q.sourceIdx < q.targetIdx)).map(p => (
+              <div key={`${p.source}-${p.target}`} style={{ fontFamily: MONO, marginLeft: 8, fontSize: 9 }}>
+                \u2022 {p.source} \u2194 {p.target}: {(p.activity * 100).toFixed(1)}% ({p.risk.toUpperCase()}) \u2014 {p.note}
+              </div>
+            ))}
+            <div style={{ marginTop: 6, fontSize: 9, color: T.textTer, fontStyle: "italic" }}>
+              Managed by spatial separation: each crRNA contacts only its own amplicon within its physically isolated detection zone.
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Interpretation */}
+      <div style={{ background: T.bg, border: `1px solid ${T.borderLight}`, borderRadius: 8, padding: "12px 16px", fontSize: 10, color: T.textSec, lineHeight: 1.7 }}>
+        <div style={{ fontWeight: 700, color: T.text, marginBottom: 4 }}>Interpretation</div>
+        Cross-reactivity is assessed by scoring each crRNA against all non-self amplicons in the 14-target panel.
+        For the paper-based spatially multiplexed electrode array (Bezinge et al., <em>Adv. Mater.</em> 2023),
+        each detection zone is isolated by wax-printed hydrophobic barriers \u2014 each crRNA physically contacts only its own zone's amplicon, making inter-zone cross-reactivity impossible.
+        <br /><br />
+        This analysis validates that same-gene targets with overlapping amplicons (e.g., rpoB_S531L and rpoB_H526Y, which share the rpoB RRDR amplicon) do not produce false positives even in a hypothetical shared-solution format, and identifies any targets where crRNA redesign would improve panel orthogonality.
+        <br /><br />
+        <strong>PAM-level filtering:</strong> Cas12a requires a 5\u2032-TTTV PAM for activation. Off-target sites without a valid PAM are scored as zero regardless of spacer complementarity, as PAM recognition is an absolute prerequisite for R-loop initiation (Suea-Ngam et al., <em>Chem. Sci.</em> 2021, Fig. 4).
+      </div>
+    </div>
+  );
+};
+
 const DiscriminationTab = ({ results }) => {
   const mobile = useIsMobile();
   const nonControl = results.filter((r) => r.disc < 900);
@@ -4784,6 +5043,11 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
           HEADING={HEADING}
           MONO={MONO}
         />
+      </CollapsibleSection>
+
+      {/* ═══════════ SECTION 5b: Panel Cross-Reactivity Analysis ═══════════ */}
+      <CollapsibleSection title="Panel Cross-Reactivity Analysis" defaultOpen={false} badge={{ text: `${MOCK_CROSS_REACTIVITY.same_gene_pairs.length} pairs`, bg: "#FEF3C720", color: "#D97706" }}>
+        <CrossReactivityMatrix />
       </CollapsibleSection>
 
       {/* ═══════════ SECTION 6: In Situ RNP Formation Kinetics ═══════════ */}

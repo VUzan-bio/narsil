@@ -412,3 +412,45 @@ async def get_umap_data(job_id: str) -> dict:
 
     with open(umap_path) as f:
         return json.load(f)
+
+
+@router.get("/{job_id}/cross-reactivity")
+async def get_cross_reactivity(job_id: str) -> dict:
+    """Score every crRNA against every other target's amplicon for off-target risk."""
+    from guard.scoring.cross_reactivity import compute_cross_reactivity_matrix
+
+    result = _get_completed_result(job_id)
+    members = result.get("members", [])
+
+    spacers: list[str] = []
+    amplicons: list[str] = []
+    labels: list[str] = []
+
+    for m in members:
+        target = m.get("target", {})
+        mutation = target.get("mutation", {})
+        selected = m.get("selected_candidate", {})
+        candidate = selected.get("candidate", {})
+        primers = m.get("primers")
+
+        label = mutation.get(
+            "label",
+            f"{mutation.get('gene', '')}_{mutation.get('ref_aa', '')}"
+            f"{mutation.get('position', '')}{mutation.get('alt_aa', '')}",
+        )
+        spacer = candidate.get("spacer_seq", "")
+        amplicon = primers.get("amplicon_seq", "") if primers else ""
+
+        if spacer and amplicon:
+            spacers.append(spacer)
+            amplicons.append(amplicon)
+            labels.append(label)
+
+    if len(spacers) < 2:
+        raise HTTPException(
+            400,
+            "Cross-reactivity analysis requires at least 2 panel members "
+            "with both spacer and amplicon sequences.",
+        )
+
+    return compute_cross_reactivity_matrix(spacers, amplicons, labels)

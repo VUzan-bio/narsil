@@ -81,6 +81,11 @@ export async function getUmapData(jobId) {
   return request(`/api/results/${jobId}/umap`);
 }
 
+// Cross-reactivity matrix
+export async function getCrossReactivity(jobId) {
+  return request(`/api/results/${jobId}/cross-reactivity`);
+}
+
 // Spatially-addressed electrode array: pools, kinetics, specificity
 export async function getPoolData(jobId) {
   return request(`/api/results/${jobId}/pools`);

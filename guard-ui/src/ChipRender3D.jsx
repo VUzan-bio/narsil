@@ -8,27 +8,44 @@ const DRUG_HEX = { RIF: 0xef4444, INH: 0xf97316, EMB: 0xeab308, PZA: 0xeab308, F
 const DRUG_CSS = { RIF: "#ef4444", INH: "#f97316", EMB: "#eab308", PZA: "#eab308", FQ: "#a855f7", AG: "#ec4899", CTRL: "#22d3ee", OTHER: "#888888" };
 const addAt = (parent, mesh, x, y, z) => { mesh.position.set(x, y, z); parent.add(mesh); return mesh; };
 
-// ── Electrochemistry curve generators (Nernst-based) ──
-const miniSWV = (Gamma, G0) => {
+/* ── Architecture-dependent SWV curve generators ── */
+
+// Architecture A: pAP/ALP — peak at +0.15 V, signal-ON
+const miniSWV_pAP = (Gamma, G0) => {
   const nFRT = (2 * 96485) / (8.314 * 310.15);
   const pts = [];
   for (let i = 0; i <= 80; i++) {
-    const E = -0.05 - i * 0.004375;
-    const xp = nFRT * (E + 0.025 - (-0.22));
-    const xm = nFRT * (E - 0.025 - (-0.22));
+    const E = -0.2 + i * 0.005625;
+    const xp = nFRT * (E + 0.0125 - 0.15);
+    const xm = nFRT * (E - 0.0125 - 0.15);
+    const base = (1 / (1 + Math.exp(xp)) - 1 / (1 + Math.exp(xm))) * 2.5;
+    pts.push({ E, I: (1.0 - Gamma / G0 * 0.6 + 0.4) * base });
+  }
+  return pts;
+};
+
+// Architecture B: Silver metallization — peak at +0.16 V, signal-OFF
+const miniSWV_Ag = (Gamma, G0) => {
+  const nFRT = (1 * 96485) / (8.314 * 310.15);
+  const pts = [];
+  for (let i = 0; i <= 80; i++) {
+    const E = -0.3 + i * 0.01;
+    const xp = nFRT * (E + 0.03 - 0.16);
+    const xm = nFRT * (E - 0.03 - 0.16);
     pts.push({ E, I: (Gamma / G0) * (1 / (1 + Math.exp(xp)) - 1 / (1 + Math.exp(xm))) * 3.0 });
   }
   return pts;
 };
 
-const miniDPV = (Gamma, G0) => {
+// Architecture C: Direct MB-ssDNA — peak at -0.22 V, signal-OFF
+const miniSWV_MB = (Gamma, G0) => {
   const nFRT = (2 * 96485) / (8.314 * 310.15);
   const pts = [];
   for (let i = 0; i <= 80; i++) {
-    const E = -0.05 - i * 0.004375;
-    const xp = nFRT * (E + 0.05 - (-0.22));
-    const xm = nFRT * (E - (-0.22));
-    pts.push({ E, I: (Gamma / G0) * (1 / (1 + Math.exp(xp)) - 1 / (1 + Math.exp(xm))) * 2.5 });
+    const E = -0.5 + i * 0.00625;
+    const xp = nFRT * (E + 0.0125 - (-0.22));
+    const xm = nFRT * (E - 0.0125 - (-0.22));
+    pts.push({ E, I: (Gamma / G0) * (1 / (1 + Math.exp(xp)) - 1 / (1 + Math.exp(xm))) * 3.0 });
   }
   return pts;
 };
@@ -45,7 +62,13 @@ const miniEIS = (Gamma, G0) => {
   return pts;
 };
 
-// Sprite text label helper — sharp, crisp text
+const ARCH_META = {
+  A: { name: "Vertical-flow ALP", short: "ALP", peak: "+0.15 V", label: "pAP oxidation", freq: "2.5 Hz", amp: "25 mV", step: "5 mV", eRange: "−0.2 to +0.25 V", sig: "ON", lod: "1 cp/µL", ref: "Bezinge 2023", swv: miniSWV_pAP },
+  B: { name: "Silver metallization", short: "Ag", peak: "+0.16 V", label: "Ag⁰ → Ag⁺", freq: "200 Hz", amp: "60 mV", step: "10 mV", eRange: "−0.3 to +0.5 V", sig: "OFF", lod: "3.5 fM", ref: "Suea-Ngam 2021", swv: miniSWV_Ag },
+  C: { name: "Direct MB-ssDNA", short: "MB", peak: "−0.22 V", label: "MB reduction", freq: "50 Hz", amp: "25 mV", step: "4 mV", eRange: "−0.5 to 0.0 V", sig: "OFF", lod: "~pM", ref: "Conceptual", swv: miniSWV_MB },
+};
+
+// Sprite text label helper
 const makeSprite = (text, color, size, bold) => {
   const canvas = document.createElement("canvas");
   const dpr = 2;
@@ -67,7 +90,6 @@ const makeSprite = (text, color, size, bold) => {
 
 // 14-target electrode layout: 7 columns × 2 rows
 const ELECTRODE_TARGETS = [
-  // Row 0 (top): cols 0-6
   { row: 0, col: 0, target: "IS6110", drug: "CTRL", color: 0x22d3ee, label: "IS6110\nTB ID" },
   { row: 0, col: 1, target: "IS1081", drug: "CTRL", color: 0x22d3ee, label: "IS1081\nTB ID" },
   { row: 0, col: 2, target: "rpoB_S531L", drug: "RIF", color: 0xef4444, label: "rpoB S531L\nRIF" },
@@ -75,7 +97,6 @@ const ELECTRODE_TARGETS = [
   { row: 0, col: 4, target: "katG_S315T", drug: "INH", color: 0xf97316, label: "katG S315T\nINH" },
   { row: 0, col: 5, target: "inhA_C-15T", drug: "INH", color: 0xf97316, label: "inhA C-15T\nINH" },
   { row: 0, col: 6, target: "embB_M306V", drug: "EMB", color: 0xeab308, label: "embB M306V\nEMB" },
-  // Row 1 (bottom): cols 0-6
   { row: 1, col: 0, target: "pncA", drug: "PZA", color: 0xeab308, label: "pncA\nPZA" },
   { row: 1, col: 1, target: "gyrA_D94G", drug: "FQ", color: 0xa855f7, label: "gyrA D94G\nFQ" },
   { row: 1, col: 2, target: "gyrA_A90V", drug: "FQ", color: 0xa855f7, label: "gyrA A90V\nFQ" },
@@ -91,16 +112,18 @@ const ELECTRODE_TARGETS = [
 export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrategy, getEfficiency, results, computeGamma, echemTime, echemKtrans, echemGamma0_mol, HEADING, MONO }) {
   const mountRef = useRef(null);
   const stateRef = useRef(null);
-  const [mode, setMode] = useState(1); // 1=chip, 2=cross-section, 3=side-profile
+  const [mode, setMode] = useState(1);
+  const [arch, setArch] = useState("B");
   const [selectedPad, setSelectedPad] = useState(null);
   const [cas12aActive, setCas12aActive] = useState(false);
   const [tooltipInfo, setTooltipInfo] = useState(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [incubationMin, setIncubationMin] = useState(echemTime);
   const [curveMode, setCurveMode] = useState("SWV");
-  const [showMicrofluidics, setShowMicrofluidics] = useState(true);
-  const [showPassivation, setShowPassivation] = useState(true);
+  const [showFluidics, setShowFluidics] = useState(true);
+  const [showWaxBarriers, setShowWaxBarriers] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
+  const [showCapillaryFlow, setShowCapillaryFlow] = useState(false);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -140,102 +163,110 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     scene.add(ground);
 
     // ══════════════════════════════════════════════════════════
-    // MODE 1: CHIP OVERVIEW — 60×30mm, 7×2 WE array
+    // MATERIALS — Cellulose paper platform
+    // ══════════════════════════════════════════════════════════
+    const celluloseMat = new THREE.MeshStandardMaterial({ color: 0xF5F0E8, roughness: 0.85, metalness: 0.0 });
+    const ligMat = new THREE.MeshStandardMaterial({ color: 0x374151, roughness: 0.9, metalness: 0.1 });
+    const waxMat = new THREE.MeshStandardMaterial({ color: 0x3D2B1F, roughness: 0.7, metalness: 0.0 });
+    const agMat = new THREE.MeshStandardMaterial({ color: 0xC0C0C0, metalness: 0.7, roughness: 0.2 });
+    const channelMat = new THREE.MeshStandardMaterial({ color: 0x88BBDD, transparent: true, opacity: 0.25, roughness: 0.4 });
+    const bloodMat = new THREE.MeshStandardMaterial({ color: 0xCC3333, transparent: true, opacity: 0.45, roughness: 0.6 });
+    const plasmaMat = new THREE.MeshStandardMaterial({ color: 0xF5D0A0, transparent: true, opacity: 0.35, roughness: 0.5 });
+
+    // ══════════════════════════════════════════════════════════
+    // MODE 1: CHIP OVERVIEW — ~40 × 25 mm cellulose paper
     // ══════════════════════════════════════════════════════════
     const chipGroup = new THREE.Group();
     scene.add(chipGroup);
 
-    // Materials
-    const kaptonMat = new THREE.MeshPhysicalMaterial({ color: 0xd4a843, roughness: 0.25, clearcoat: 0.3, clearcoatRoughness: 0.4 });
-    const ligMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.85, metalness: 0.1 });
-    const goldMat = new THREE.MeshStandardMaterial({ color: 0xc5a03f, metalness: 0.85, roughness: 0.15 });
-    const agMat = new THREE.MeshStandardMaterial({ color: 0xC0C0C0, metalness: 0.7, roughness: 0.2 });
-    const cocMat = new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, transparent: true, opacity: 0.22, roughness: 0.1, clearcoat: 0.6, side: THREE.DoubleSide });
-    const channelMat = new THREE.MeshStandardMaterial({ color: 0x4488AA, transparent: true, opacity: 0.35, roughness: 0.4 });
-    const chamberMat = new THREE.MeshStandardMaterial({ color: 0x336677, transparent: true, opacity: 0.4, roughness: 0.4, side: THREE.DoubleSide });
-    const passivMat = new THREE.MeshStandardMaterial({ color: 0x1a2744, transparent: true, opacity: 0.15, side: THREE.DoubleSide, depthWrite: false });
+    const chipW = 40, chipD = 25, chipH = 3.9; // 390 µm → 3.9 scaled
 
-    // ── Kapton substrate: 60 × 30 mm (1 unit = 1 mm) ──
-    const chipW = 60, chipD = 30, chipH = 1.25; // 125 µm = 1.25 scaled
-    const body = new THREE.Mesh(new THREE.BoxGeometry(chipW, chipH, chipD), kaptonMat);
+    // Cellulose paper substrate (white, fibrous)
+    const body = new THREE.Mesh(new THREE.BoxGeometry(chipW, chipH, chipD), celluloseMat);
     body.castShadow = true; body.receiveShadow = true;
     chipGroup.add(body);
 
-    // ── Electrode grid: 7 cols × 2 rows ──
-    // Center the grid horizontally with space for CE/RE on right
-    const gridOriginX = -16; // left-offset to leave room for CE/RE on right
-    const gridOriginZ = -4; // vertical center offset
-    const colSpacing = 5; // 5 mm center-to-center
-    const rowSpacing = 8; // 8 mm center-to-center
-    const weRadius = 1.5; // 3 mm diameter / 2
+    // Fiber texture on top surface
+    const fiberMat = new THREE.MeshStandardMaterial({ color: 0xEDE8DD, roughness: 0.95 });
+    for (let i = 0; i < 60; i++) {
+      const fx = (Math.random() - 0.5) * (chipW - 2);
+      const fz = (Math.random() - 0.5) * (chipD - 2);
+      const fLen = 1.0 + Math.random() * 2.5;
+      const fib = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, fLen, 3), fiberMat);
+      fib.position.set(fx, chipH / 2 + 0.01, fz);
+      fib.rotation.x = Math.PI / 2 + (Math.random() - 0.5) * 0.3;
+      fib.rotation.y = Math.random() * Math.PI;
+      chipGroup.add(fib);
+    }
 
-    const padPositions = [];
-    const padMeshes = [];
+    // ── LIG-E region (embedded IN cellulose, dark) ──
+    const gridOriginX = -10;
+    const gridOriginZ = -3;
+    const colSpacing = 3.5;
+    const rowSpacing = 6;
+    const weRadius = 1.2;
 
-    // ── LIG patterned area under the grid ──
     const ligPadX = gridOriginX + 3 * colSpacing;
-    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(38, 0.06, 20), ligMat), ligPadX, chipH / 2 + 0.03, gridOriginZ + rowSpacing / 2);
+    // LIG-E is embedded — show as darker region flush with surface
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(28, 0.08, 16), ligMat), ligPadX, chipH / 2 - 0.02, gridOriginZ + rowSpacing / 2);
 
-    // ── Passivation mask with circular openings ──
-    const maskShape = new THREE.Shape();
-    const mw = 42, mh = 22;
-    maskShape.moveTo(-mw / 2, -mh / 2); maskShape.lineTo(mw / 2, -mh / 2);
-    maskShape.lineTo(mw / 2, mh / 2); maskShape.lineTo(-mw / 2, mh / 2); maskShape.closePath();
+    // ── Wax-printed hydrophobic barriers ──
+    const waxGroup = new THREE.Group();
+    chipGroup.add(waxGroup);
 
-    ELECTRODE_TARGETS.forEach(e => {
-      const px = gridOriginX + e.col * colSpacing;
-      const pz = gridOriginZ + e.row * rowSpacing;
-      const hole = new THREE.Path();
-      hole.absarc(px - ligPadX, -(pz - gridOriginZ - rowSpacing / 2), weRadius, 0, Math.PI * 2, false);
-      maskShape.holes.push(hole);
-    });
-    const passivGeo = new THREE.ShapeGeometry(maskShape);
-    const passivMesh = new THREE.Mesh(passivGeo, passivMat);
-    passivMesh.rotation.x = -Math.PI / 2;
-    passivMesh.position.set(ligPadX, chipH / 2 + 0.08, gridOriginZ + rowSpacing / 2);
-    chipGroup.add(passivMesh);
+    // Outer barrier rectangle around detection zone
+    const wBW = 30, wBD = 18;
+    const waxH = 0.15;
+    [[-wBW / 2, 0, wBD / 2], [wBW / 2, 0, wBD / 2], [-wBW / 2, 0, -wBD / 2], [wBW / 2, 0, -wBD / 2]].forEach(() => {});
+    // Top/bottom horizontal barriers
+    addAt(waxGroup, new THREE.Mesh(new THREE.BoxGeometry(wBW, waxH, 0.2), waxMat), ligPadX, chipH / 2 + 0.05, gridOriginZ - 1.5);
+    addAt(waxGroup, new THREE.Mesh(new THREE.BoxGeometry(wBW, waxH, 0.2), waxMat), ligPadX, chipH / 2 + 0.05, gridOriginZ + rowSpacing + 1.5);
+    // Left/right vertical barriers
+    addAt(waxGroup, new THREE.Mesh(new THREE.BoxGeometry(0.2, waxH, rowSpacing + 3), waxMat), gridOriginX - 2, chipH / 2 + 0.05, gridOriginZ + rowSpacing / 2);
+    addAt(waxGroup, new THREE.Mesh(new THREE.BoxGeometry(0.2, waxH, rowSpacing + 3), waxMat), gridOriginX + 6 * colSpacing + 2, chipH / 2 + 0.05, gridOriginZ + rowSpacing / 2);
+    // Inter-column barriers (between each electrode)
+    for (let c = 0; c < 6; c++) {
+      const bx = gridOriginX + (c + 0.5) * colSpacing;
+      addAt(waxGroup, new THREE.Mesh(new THREE.BoxGeometry(0.12, waxH, rowSpacing + 2.5), waxMat), bx, chipH / 2 + 0.05, gridOriginZ + rowSpacing / 2);
+    }
+    // Inter-row barrier
+    addAt(waxGroup, new THREE.Mesh(new THREE.BoxGeometry(wBW, waxH, 0.12), waxMat), ligPadX, chipH / 2 + 0.05, gridOriginZ + rowSpacing / 2);
 
     // ── Working Electrodes (14 pads) ──
+    const padPositions = [];
+    const padMeshes = [];
     const labelSprites = [];
     ELECTRODE_TARGETS.forEach((e, idx) => {
       const px = gridOriginX + e.col * colSpacing;
       const pz = gridOriginZ + e.row * rowSpacing;
       padPositions.push({ x: px, z: pz, ...e, idx });
 
-      // LIG floor (dark, porous)
-      addAt(chipGroup, new THREE.Mesh(new THREE.CylinderGeometry(weRadius, weRadius, 0.06, 24), ligMat), px, chipH / 2 + 0.06, pz);
+      // LIG-E floor (dark, porous, embedded)
+      addAt(chipGroup, new THREE.Mesh(new THREE.CylinderGeometry(weRadius, weRadius, 0.08, 24), ligMat), px, chipH / 2, pz);
 
-      // Pore texture dots on WE
-      for (let p = 0; p < 8; p++) {
+      // Pore texture dots
+      for (let p = 0; p < 6; p++) {
         const a2 = Math.random() * Math.PI * 2, rd2 = Math.random() * (weRadius - 0.2);
-        addAt(chipGroup, new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.07, 4), new THREE.MeshStandardMaterial({ color: 0x111111 })),
-          px + Math.cos(a2) * rd2, chipH / 2 + 0.1, pz + Math.sin(a2) * rd2);
+        addAt(chipGroup, new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.09, 4),
+          new THREE.MeshStandardMaterial({ color: 0x1a1a1a })),
+          px + Math.cos(a2) * rd2, chipH / 2 + 0.06, pz + Math.sin(a2) * rd2);
       }
 
       // Drug class color ring
       const ringMat = new THREE.MeshStandardMaterial({ color: e.color, emissive: e.color, emissiveIntensity: 0.35, transparent: true, opacity: 0.85, side: THREE.DoubleSide });
-      const ring = new THREE.Mesh(new THREE.RingGeometry(weRadius - 0.3, weRadius, 24), ringMat);
-      ring.rotation.x = -Math.PI / 2; addAt(chipGroup, ring, px, chipH / 2 + 0.09, pz);
-
-      // AuNP specks (tiny gold hemispheres)
-      for (let i = 0; i < 8; i++) {
-        const a = Math.random() * Math.PI * 2, rd = Math.random() * (weRadius - 0.3);
-        addAt(chipGroup, new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 5, 0, Math.PI * 2, 0, Math.PI / 2),
-          new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.9, roughness: 0.1 })),
-          px + Math.cos(a) * rd, chipH / 2 + 0.09, pz + Math.sin(a) * rd);
-      }
+      const ring = new THREE.Mesh(new THREE.RingGeometry(weRadius - 0.2, weRadius, 24), ringMat);
+      ring.rotation.x = -Math.PI / 2;
+      addAt(chipGroup, ring, px, chipH / 2 + 0.07, pz);
 
       // Target label sprite
-      const lbl = makeSprite(e.target, "#ffffff", 9, true);
-      lbl.position.set(px, chipH / 2 + 1.6, pz);
-      chipGroup.add(lbl);
-      labelSprites.push(lbl);
+      const lbl = makeSprite(e.target, "#555555", 7, true);
+      lbl.position.set(px, chipH / 2 + 1.5, pz);
+      chipGroup.add(lbl); labelSprites.push(lbl);
 
       // Drug class sub-label
-      const drugLbl = makeSprite(e.drug, DRUG_CSS[e.drug] || "#888", 7);
-      drugLbl.position.set(px, chipH / 2 + 1.15, pz);
-      chipGroup.add(drugLbl);
-      labelSprites.push(drugLbl);
+      const drugLbl = makeSprite(e.drug, DRUG_CSS[e.drug] || "#888", 6);
+      drugLbl.position.set(px, chipH / 2 + 1.1, pz);
+      chipGroup.add(drugLbl); labelSprites.push(drugLbl);
 
       // Raycast hit mesh
       const pm = new THREE.Mesh(new THREE.CylinderGeometry(weRadius, weRadius, 1.0, 16), new THREE.MeshBasicMaterial({ visible: false }));
@@ -244,165 +275,114 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
       chipGroup.add(pm); padMeshes.push(pm);
     });
 
-    // ── Counter Electrode — 8×8 mm, left of WE grid ──
-    const ceX = gridOriginX - 7;
+    // ── Counter Electrode — LIG-E arc ──
+    const ceX = gridOriginX - 5;
     const ceZ = gridOriginZ + rowSpacing / 2;
-    const ceW = 8, ceD = 8;
-    const ceMesh = new THREE.Mesh(new THREE.BoxGeometry(ceW, 0.12, ceD), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.85, metalness: 0.15 }));
-    addAt(chipGroup, ceMesh, ceX, chipH / 2 + 0.06, ceZ);
-    // CE porous texture
-    for (let i = 0; i < 30; i++) {
-      const tx = (Math.random() - 0.5) * (ceW - 0.4), tz = (Math.random() - 0.5) * (ceD - 0.4);
-      addAt(chipGroup, new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.13, 4), new THREE.MeshStandardMaterial({ color: 0x111111 })),
-        ceX + tx, chipH / 2 + 0.13, ceZ + tz);
-    }
-    addAt(chipGroup, makeSprite("CE", "#aaaaaa", 12, true), ceX, chipH / 2 + 1.8, ceZ);
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(3, 0.1, 8), ligMat), ceX, chipH / 2, ceZ);
+    addAt(chipGroup, makeSprite("CE", "#888888", 9, true), ceX, chipH / 2 + 1.6, ceZ);
 
-    // ── Ag/AgCl Reference Electrode — 2×12 mm strip, right of grid ──
-    const reX = gridOriginX + 6 * colSpacing + 5;
+    // ── Ag/AgCl Reference Electrode ──
+    const reX = gridOriginX + 6 * colSpacing + 4;
     const reZ = gridOriginZ + rowSpacing / 2;
-    // LIG base
-    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(2, 0.1, 12), ligMat), reX, chipH / 2 + 0.05, reZ);
-    // Silver coating
-    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(2, 0.02, 12), new THREE.MeshStandardMaterial({ color: 0xE8E8F0, transparent: true, opacity: 0.6, metalness: 0.5 })), reX, chipH / 2 + 0.11, reZ);
-    addAt(chipGroup, makeSprite("Ag/AgCl RE", "#8888aa", 9, true), reX, chipH / 2 + 1.8, reZ);
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 8), ligMat), reX, chipH / 2, reZ);
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.02, 8),
+      new THREE.MeshStandardMaterial({ color: 0xE8E8F0, transparent: true, opacity: 0.6, metalness: 0.5 })), reX, chipH / 2 + 0.06, reZ);
+    addAt(chipGroup, makeSprite("Ag/AgCl RE", "#8888aa", 7, true), reX, chipH / 2 + 1.6, reZ);
 
-    // ── Contact Pads — 16 pads along bottom edge ──
-    const padEdgeZ = chipD / 2 - 1.5;
-    const padSize = 1.5;
+    // ── Contact Pads along bottom edge ──
+    const padEdgeZ = chipD / 2 - 1.2;
     const numPads = 16;
-    const padStartX = -chipW / 2 + 5;
-    const padSpacing = (chipW - 10) / (numPads - 1);
+    const padStartX = -chipW / 2 + 4;
+    const padSpacing = (chipW - 8) / (numPads - 1);
+    const contactMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.6, metalness: 0.2 });
     for (let i = 0; i < numPads; i++) {
       const px = padStartX + i * padSpacing;
-      addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(padSize, 0.1, padSize), goldMat), px, chipH / 2 + 0.05, padEdgeZ);
+      addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.1, 1.0), contactMat), px, chipH / 2 + 0.05, padEdgeZ);
     }
-    // Thin LIG traces from each WE to nearest contact pad
+
+    // LIG traces from WE to contact pads
     ELECTRODE_TARGETS.forEach((e, idx) => {
       const px = gridOriginX + e.col * colSpacing;
       const pz = gridOriginZ + e.row * rowSpacing;
       const padX = padStartX + idx * padSpacing;
-      const traceW = 0.12; // ~300 µm trace width
-      // Vertical segment to edge
+      const traceW = 0.1;
       const vLen = padEdgeZ - pz - weRadius;
       if (vLen > 0.5) {
         addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(traceW, 0.03, vLen), ligMat),
           px, chipH / 2 + 0.02, pz + weRadius + vLen / 2);
       }
-      // Horizontal jog if needed
       const dx = padX - px;
       if (Math.abs(dx) > 0.2) {
         addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(Math.abs(dx), 0.03, traceW), ligMat),
-          (px + padX) / 2, chipH / 2 + 0.02, padEdgeZ - 1);
+          (px + padX) / 2, chipH / 2 + 0.02, padEdgeZ - 0.8);
       }
-      // Final segment to pad
-      addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(traceW, 0.03, 1.5), ligMat),
-        padX, chipH / 2 + 0.02, padEdgeZ - 0.5);
+      addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(traceW, 0.03, 1.0), ligMat),
+        padX, chipH / 2 + 0.02, padEdgeZ - 0.3);
     });
-    // CE and RE traces to last 2 pads
-    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, padEdgeZ - ceZ - ceD / 2), ligMat),
-      ceX, chipH / 2 + 0.02, ceZ + ceD / 2 + (padEdgeZ - ceZ - ceD / 2) / 2);
-    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, padEdgeZ - reZ - 6), ligMat),
-      reX, chipH / 2 + 0.02, reZ + 6 + (padEdgeZ - reZ - 6) / 2);
 
-    // Insertion guide bar
-    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(chipW - 4, 0.2, 0.3),
-      new THREE.MeshStandardMaterial({ color: 0xB8860B, roughness: 0.4, metalness: 0.3 })), 0, chipH / 2 + 0.1, chipD / 2 - 0.5);
-
-    // ── Microfluidic overlay group (toggleable) ──
+    // ── Microfluidic overlay (blood cfDNA workflow) ──
     const fluidicsGroup = new THREE.Group();
     chipGroup.add(fluidicsGroup);
 
-    // COC slab (semi-transparent top layer)
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(chipW, 0.25, chipD), cocMat), 0, chipH / 2 + 0.5, 0);
+    // Blood inlet absorption pad (top center, red-tinted)
+    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(6, 0.2, 3), bloodMat), 0, chipH / 2 + 0.1, -chipD / 2 + 2);
+    addAt(fluidicsGroup, makeSprite("Blood inlet", "#CC3333", 8, true), 0, chipH / 2 + 1.8, -chipD / 2 + 2);
 
-    // Sample inlet port (top center)
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.35, 16),
-      new THREE.MeshStandardMaterial({ color: 0x3388AA, transparent: true, opacity: 0.55, roughness: 0.3 })), 0, chipH / 2 + 0.75, -chipD / 2 + 3);
-    addAt(fluidicsGroup, makeSprite("Sample In", "#1a6680", 10, true), 0, chipH / 2 + 2.2, -chipD / 2 + 3);
+    // Plasma separation zone (cellulose filtration — gradient from red to yellow)
+    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(6, 0.15, 2), plasmaMat), 0, chipH / 2 + 0.1, -chipD / 2 + 4.5);
+    addAt(fluidicsGroup, makeSprite("Plasma sep.", "#B8860B", 7), 0, chipH / 2 + 1.6, -chipD / 2 + 4.5);
 
-    // Lysis chamber (5×5 mm)
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(5, 0.15, 5),
-      new THREE.MeshStandardMaterial({ color: 0x93C5FD, transparent: true, opacity: 0.3 })), -10, chipH / 2 + 0.5, -chipD / 2 + 5);
-    // Zirconia beads
-    const beadMat = new THREE.MeshStandardMaterial({ color: 0x4B5563, metalness: 0.6, roughness: 0.3 });
-    for (let i = 0; i < 10; i++) {
-      addAt(fluidicsGroup, new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 6), beadMat),
-        -10 + (Math.random() - 0.5) * 4, chipH / 2 + 0.7, -chipD / 2 + 5 + (Math.random() - 0.5) * 4);
-    }
-    addAt(fluidicsGroup, makeSprite("Lysis", "#1a6680", 9), -10, chipH / 2 + 2.0, -chipD / 2 + 5);
+    // Channel: plasma → RPA zone
+    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 2), channelMat), 0, chipH / 2 + 0.08, -chipD / 2 + 6.5);
 
-    // Channel: inlet → lysis
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(10, 0.08, 0.4), channelMat), -5, chipH / 2 + 0.5, -chipD / 2 + 3);
-
-    // Purification zone (2×3 mm)
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(3, 0.12, 2),
-      new THREE.MeshStandardMaterial({ color: 0x55AA88, transparent: true, opacity: 0.45 })), -3, chipH / 2 + 0.5, -chipD / 2 + 5);
-    addAt(fluidicsGroup, makeSprite("Purify", "#2d7a55", 8), -3, chipH / 2 + 2.0, -chipD / 2 + 5);
-
-    // Channel: lysis → purification
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(4, 0.08, 0.4), channelMat), -6.5, chipH / 2 + 0.5, -chipD / 2 + 5);
-
-    // RPA amplification chambers (4 chambers, 4×3 mm each)
-    const rpaStartX = 4;
-    const rpaLabels = [
-      "RPA-A: IS6110,\nIS1081, rpoB",
-      "RPA-B: katG,\ninhA, embB",
-      "RPA-C: pncA,\ngyrA, gyrB",
-      "RPA-D: rrs,\neis, RNaseP"
-    ];
-    const rpaShortLabels = ["RPA-A", "RPA-B", "RPA-C", "RPA-D"];
-    for (let i = 0; i < 4; i++) {
-      const rx = rpaStartX + i * 6;
-      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(4, 0.15, 3),
-        new THREE.MeshStandardMaterial({ color: 0xCC8844, transparent: true, opacity: 0.45 })), rx, chipH / 2 + 0.5, -chipD / 2 + 5);
-      addAt(fluidicsGroup, makeSprite(rpaShortLabels[i], "#996633", 8), rx, chipH / 2 + 2.0, -chipD / 2 + 5);
+    // RPA amplification zone (lyophilized, 3 sub-pools)
+    const rpaLabels = ["RPA-A", "RPA-B", "RPA-C"];
+    for (let i = 0; i < 3; i++) {
+      const rx = -5 + i * 5;
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.12, 2),
+        new THREE.MeshStandardMaterial({ color: 0xCC8844, transparent: true, opacity: 0.35 })), rx, chipH / 2 + 0.1, -chipD / 2 + 8);
+      addAt(fluidicsGroup, makeSprite(rpaLabels[i], "#996633", 7), rx, chipH / 2 + 1.5, -chipD / 2 + 8);
     }
 
-    // Channel: purification → RPA manifold
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(rpaStartX + 18 + 3, 0.08, 0.4), channelMat),
-      ((-3) + rpaStartX + 18) / 2, chipH / 2 + 0.5, -chipD / 2 + 3.5);
-
-    // Distribution manifold: RPA → detection grid (tree/fishbone)
-    // Main trunk running horizontally across the grid
-    const trunkZ = gridOriginZ - 2;
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(6 * colSpacing + 4, 0.06, 0.35), channelMat),
-      gridOriginX + 3 * colSpacing, chipH / 2 + 0.5, trunkZ);
-    // Vertical channels from trunk down to each column
+    // Distribution channels from RPA → detection grid
+    const trunkZ = gridOriginZ - 1.5;
+    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(6 * colSpacing + 3, 0.05, 0.25), channelMat),
+      gridOriginX + 3 * colSpacing, chipH / 2 + 0.08, trunkZ);
     for (let c = 0; c < 7; c++) {
       const cx = gridOriginX + c * colSpacing;
-      // Branch to row 0
-      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, Math.abs(gridOriginZ - trunkZ)), channelMat),
-        cx, chipH / 2 + 0.5, (gridOriginZ + trunkZ) / 2);
-      // Branch to row 1
-      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, rowSpacing), channelMat),
-        cx, chipH / 2 + 0.5, gridOriginZ + rowSpacing / 2);
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, Math.abs(gridOriginZ - trunkZ)), channelMat),
+        cx, chipH / 2 + 0.08, (gridOriginZ + trunkZ) / 2);
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, rowSpacing), channelMat),
+        cx, chipH / 2 + 0.08, gridOriginZ + rowSpacing / 2);
     }
-    // Vertical from RPA area down to trunk
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.06, Math.abs(trunkZ - (-chipD / 2 + 5))), channelMat),
-      gridOriginX + 3 * colSpacing, chipH / 2 + 0.5, (trunkZ + (-chipD / 2 + 5)) / 2);
 
-    // 14 detection chambers (3.5×3.5 mm wells around each WE)
-    ELECTRODE_TARGETS.forEach(e => {
-      const px = gridOriginX + e.col * colSpacing;
-      const pz = gridOriginZ + e.row * rowSpacing;
-      // Chamber wall (open cylinder)
-      const cw = new THREE.Mesh(new THREE.CylinderGeometry(2.0, 2.0, 0.4, 24, 1, true),
-        new THREE.MeshStandardMaterial({ color: e.color, transparent: true, opacity: 0.2, side: THREE.DoubleSide }));
-      addAt(fluidicsGroup, cw, px, chipH / 2 + 0.4, pz);
-    });
+    // Waste absorption pad (bottom)
+    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(chipW - 10, 0.12, 2),
+      new THREE.MeshStandardMaterial({ color: 0x886666, transparent: true, opacity: 0.25 })),
+      0, chipH / 2 + 0.1, chipD / 2 - 2);
+    addAt(fluidicsGroup, makeSprite("Waste pad", "#884444", 7), 0, chipH / 2 + 1.5, chipD / 2 - 2);
 
-    // Waste reservoir (5×8 mm)
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(5, 0.12, 8),
-      new THREE.MeshStandardMaterial({ color: 0x996666, transparent: true, opacity: 0.35 })),
-      chipW / 2 - 5, chipH / 2 + 0.5, 0);
-    addAt(fluidicsGroup, makeSprite("Waste", "#884444", 10), chipW / 2 - 5, chipH / 2 + 2.0, 0);
-    // Channels from grid to waste
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(5, 0.06, 0.35), channelMat),
-      gridOriginX + 6 * colSpacing + 3, chipH / 2 + 0.5, gridOriginZ + rowSpacing / 2);
+    // Insertion guide mark
+    addAt(chipGroup, new THREE.Mesh(new THREE.BoxGeometry(chipW - 3, 0.08, 0.2),
+      new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5 })), 0, chipH / 2 + 0.04, chipD / 2 - 0.6);
+
+    // ── Capillary flow particles (toggled) ──
+    const capillaryParticles = [];
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x3B82F6, transparent: true, opacity: 0.7 });
+    for (let i = 0; i < 30; i++) {
+      const cp = new THREE.Mesh(new THREE.SphereGeometry(0.08, 4, 4), capMat);
+      cp.position.set(
+        gridOriginX + Math.random() * 6 * colSpacing,
+        chipH / 2 - 0.5 - Math.random() * 2,
+        gridOriginZ + Math.random() * rowSpacing
+      );
+      cp.visible = false;
+      chipGroup.add(cp);
+      capillaryParticles.push({ mesh: cp, speed: 0.02 + Math.random() * 0.04, baseX: cp.position.x });
+    }
 
     // ══════════════════════════════════════════════════════════
-    // MODE 2: CROSS-SECTION — Accurate single electrode
+    // MODE 2: CROSS-SECTION — Architecture-dependent layer stack
     // ══════════════════════════════════════════════════════════
     const crossGroup = new THREE.Group();
     crossGroup.visible = false;
@@ -410,160 +390,232 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
 
     const secR = 3.5;
 
-    // Kapton substrate — 125 µm → 4.0 units (thickest)
+    // ── Common base: Cellulose paper (390 µm → 4.0 units) ──
     addAt(crossGroup, new THREE.Mesh(new THREE.CylinderGeometry(secR, secR, 4.0, 32),
-      new THREE.MeshStandardMaterial({ color: 0xD4A843, roughness: 0.35 })), 0, 2.0, 0).castShadow = true;
+      new THREE.MeshStandardMaterial({ color: 0xF5F0E8, roughness: 0.85 })), 0, 2.0, 0).castShadow = true;
 
-    // LIG layer — 20-50 µm → 0.8 units with dramatic porosity
+    // Cellulose fiber texture in cross-section
+    const fibCrossMat = new THREE.MeshStandardMaterial({ color: 0xE8E3D8, roughness: 0.95 });
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2, rr = Math.random() * (secR - 0.3);
+      const fy = 0.3 + Math.random() * 3.4;
+      const fib = new THREE.Mesh(new THREE.CylinderGeometry(0.04 + Math.random() * 0.03, 0.04, 0.3 + Math.random() * 0.8, 4), fibCrossMat);
+      fib.position.set(Math.cos(a) * rr, fy, Math.sin(a) * rr);
+      fib.rotation.z = Math.PI / 2 + (Math.random() - 0.5) * 0.4;
+      fib.rotation.y = Math.random() * Math.PI;
+      crossGroup.add(fib);
+    }
+
+    // ── LIG-E layer (embedded in top surface, 0.8 units) ──
     addAt(crossGroup, new THREE.Mesh(new THREE.CylinderGeometry(secR, secR, 0.8, 32),
       new THREE.MeshStandardMaterial({ color: 0x2D2D2D, roughness: 0.9 })), 0, 4.4, 0).castShadow = true;
 
-    // ── Heavy pore texture (foam/sponge-like LIG porosity) ──
+    // LIG-E pore texture
     const poreMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 1 });
-    // Top surface pores — many sizes, irregular
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 80; i++) {
       const a = Math.random() * Math.PI * 2, rr = Math.random() * (secR - 0.15);
-      const pSize = 0.02 + Math.random() * 0.1;
-      const pDepth = 0.04 + Math.random() * 0.35;
+      const pSize = 0.02 + Math.random() * 0.08;
+      const pDepth = 0.04 + Math.random() * 0.3;
       const p = new THREE.Mesh(new THREE.CylinderGeometry(pSize, pSize * 0.6, pDepth, 5), poreMat);
       p.position.set(Math.cos(a) * rr, 4.8 + Math.random() * 0.05, Math.sin(a) * rr);
       p.rotation.x = (Math.random() - 0.5) * 0.5;
-      p.rotation.z = (Math.random() - 0.5) * 0.5;
       crossGroup.add(p);
     }
-    // Side pores (visible on cylinder wall — coral-like)
-    for (let i = 0; i < 40; i++) {
+    // Side pores
+    for (let i = 0; i < 30; i++) {
       const a = Math.random() * Math.PI * 2;
       const py = 4.05 + Math.random() * 0.7;
-      const p = new THREE.Mesh(new THREE.SphereGeometry(0.03 + Math.random() * 0.07, 4, 4), poreMat);
+      const p = new THREE.Mesh(new THREE.SphereGeometry(0.03 + Math.random() * 0.06, 4, 4), poreMat);
       p.position.set(Math.cos(a) * (secR - 0.01), py, Math.sin(a) * (secR - 0.01));
       crossGroup.add(p);
     }
-    // Interconnected pore ridges (foam struts)
-    for (let i = 0; i < 25; i++) {
-      const a1 = Math.random() * Math.PI * 2, r1 = Math.random() * (secR - 0.5);
-      const a2 = a1 + (Math.random() - 0.5) * 0.8, r2 = r1 + (Math.random() - 0.5) * 1.5;
-      const x1 = Math.cos(a1) * r1, z1 = Math.sin(a1) * r1;
-      const x2 = Math.cos(a2) * Math.min(r2, secR - 0.2), z2 = Math.sin(a2) * Math.min(r2, secR - 0.2);
-      const len = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
-      if (len < 0.1) continue;
-      const ridge = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, len, 3), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.95 }));
-      ridge.position.set((x1 + x2) / 2, 4.82, (z1 + z2) / 2);
-      ridge.rotation.z = Math.PI / 2;
-      ridge.rotation.y = Math.atan2(z2 - z1, x2 - x1);
-      crossGroup.add(ridge);
-    }
 
-    // ── AuNPs — discrete hemispheres nestled in pores ──
-    const auSurf = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.9, roughness: 0.1 });
-    const auPositions = [];
-    for (let i = 0; i < 35; i++) {
+    const baseY = 4.85;
+
+    // ────────────────────────────────────────
+    // Architecture B: Silver metallization (default)
+    // ────────────────────────────────────────
+    const archBGroup = new THREE.Group();
+    crossGroup.add(archBGroup);
+
+    // Pyrene monolayer (thin amber)
+    const pyreneMat = new THREE.MeshStandardMaterial({ color: 0xF59E0B, roughness: 0.3, metalness: 0.2 });
+    for (let i = 0; i < 50; i++) {
       const a = Math.random() * Math.PI * 2, rr = Math.random() * (secR - 0.3);
-      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
-      const size = 0.03 + Math.random() * 0.04;
-      addAt(crossGroup, new THREE.Mesh(new THREE.SphereGeometry(size, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2), auSurf), x, 4.84, z);
-      auPositions.push({ x, z, size });
+      const px = Math.cos(a) * rr, pz = Math.sin(a) * rr;
+      const pyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.06), pyreneMat);
+      pyMesh.position.set(px, baseY, pz);
+      pyMesh.rotation.y = Math.random() * Math.PI;
+      archBGroup.add(pyMesh);
     }
 
-    // ── MCH backfill — dense carpet of SHORT stubs ──
-    const mchMat = new THREE.MeshStandardMaterial({ color: 0x9ca3af, roughness: 0.6 });
-    for (let i = 0; i < 120; i++) {
-      const mx = (Math.random() - 0.5) * (secR * 2 - 0.4);
-      const mz = (Math.random() - 0.5) * (secR * 2 - 0.4);
-      if (mx * mx + mz * mz > (secR - 0.2) ** 2) continue;
-      const mh = 0.12 + Math.random() * 0.08; // ~0.8 nm → clearly shorter than reporters
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, mh, 3), mchMat);
-      m.position.set(mx, 4.86 + mh / 2, mz);
-      m.rotation.x = (Math.random() - 0.5) * 0.2;
-      m.rotation.z = (Math.random() - 0.5) * 0.2;
-      crossGroup.add(m);
-      // OH terminus (tiny sphere at top)
-      if (Math.random() < 0.3) {
-        addAt(crossGroup, new THREE.Mesh(new THREE.SphereGeometry(0.015, 4, 4),
-          new THREE.MeshStandardMaterial({ color: 0xd1d5db })), mx, 4.86 + mh, mz);
-      }
-    }
-
-    const baseY = 4.88;
-
-    // ── ssDNA reporters: FLOPPY, wavy, variable conformations ──
-    const strandMat = new THREE.MeshStandardMaterial({ color: 0x67e8f9 });
-    const mbMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, emissive: 0x1a3a6b, emissiveIntensity: 0.3 });
-    const thiolMat = new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.8, roughness: 0.15 });
+    // ssDNA probes with silver deposits
+    const strandMat = new THREE.MeshStandardMaterial({ color: 0x60A5FA });
+    const silverMat = new THREE.MeshStandardMaterial({ color: 0xC0C0C0, metalness: 0.8, roughness: 0.15 });
     const cutMat = new THREE.MeshStandardMaterial({ color: 0x3d7a63 });
-
     const reporters = [];
-    // Place reporters ON AuNP positions (3-5 per AuNP)
-    auPositions.forEach((au, ai) => {
-      const nRep = 3 + Math.floor(Math.random() * 3); // 3-5 reporters per AuNP
-      for (let ri = 0; ri < nRep; ri++) {
-        const jitter = 0.06;
-        const x = au.x + (Math.random() - 0.5) * jitter;
-        const z = au.z + (Math.random() - 0.5) * jitter;
-        if (x * x + z * z > (secR - 0.4) ** 2) continue;
 
-        const h = 1.5 + Math.random() * 0.8;
-        // Conformation distribution: 30% bent down, 40% intermediate, 30% extended
-        const rnd = Math.random();
-        const bentToward = rnd < 0.3;
-        const extended = rnd > 0.7;
-        const bendMag = bentToward ? 0.15 : extended ? 0.03 : 0.08;
-        const bendX = (Math.random() - 0.5) * (bentToward ? 1.2 : 0.4);
-        const bendZ = (Math.random() - 0.5) * (bentToward ? 1.2 : 0.4);
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2, rr = Math.random() * (secR - 0.4);
+      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+      const h = 1.2 + Math.random() * 0.6;
+      const rnd = Math.random();
+      const bendMag = rnd < 0.3 ? 0.12 : rnd > 0.7 ? 0.03 : 0.07;
+      const bendX = (Math.random() - 0.5) * 0.4;
+      const bendZ = (Math.random() - 0.5) * 0.4;
 
-        // Thiol-Au bond marker (S atom — yellow)
-        const th = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), thiolMat);
-        addAt(crossGroup, th, x, baseY, z);
+      // Pyrene anchor (amber dot at base)
+      addAt(archBGroup, new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), pyreneMat), x, baseY, z);
 
-        // C6 spacer (very short gray connector)
-        const spacer = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.08, 3),
-          new THREE.MeshStandardMaterial({ color: 0x888888 }));
-        addAt(crossGroup, spacer, x, baseY + 0.04, z);
-
-        // Floppy ssDNA: 6 segments with random-coil trajectory
-        const segs = [];
-        const nSeg = 6, segH = h / nSeg;
-        let cx = x, cz = z, cy = baseY + 0.08;
-        for (let s = 0; s < nSeg; s++) {
-          const t_param = s / nSeg;
-          const waveMag = bendMag + Math.random() * 0.06;
-          cx += Math.sin(ai * 2.3 + ri * 1.7 + s * 1.7) * waveMag + bendX * (t_param * t_param);
-          cz += Math.cos(ai * 1.9 + ri * 1.3 + s * 1.3) * waveMag + bendZ * (t_param * t_param);
-          const segMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, segH, 4), strandMat.clone());
-          segMesh.position.set(cx, cy + segH / 2, cz);
-          segMesh.rotation.x = bendX * 0.3 + Math.sin(s * 1.4 + ai + ri) * 0.2;
-          segMesh.rotation.z = bendZ * 0.3 + Math.cos(s * 1.1 + ai * 0.7 + ri) * 0.2;
-          segMesh.userData._rx0 = segMesh.rotation.x;
-          segMesh.userData._rz0 = segMesh.rotation.z;
-          crossGroup.add(segMesh); segs.push(segMesh);
-          cy += segH;
-        }
-
-        // MB sphere at tip — position depends on conformation
-        const mbY = bentToward ? baseY + h * 0.35 : baseY + h + 0.08;
-        const mb = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 10), mbMat.clone());
-        mb.position.set(cx, mbY, cz);
-        crossGroup.add(mb);
-
-        // Cut stub (for Cas12a cleavage animation)
-        const cleavageTime = 2 + Math.random() * 26;
-        const cutH = h * (0.15 + Math.random() * 0.2);
-        const st = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, cutH, 4), cutMat);
-        st.position.set(x, baseY + cutH / 2, z);
-        st.visible = false; crossGroup.add(st);
-
-        // Detached MB fragment
-        const detachedMB = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8),
-          new THREE.MeshStandardMaterial({ color: 0x2563eb, transparent: true, opacity: 0.65 }));
-        detachedMB.position.set(cx + (Math.random() - 0.5) * 0.6, baseY + h + 1.5 + Math.random() * 3, cz + (Math.random() - 0.5) * 0.6);
-        detachedMB.visible = false; crossGroup.add(detachedMB);
-
-        reporters.push({ segs, mb, stub: st, thiol: th, detachedMB, cleavageTime, bentToward, baseX: x, baseZ: z });
+      // ssDNA segments
+      const segs = [];
+      const nSeg = 5, segH = h / nSeg;
+      let cx = x, cz = z, cy = baseY + 0.04;
+      for (let s = 0; s < nSeg; s++) {
+        const t_param = s / nSeg;
+        cx += Math.sin(i * 2.3 + s * 1.7) * bendMag + bendX * (t_param * t_param);
+        cz += Math.cos(i * 1.9 + s * 1.3) * bendMag + bendZ * (t_param * t_param);
+        const segMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, segH, 4), strandMat.clone());
+        segMesh.position.set(cx, cy + segH / 2, cz);
+        segMesh.rotation.x = bendX * 0.3 + Math.sin(s * 1.4 + i) * 0.15;
+        segMesh.rotation.z = bendZ * 0.3 + Math.cos(s * 1.1 + i * 0.7) * 0.15;
+        segMesh.userData._rx0 = segMesh.rotation.x;
+        segMesh.userData._rz0 = segMesh.rotation.z;
+        archBGroup.add(segMesh); segs.push(segMesh);
+        cy += segH;
       }
-    });
 
-    // ── Solution-phase elements ──
-    // Cas12a:crRNA RNP complexes (green bilobed, ~7 nm)
+      // Silver nanoparticles along the ssDNA
+      const nAg = 2 + Math.floor(Math.random() * 3);
+      const agSpheres = [];
+      for (let ai = 0; ai < nAg; ai++) {
+        const agY = baseY + 0.3 + (ai / nAg) * h * 0.7;
+        const agX = cx + (Math.random() - 0.5) * 0.15;
+        const agZ = cz + (Math.random() - 0.5) * 0.15;
+        const agSize = 0.04 + Math.random() * 0.05;
+        const agSphere = new THREE.Mesh(new THREE.SphereGeometry(agSize, 6, 6), silverMat.clone());
+        agSphere.position.set(agX, agY, agZ);
+        archBGroup.add(agSphere);
+        agSpheres.push(agSphere);
+      }
+
+      // Cut stub and detached silver
+      const cleavageTime = 2 + Math.random() * 26;
+      const cutH = h * (0.15 + Math.random() * 0.15);
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, cutH, 4), cutMat);
+      st.position.set(x, baseY + cutH / 2, z);
+      st.visible = false; archBGroup.add(st);
+
+      const detachedAg = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6),
+        new THREE.MeshStandardMaterial({ color: 0xC0C0C0, transparent: true, opacity: 0.5 }));
+      detachedAg.position.set(cx + (Math.random() - 0.5) * 0.5, baseY + h + 1.5 + Math.random() * 2, cz + (Math.random() - 0.5) * 0.5);
+      detachedAg.visible = false; archBGroup.add(detachedAg);
+
+      reporters.push({ segs, agSpheres, stub: st, detachedMB: detachedAg, cleavageTime, baseX: x, baseZ: z, archGroup: "B" });
+    }
+
+    // ────────────────────────────────────────
+    // Architecture A: Vertical-flow ALP
+    // ────────────────────────────────────────
+    const archAGroup = new THREE.Group();
+    archAGroup.visible = false;
+    crossGroup.add(archAGroup);
+
+    // Nitrocellulose membrane layer above LIG-E
+    addAt(archAGroup, new THREE.Mesh(new THREE.CylinderGeometry(secR, secR, 0.6, 32),
+      new THREE.MeshStandardMaterial({ color: 0xF0EDE5, roughness: 0.8, transparent: true, opacity: 0.7 })), 0, baseY + 1.5, 0);
+    addAt(archAGroup, makeSprite("Nitrocellulose", "#888", 7), secR + 1.0, baseY + 1.5, 0);
+
+    // Anti-DIG Y-shaped antibodies on nitrocellulose
+    const abMat = new THREE.MeshStandardMaterial({ color: 0x8B5CF6, roughness: 0.5 });
+    for (let i = 0; i < 15; i++) {
+      const a = Math.random() * Math.PI * 2, rr = Math.random() * (secR - 0.5);
+      const abX = Math.cos(a) * rr, abZ = Math.sin(a) * rr;
+      // Y stem
+      addAt(archAGroup, new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.25, 3), abMat), abX, baseY + 1.95, abZ);
+      // Y arms
+      addAt(archAGroup, new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.15, 3), abMat), abX - 0.06, baseY + 2.15, abZ).rotation.z = 0.5;
+      addAt(archAGroup, new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.15, 3), abMat), abX + 0.06, baseY + 2.15, abZ).rotation.z = -0.5;
+    }
+
+    // pAP molecules (green dots in solution)
+    const papMat = new THREE.MeshStandardMaterial({ color: 0x34D399, emissive: 0x115533, emissiveIntensity: 0.3, transparent: true, opacity: 0.7 });
+    for (let i = 0; i < 20; i++) {
+      const px = (Math.random() - 0.5) * (secR * 1.4);
+      const pz = (Math.random() - 0.5) * (secR * 1.4);
+      addAt(archAGroup, new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), papMat),
+        px, baseY + 2.8 + Math.random() * 2, pz);
+    }
+
+    // ────────────────────────────────────────
+    // Architecture C: Direct MB-ssDNA
+    // ────────────────────────────────────────
+    const archCGroup = new THREE.Group();
+    archCGroup.visible = false;
+    crossGroup.add(archCGroup);
+
+    // Pyrene monolayer (same as B)
+    for (let i = 0; i < 50; i++) {
+      const a = Math.random() * Math.PI * 2, rr = Math.random() * (secR - 0.3);
+      const pym = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.02, 0.06), pyreneMat);
+      pym.position.set(Math.cos(a) * rr, baseY, Math.sin(a) * rr);
+      pym.rotation.y = Math.random() * Math.PI;
+      archCGroup.add(pym);
+    }
+
+    // ssDNA-MB probes (like old MB-ssDNA)
+    const mbMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, emissive: 0x1a3a6b, emissiveIntensity: 0.3 });
+    const reportersC = [];
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2, rr = Math.random() * (secR - 0.4);
+      const x = Math.cos(a) * rr, z = Math.sin(a) * rr;
+      const h = 1.3 + Math.random() * 0.7;
+      const rnd = Math.random();
+      const bentToward = rnd < 0.3;
+      const bendMag = bentToward ? 0.14 : 0.05;
+      const bendX = (Math.random() - 0.5) * (bentToward ? 1.0 : 0.3);
+      const bendZ = (Math.random() - 0.5) * (bentToward ? 1.0 : 0.3);
+
+      addAt(archCGroup, new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), pyreneMat), x, baseY, z);
+
+      const segs = [];
+      const nSeg = 6, segH = h / nSeg;
+      let cx = x, cz = z, cy = baseY + 0.04;
+      for (let s = 0; s < nSeg; s++) {
+        const t_param = s / nSeg;
+        cx += Math.sin(i * 2.1 + s * 1.6) * bendMag + bendX * (t_param * t_param);
+        cz += Math.cos(i * 1.7 + s * 1.2) * bendMag + bendZ * (t_param * t_param);
+        const segMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, segH, 4), strandMat.clone());
+        segMesh.position.set(cx, cy + segH / 2, cz);
+        segMesh.rotation.x = bendX * 0.3 + Math.sin(s * 1.4 + i) * 0.15;
+        segMesh.rotation.z = bendZ * 0.3 + Math.cos(s * 1.1 + i) * 0.15;
+        segMesh.userData._rx0 = segMesh.rotation.x;
+        segMesh.userData._rz0 = segMesh.rotation.z;
+        archCGroup.add(segMesh); segs.push(segMesh);
+        cy += segH;
+      }
+
+      // MB sphere at tip
+      const mbY = bentToward ? baseY + h * 0.35 : baseY + h + 0.06;
+      const mb = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 10), mbMat.clone());
+      mb.position.set(cx, mbY, cz);
+      archCGroup.add(mb);
+
+      const cleavageTime = 2 + Math.random() * 26;
+      const cutH = h * (0.15 + Math.random() * 0.2);
+      const st = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, cutH, 4), cutMat);
+      st.position.set(x, baseY + cutH / 2, z);
+      st.visible = false; archCGroup.add(st);
+
+      const detMB = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8),
+        new THREE.MeshStandardMaterial({ color: 0x2563eb, transparent: true, opacity: 0.6 }));
+      detMB.position.set(cx + (Math.random() - 0.5) * 0.5, baseY + h + 1.5 + Math.random() * 2, cz + (Math.random() - 0.5) * 0.5);
+      detMB.visible = false; archCGroup.add(detMB);
+
+      reportersC.push({ segs, mb, stub: st, detachedMB: detMB, cleavageTime, bentToward, baseX: x, baseZ: z, archGroup: "C" });
+    }
+
+    // ── Solution-phase elements (shared) ──
     const rnpMat = new THREE.MeshStandardMaterial({ color: 0x33AA55, emissive: 0x115522, emissiveIntensity: 0.2, transparent: true, opacity: 0.75 });
     const rnps = [];
     for (let i = 0; i < 8; i++) {
@@ -576,94 +628,69 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
       rnps.push(rnp);
     }
 
-    // RPA amplicon dsDNA (double helix)
+    // RPA amplicon dsDNA
     const ampliconGroup = new THREE.Group();
     ampliconGroup.visible = false;
     const helixMat1 = new THREE.MeshStandardMaterial({ color: 0x5577CC, transparent: true, opacity: 0.6 });
     const helixMat2 = new THREE.MeshStandardMaterial({ color: 0xCC5577, transparent: true, opacity: 0.6 });
-    for (let t = 0; t < 30; t++) {
-      const angle = t * 0.4;
-      const y = baseY + 5.5 + t * 0.08;
-      addAt(ampliconGroup, new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), helixMat1),
-        Math.cos(angle) * 0.15, y, Math.sin(angle) * 0.15);
-      addAt(ampliconGroup, new THREE.Mesh(new THREE.SphereGeometry(0.05, 4, 4), helixMat2),
-        Math.cos(angle + Math.PI) * 0.15, y, Math.sin(angle + Math.PI) * 0.15);
+    for (let t = 0; t < 20; t++) {
+      const angle = t * 0.5;
+      const y = baseY + 5.5 + t * 0.07;
+      addAt(ampliconGroup, new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), helixMat1),
+        Math.cos(angle) * 0.12, y, Math.sin(angle) * 0.12);
+      addAt(ampliconGroup, new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), helixMat2),
+        Math.cos(angle + Math.PI) * 0.12, y, Math.sin(angle + Math.PI) * 0.12);
     }
     crossGroup.add(ampliconGroup);
 
-    // ── Scale bars (left side) ──
+    // ── Scale bars ──
     const sbMat = new THREE.MeshBasicMaterial({ color: 0x888888 });
-    // Kapton: 0 → 4.0
     addAt(crossGroup, new THREE.Mesh(new THREE.BoxGeometry(0.03, 4.0, 0.03), sbMat), -secR - 0.8, 2.0, 0);
     addAt(crossGroup, new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.03), sbMat), -secR - 0.8, 0.0, 0);
     addAt(crossGroup, new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.03, 0.03), sbMat), -secR - 0.8, 4.0, 0);
-    addAt(crossGroup, makeSprite("125 µm", "#777", 9), -secR - 1.7, 2.0, 0);
-    // LIG: 4.0 → 4.8
+    addAt(crossGroup, makeSprite("390 µm", "#777", 9), -secR - 1.7, 2.0, 0);
     addAt(crossGroup, new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.8, 0.03), sbMat), -secR - 0.5, 4.4, 0);
     addAt(crossGroup, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, 0.03), sbMat), -secR - 0.5, 4.0, 0);
     addAt(crossGroup, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.03, 0.03), sbMat), -secR - 0.5, 4.8, 0);
-    addAt(crossGroup, makeSprite("20–50 µm", "#777", 8), -secR - 1.6, 4.4, 0);
+    addAt(crossGroup, makeSprite("LIG-E", "#777", 8), -secR - 1.4, 4.4, 0);
 
     // ══════════════════════════════════════════════════════════
-    // MODE 3: SIDE PROFILE VIEW
+    // MODE 3: SIDE PROFILE — Cellulose + LIG-E
     // ══════════════════════════════════════════════════════════
     const sideGroup = new THREE.Group();
     sideGroup.visible = false;
     scene.add(sideGroup);
 
-    // Side profile: show layered cross-section of full chip assembly
-    const sW = 60, sKapH = 2.5, sLigH = 0.4, sPassH = 0.15, sCocH = 1.2;
-    // Kapton base
-    addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(sW, sKapH, 8),
-      new THREE.MeshStandardMaterial({ color: 0xD4A843, roughness: 0.3 })), 0, sKapH / 2, 0);
-    // LIG patterns on top (discontinuous — only where electrodes are)
+    const sW = 40, sCelH = 3.0, sLigH = 0.4, sWaxH = 0.15;
+    // Cellulose base
+    addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(sW, sCelH, 8),
+      new THREE.MeshStandardMaterial({ color: 0xF5F0E8, roughness: 0.85 })), 0, sCelH / 2, 0);
+    // LIG-E patches (embedded in surface)
     for (let i = 0; i < 7; i++) {
-      const lx = -18 + i * 5;
-      addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(3, sLigH, 8),
-        new THREE.MeshStandardMaterial({ color: 0x2D2D2D, roughness: 0.85 })), lx, sKapH + sLigH / 2, 0);
-      // Pore dots on LIG
-      for (let p = 0; p < 5; p++) {
-        addAt(sideGroup, new THREE.Mesh(new THREE.SphereGeometry(0.04, 4, 4), poreMat),
-          lx + (Math.random() - 0.5) * 2.5, sKapH + sLigH + 0.02, (Math.random() - 0.5) * 6);
-      }
+      const lx = -12 + i * 3.5;
+      addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(2.5, sLigH, 8),
+        new THREE.MeshStandardMaterial({ color: 0x2D2D2D, roughness: 0.85 })), lx, sCelH - sLigH / 2, 0);
     }
-    // Passivation layer
-    addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(sW, sPassH, 8),
-      new THREE.MeshStandardMaterial({ color: 0x1a2744, transparent: true, opacity: 0.35 })), 0, sKapH + sLigH + sPassH / 2, 0);
-    // Openings in passivation (show as gaps)
-    for (let i = 0; i < 3; i++) {
-      const ox = -8 + i * 5;
-      addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(3.2, sPassH + 0.01, 8.1),
-        new THREE.MeshStandardMaterial({ color: 0xD4A843, transparent: true, opacity: 0 })), ox, sKapH + sLigH + sPassH / 2, 0);
-    }
-    // COC microfluidic lid with chambers
-    const cocBaseY = sKapH + sLigH + sPassH;
-    addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(sW, sCocH, 8),
-      new THREE.MeshPhysicalMaterial({ color: 0xe8e8e8, transparent: true, opacity: 0.3, roughness: 0.1, clearcoat: 0.5 })), 0, cocBaseY + sCocH / 2, 0);
-    // Chamber cavities (visible inside COC)
-    for (let i = 0; i < 3; i++) {
-      const cx = -8 + i * 5;
-      addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.6, 6),
-        new THREE.MeshStandardMaterial({ color: 0x4488AA, transparent: true, opacity: 0.3 })), cx, cocBaseY + 0.3, 0);
-      // Solution inside chamber
-      addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(3, 0.4, 5.5),
-        new THREE.MeshStandardMaterial({ color: 0x93C5FD, transparent: true, opacity: 0.2 })), cx, cocBaseY + 0.2, 0);
-    }
-    // Contact pads at edge
+    // Wax barriers
     for (let i = 0; i < 6; i++) {
-      addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.15, 1.5), goldMat), -15 + i * 6, sKapH + 0.08, 5);
+      const bx = -10.5 + i * 3.5;
+      addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(0.15, sWaxH, 8.1), waxMat), bx, sCelH + sWaxH / 2, 0);
     }
-    // Scale bars for side view
-    addAt(sideGroup, makeSprite("Kapton 125 µm", "#B8860B", 9), -sW / 2 - 4, sKapH / 2, 0);
-    addAt(sideGroup, makeSprite("LIG 20–50 µm", "#555", 8), -sW / 2 - 4, sKapH + sLigH / 2, 0);
-    addAt(sideGroup, makeSprite("COC lid ~1 mm", "#888", 8), -sW / 2 - 4, cocBaseY + sCocH / 2, 0);
-    addAt(sideGroup, makeSprite("Contact pads →", "#B8860B", 8), 18, sKapH + 0.5, 5);
+    // Contact pads
+    for (let i = 0; i < 6; i++) {
+      addAt(sideGroup, new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.1, 1.2), contactMat), -12 + i * 5, sCelH + 0.05, 5);
+    }
+    // Labels
+    addAt(sideGroup, makeSprite("Cellulose CF3, 390 µm", "#8B7355", 8), -sW / 2 - 4, sCelH / 2, 0);
+    addAt(sideGroup, makeSprite("LIG-E, 23 Ω/sq", "#555", 7), -sW / 2 - 4, sCelH - sLigH / 2, 0);
+    addAt(sideGroup, makeSprite("Wax barriers", "#3D2B1F", 7), -sW / 2 - 4, sCelH + sWaxH, 0);
+    addAt(sideGroup, makeSprite("Contact pads →", "#666", 7), 12, sCelH + 0.5, 5);
 
     // ══════════════════════════════════════════════════════════
     // CAMERA ORBIT
     // ══════════════════════════════════════════════════════════
-    let orbit = { theta: 0.3, phi: -0.45, dist: 80, target: new THREE.Vector3(0, 0, 0) };
-    let tgtOrbit = { theta: 0.3, phi: -0.45, dist: 80, target: new THREE.Vector3(0, 0, 0) };
+    let orbit = { theta: 0.3, phi: -0.45, dist: 60, target: new THREE.Vector3(0, 0, 0) };
+    let tgtOrbit = { theta: 0.3, phi: -0.45, dist: 60, target: new THREE.Vector3(0, 0, 0) };
     let isDragging = false, prevMouse = { x: 0, y: 0 };
     const canvas = renderer.domElement;
     const raycaster = new THREE.Raycaster();
@@ -696,7 +723,7 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
       tgtOrbit.phi = Math.max(-1.3, Math.min(-0.08, tgtOrbit.phi + dy * 0.005));
       prevMouse = { x: p.clientX, y: p.clientY };
     };
-    const onWheel = (e) => { e.preventDefault(); tgtOrbit.dist = Math.max(12, Math.min(150, tgtOrbit.dist + e.deltaY * 0.08)); };
+    const onWheel = (e) => { e.preventDefault(); tgtOrbit.dist = Math.max(12, Math.min(120, tgtOrbit.dist + e.deltaY * 0.06)); };
     const onClick = (e) => {
       const rect = canvas.getBoundingClientRect();
       const mx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -729,15 +756,29 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
       camera.position.z = orbit.target.z + orbit.dist * Math.cos(orbit.theta) * Math.cos(orbit.phi);
       camera.lookAt(orbit.target);
 
-      // Animate reporters (floppy thermal motion)
+      // Animate reporters (Architecture B — silver)
       reporters.forEach((r, i) => {
+        r.segs.forEach((seg, si) => {
+          if (seg.visible) {
+            seg.rotation.x = seg.userData._rx0 + Math.sin(time * 1.9 + i * 0.7 + si * 0.5) * 0.05;
+            seg.rotation.z = seg.userData._rz0 + Math.cos(time * 1.5 + i * 1.1 + si * 0.3) * 0.05;
+          }
+        });
+        if (r.detachedMB.visible) {
+          r.detachedMB.position.y += Math.sin(time * 0.5 + i) * 0.002;
+          r.detachedMB.position.x += Math.sin(time * 0.3 + i * 1.3) * 0.001;
+        }
+      });
+
+      // Animate reporters (Architecture C — MB)
+      reportersC.forEach((r, i) => {
         r.segs.forEach((seg, si) => {
           if (seg.visible) {
             seg.rotation.x = seg.userData._rx0 + Math.sin(time * 1.9 + i * 0.7 + si * 0.5) * 0.06;
             seg.rotation.z = seg.userData._rz0 + Math.cos(time * 1.5 + i * 1.1 + si * 0.3) * 0.06;
           }
         });
-        if (r.mb.visible) r.mb.material.emissiveIntensity = 0.2 + 0.15 * Math.sin(time * 3.14 + i);
+        if (r.mb && r.mb.visible) r.mb.material.emissiveIntensity = 0.2 + 0.15 * Math.sin(time * 3.14 + i);
         if (r.detachedMB.visible) {
           r.detachedMB.position.y += Math.sin(time * 0.5 + i) * 0.002;
           r.detachedMB.position.x += Math.sin(time * 0.3 + i * 1.3) * 0.001;
@@ -750,6 +791,17 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
           rnp.rotation.y += 0.01;
           rnp.position.y += Math.sin(time * 0.7 + i * 2) * 0.003;
           rnp.position.x += Math.cos(time * 0.4 + i * 1.5) * 0.002;
+        }
+      });
+
+      // Capillary flow particles
+      capillaryParticles.forEach((cp, i) => {
+        if (cp.mesh.visible) {
+          cp.mesh.position.x += cp.speed;
+          cp.mesh.position.y += Math.sin(time * 2 + i) * 0.005;
+          if (cp.mesh.position.x > gridOriginX + 6 * colSpacing + 3) {
+            cp.mesh.position.x = gridOriginX - 2;
+          }
         }
       });
 
@@ -766,8 +818,9 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     window.addEventListener("resize", onResize);
 
     stateRef.current = {
-      chipGroup, crossGroup, sideGroup, fluidicsGroup, passivMesh, labelSprites,
-      reporters, padMeshes, rnps, ampliconGroup, orbit, tgtOrbit,
+      chipGroup, crossGroup, sideGroup, fluidicsGroup, waxGroup, labelSprites,
+      reporters, reportersC, padMeshes, rnps, ampliconGroup, orbit, tgtOrbit,
+      archAGroup, archBGroup, archCGroup, capillaryParticles,
       _hovIdx: -1,
       _selectPad: (idx, target) => { setSelectedPad({ idx, target }); setMode(2); },
       _toMode1: () => { setMode(1); setSelectedPad(null); setCas12aActive(false); },
@@ -795,54 +848,79 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     s.crossGroup.visible = mode === 2;
     s.sideGroup.visible = mode === 3;
     if (mode === 1) {
-      s.tgtOrbit.dist = 80; s.tgtOrbit.theta = 0.3; s.tgtOrbit.phi = -0.45;
+      s.tgtOrbit.dist = 60; s.tgtOrbit.theta = 0.3; s.tgtOrbit.phi = -0.45;
       s.tgtOrbit.target = new THREE.Vector3(0, 0, 0);
     } else if (mode === 2) {
       s.tgtOrbit.dist = 18; s.tgtOrbit.theta = 0.4; s.tgtOrbit.phi = -0.3;
       s.tgtOrbit.target = new THREE.Vector3(0, 4.5, 0);
     } else if (mode === 3) {
-      s.tgtOrbit.dist = 30; s.tgtOrbit.theta = 0.0; s.tgtOrbit.phi = -0.1;
+      s.tgtOrbit.dist = 25; s.tgtOrbit.theta = 0.0; s.tgtOrbit.phi = -0.1;
       s.tgtOrbit.target = new THREE.Vector3(0, 2, 0);
     }
   }, [mode, selectedPad]);
 
   // ── Toggle visibility ──
+  useEffect(() => { const s = stateRef.current; if (s?.fluidicsGroup) s.fluidicsGroup.visible = showFluidics; }, [showFluidics]);
+  useEffect(() => { const s = stateRef.current; if (s?.waxGroup) s.waxGroup.visible = showWaxBarriers; }, [showWaxBarriers]);
+  useEffect(() => { const s = stateRef.current; if (s?.labelSprites) s.labelSprites.forEach(l => { l.visible = showLabels; }); }, [showLabels]);
   useEffect(() => {
     const s = stateRef.current;
-    if (s?.fluidicsGroup) s.fluidicsGroup.visible = showMicrofluidics;
-  }, [showMicrofluidics]);
+    if (s?.capillaryParticles) s.capillaryParticles.forEach(cp => { cp.mesh.visible = showCapillaryFlow; });
+  }, [showCapillaryFlow]);
 
+  // ── Architecture switching ──
   useEffect(() => {
     const s = stateRef.current;
-    if (s?.passivMesh) s.passivMesh.visible = showPassivation;
-  }, [showPassivation]);
-
-  useEffect(() => {
-    const s = stateRef.current;
-    if (s?.labelSprites) s.labelSprites.forEach(l => { l.visible = showLabels; });
-  }, [showLabels]);
+    if (!s) return;
+    s.archAGroup.visible = arch === "A";
+    s.archBGroup.visible = arch === "B";
+    s.archCGroup.visible = arch === "C";
+  }, [arch]);
 
   // ── Progressive Cas12a cleavage ──
   useEffect(() => {
     const s = stateRef.current;
     if (!s) return;
-    s.reporters.forEach(r => {
-      if (cas12aActive) {
-        const cleaved = incubationMin >= r.cleavageTime;
-        r.segs.forEach(seg => { seg.visible = !cleaved; });
-        r.mb.visible = !cleaved;
-        r.stub.visible = cleaved;
-        r.detachedMB.visible = cleaved;
-      } else {
-        r.segs.forEach(seg => { seg.visible = true; });
-        r.mb.visible = true;
-        r.stub.visible = false;
-        r.detachedMB.visible = false;
-      }
-    });
+
+    // Architecture B reporters (silver)
+    if (arch === "B") {
+      s.reporters.forEach(r => {
+        if (cas12aActive) {
+          const cleaved = incubationMin >= r.cleavageTime;
+          r.segs.forEach(seg => { seg.visible = !cleaved; });
+          r.agSpheres.forEach(ag => { ag.visible = !cleaved; });
+          r.stub.visible = cleaved;
+          r.detachedMB.visible = cleaved;
+        } else {
+          r.segs.forEach(seg => { seg.visible = true; });
+          r.agSpheres.forEach(ag => { ag.visible = true; });
+          r.stub.visible = false;
+          r.detachedMB.visible = false;
+        }
+      });
+    }
+
+    // Architecture C reporters (MB)
+    if (arch === "C") {
+      s.reportersC.forEach(r => {
+        if (cas12aActive) {
+          const cleaved = incubationMin >= r.cleavageTime;
+          r.segs.forEach(seg => { seg.visible = !cleaved; });
+          r.mb.visible = !cleaved;
+          r.stub.visible = cleaved;
+          r.detachedMB.visible = cleaved;
+        } else {
+          r.segs.forEach(seg => { seg.visible = true; });
+          r.mb.visible = true;
+          r.stub.visible = false;
+          r.detachedMB.visible = false;
+        }
+      });
+    }
+
     s.rnps.forEach(rnp => { rnp.visible = cas12aActive; });
     s.ampliconGroup.visible = cas12aActive;
-  }, [cas12aActive, incubationMin]);
+  }, [cas12aActive, incubationMin, arch]);
 
   // ── Computed data for selected pad ──
   const selTarget = selectedPad ? ELECTRODE_TARGETS[selectedPad.idx] : null;
@@ -858,11 +936,11 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     return ((1 - G / echemGamma0_mol) * 100).toFixed(1);
   })() : null;
 
-  // ── Curve data ──
+  // ── Architecture-dependent curve data ──
+  const am = ARCH_META[arch];
   const curveData = selectedPad ? (() => {
     const G_after = computeGamma(incubationMin * 60, getEfficiency(selectedPad.target), echemKtrans);
-    if (curveMode === "SWV") return { before: miniSWV(echemGamma0_mol, echemGamma0_mol), after: miniSWV(G_after, echemGamma0_mol) };
-    if (curveMode === "DPV") return { before: miniDPV(echemGamma0_mol, echemGamma0_mol), after: miniDPV(G_after, echemGamma0_mol) };
+    if (curveMode === "SWV") return { before: am.swv(echemGamma0_mol, echemGamma0_mol), after: am.swv(G_after, echemGamma0_mol) };
     if (curveMode === "EIS") return { before: miniEIS(echemGamma0_mol, echemGamma0_mol), after: miniEIS(G_after, echemGamma0_mol) };
     return null;
   })() : null;
@@ -888,7 +966,83 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     }).join(" ");
   };
 
-  const cleavedCount = cas12aActive && reporters.length > 0 ? Math.round(reporters.length * Math.min(1, incubationMin / 28)) : 0;
+  const allReporters = arch === "B" ? reporters : arch === "C" ? reportersC : [];
+  const cleavedCount = cas12aActive && allReporters.length > 0 ? Math.round(allReporters.length * Math.min(1, incubationMin / 28)) : 0;
+
+  // Architecture-dependent layer labels
+  const LAYER_LABELS = {
+    A: [
+      { label: "Streptavidin-ALP enzyme", color: "#8B5CF6", dim: "" },
+      { label: "Anti-DIG antibodies (nitrocellulose)", color: "#8B5CF6", dim: "" },
+      { label: "Biotin-DIG reporters (solution)", color: "#60A5FA", dim: "" },
+      { label: "LIG-E (23 ± 2 Ω/sq, porous, hydrophilic)", color: "#2D2D2D", dim: "" },
+      { label: "Cellulose CF3 ((NH₄)SO₃NH₂ pre-treated)", color: "#F5F0E8", dim: "390 µm" },
+    ],
+    B: [
+      { label: "Ag deposits (Ag⁰ → Ag⁺ + e⁻ at +0.16 V)", color: "#C0C0C0", dim: "" },
+      { label: "ssDNA probe (zone-specific, amine-terminated)", color: "#60A5FA", dim: "" },
+      { label: "Pyrene-NHS (PBASE, π-π on graphene, ~74 kJ/mol)", color: "#F59E0B", dim: "" },
+      { label: "LIG-E (23 Ω/sq, cellulose-derived, porous)", color: "#2D2D2D", dim: "" },
+      { label: "Cellulose paper (CF3, (NH₄)SO₃NH₂ pre-treated)", color: "#F5F0E8", dim: "390 µm" },
+    ],
+    C: [
+      { label: "MB (E° = −0.22 V, n = 2e⁻)", color: "#2563eb", dim: "" },
+      { label: "ssDNA-MB probe (pyrene-tethered)", color: "#60A5FA", dim: "" },
+      { label: "Pyrene-NHS (PBASE, π-π stacking)", color: "#F59E0B", dim: "" },
+      { label: "LIG-E (23 Ω/sq, hydrophilic)", color: "#2D2D2D", dim: "" },
+      { label: "Cellulose paper (CF3, 390 µm)", color: "#F5F0E8", dim: "390 µm" },
+    ],
+  };
+
+  // Architecture-dependent electron transfer SVG
+  const eTransferSVG = {
+    A: (
+      <svg width={100} height={40} viewBox="0 0 100 40">
+        <rect x={0} y={32} width={100} height={8} fill="#374151" rx={1} opacity={0.6} />
+        <text x={50} y={38} fontSize="4" fill="#999" textAnchor="middle">LIG-E surface</text>
+        <circle cx={30} cy={15} r={4} fill="#34D399" />
+        <text x={30} y={16.5} fontSize="3.5" fill="#fff" textAnchor="middle">pAP</text>
+        <path d="M30,19 L30,32" stroke="#34D399" strokeWidth="1" strokeDasharray="2,1" />
+        <text x={42} y={24} fontSize="3.5" fill="#16A34A">e⁻ →</text>
+        <circle cx={70} cy={8} r={3} fill="#8B5CF6" />
+        <text x={70} y={9.5} fontSize="3" fill="#fff" textAnchor="middle">ALP</text>
+        <path d="M67,10 L50,18 L33,15" stroke="#8B5CF6" strokeWidth="0.5" strokeDasharray="1,1" fill="none" />
+        <text x={80} y={8} fontSize="3.5" fill="#8B5CF6">p-APP→pAP</text>
+      </svg>
+    ),
+    B: (
+      <svg width={100} height={40} viewBox="0 0 100 40">
+        <rect x={0} y={32} width={100} height={8} fill="#374151" rx={1} opacity={0.6} />
+        <text x={50} y={38} fontSize="4" fill="#999" textAnchor="middle">LIG-E (graphene)</text>
+        <line x1={25} y1={32} x2={25} y2={10} stroke="#60A5FA" strokeWidth="1" />
+        <circle cx={22} cy={15} r={3} fill="#C0C0C0" />
+        <circle cx={28} cy={20} r={2.5} fill="#C0C0C0" />
+        <text x={12} y={22} fontSize="3.5" fill="#C0C0C0">Ag⁰</text>
+        <path d="M28,22 L40,30" stroke="#16A34A" strokeWidth="1" strokeDasharray="2,1" />
+        <text x={42} y={28} fontSize="3.5" fill="#16A34A">Ag⁰→Ag⁺+e⁻</text>
+        <text x={5} y={8} fontSize="3.5" fill="#60A5FA">ssDNA scaffold</text>
+        <rect x={23} y={31} width={4} height={2} fill="#F59E0B" rx={0.5} />
+        <text x={32} y={33} fontSize="3" fill="#F59E0B">pyrene π-π</text>
+      </svg>
+    ),
+    C: (
+      <svg width={100} height={40} viewBox="0 0 100 40">
+        <rect x={0} y={32} width={100} height={8} fill="#374151" rx={1} opacity={0.6} />
+        <text x={50} y={38} fontSize="4" fill="#999" textAnchor="middle">LIG-E (graphene)</text>
+        <path d="M20,32 Q18,20 22,10" fill="none" stroke="#60A5FA" strokeWidth="1" />
+        <circle cx={22} cy={10} r={3} fill="#2563eb" />
+        <text x={22} y={11.5} fontSize="3" fill="#fff" textAnchor="middle">MB</text>
+        <text x={10} y={20} fontSize="3.5" fill="#16A34A">⚡ e⁻</text>
+        <text x={5} y={6} fontSize="3.5" fill="#16A34A">&lt;2 nm</text>
+        <path d="M65,32 Q63,22 68,4" fill="none" stroke="#60A5FA" strokeWidth="1" />
+        <circle cx={68} cy={4} r={3} fill="#2563eb" />
+        <text x={68} y={5.5} fontSize="3" fill="#fff" textAnchor="middle">MB</text>
+        <text x={74} y={10} fontSize="3.5" fill="#ef4444">✗ too far</text>
+        <rect x={18} y={31} width={4} height={2} fill="#F59E0B" rx={0.5} />
+        <text x={28} y={33} fontSize="3" fill="#F59E0B">pyrene</text>
+      </svg>
+    ),
+  };
 
   // ══════════════════════════════════════════════════════════
   // RENDER
@@ -903,14 +1057,15 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
           <div style={{ position: "absolute", top: 12, left: 16, fontSize: 14, fontWeight: 700, color: "#111827", fontFamily: HEADING, textShadow: "0 1px 3px rgba(255,255,255,0.9)" }}>
             GUARD 14-Plex MDR-TB Chip
           </div>
-          <div style={{ position: "absolute", top: 12, right: 16, display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ position: "absolute", top: 12, right: 16, display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
             {[
-              { label: "Fluidics", active: showMicrofluidics, toggle: () => setShowMicrofluidics(!showMicrofluidics) },
-              { label: "Passivation", active: showPassivation, toggle: () => setShowPassivation(!showPassivation) },
+              { label: "Fluidics", active: showFluidics, toggle: () => setShowFluidics(!showFluidics) },
+              { label: "Wax Barriers", active: showWaxBarriers, toggle: () => setShowWaxBarriers(!showWaxBarriers) },
               { label: "Labels", active: showLabels, toggle: () => setShowLabels(!showLabels) },
+              { label: "Capillary Flow", active: showCapillaryFlow, toggle: () => setShowCapillaryFlow(!showCapillaryFlow) },
             ].map(b => (
               <button key={b.label} onClick={b.toggle} style={{
-                fontSize: 9, fontWeight: 600, padding: "3px 10px", borderRadius: 4,
+                fontSize: 8, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
                 border: "1px solid #D1D5DB", cursor: "pointer", fontFamily: MONO,
                 background: b.active ? "rgba(51,136,170,0.15)" : "rgba(255,255,255,0.88)",
                 color: b.active ? "#1a6680" : "#6B7280",
@@ -919,7 +1074,7 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
               </button>
             ))}
             <button onClick={() => setMode(3)} style={{
-              fontSize: 9, fontWeight: 600, padding: "3px 10px", borderRadius: 4,
+              fontSize: 8, fontWeight: 600, padding: "2px 8px", borderRadius: 4,
               border: "1px solid #D1D5DB", cursor: "pointer", fontFamily: MONO,
               background: "rgba(255,255,255,0.88)", color: "#6B7280",
             }}>
@@ -927,23 +1082,37 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
             </button>
           </div>
 
+          {/* Architecture toggle */}
+          <div style={{ position: "absolute", top: 40, right: 16, display: "flex", gap: 2 }}>
+            {["A", "B", "C"].map(a => (
+              <button key={a} onClick={() => setArch(a)} style={{
+                fontSize: 8, fontWeight: arch === a ? 700 : 500, padding: "2px 8px", borderRadius: 3,
+                border: arch === a ? "1px solid #374151" : "1px solid #D1D5DB", cursor: "pointer", fontFamily: MONO,
+                background: arch === a ? "#374151" : "rgba(255,255,255,0.9)",
+                color: arch === a ? "#fff" : "#6B7280",
+              }}>
+                {a}: {ARCH_META[a].short}
+              </button>
+            ))}
+          </div>
+
           {/* Drug class legend */}
-          <div style={{ position: "absolute", bottom: 12, left: 16, display: "flex", gap: 5, flexWrap: "wrap" }}>
+          <div style={{ position: "absolute", bottom: 12, left: 16, display: "flex", gap: 4, flexWrap: "wrap" }}>
             {[
               { d: "TB ID", c: "#22d3ee" }, { d: "RIF", c: "#ef4444" }, { d: "INH", c: "#f97316" },
               { d: "EMB", c: "#eab308" }, { d: "PZA", c: "#eab308" }, { d: "FQ", c: "#a855f7" },
               { d: "KAN/AMK", c: "#ec4899" }, { d: "Human Ctrl", c: "#22d3ee" },
             ].map(l => (
-              <span key={l.d} style={{ fontSize: 8, fontWeight: 700, fontFamily: MONO, display: "flex", alignItems: "center", gap: 3, background: "rgba(255,255,255,0.9)", padding: "2px 6px", borderRadius: 3 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: l.c, display: "inline-block" }} />{l.d}
+              <span key={l.d} style={{ fontSize: 7, fontWeight: 700, fontFamily: MONO, display: "flex", alignItems: "center", gap: 2, background: "rgba(255,255,255,0.9)", padding: "1px 5px", borderRadius: 3 }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: l.c, display: "inline-block" }} />{l.d}
               </span>
             ))}
           </div>
 
-          {/* Chip specs */}
-          <div style={{ position: "absolute", bottom: 12, right: 16, display: "flex", gap: 6, alignItems: "center" }}>
-            <span style={{ fontSize: 8, color: "#6B7280", background: "rgba(255,255,255,0.9)", padding: "2px 7px", borderRadius: 3, fontFamily: MONO }}>
-              60 × 30 mm · Kapton HN + LIG · 14 WE + CE + RE
+          {/* Chip specs footer */}
+          <div style={{ position: "absolute", bottom: 12, right: 16 }}>
+            <span style={{ fontSize: 7, color: "#6B7280", background: "rgba(255,255,255,0.9)", padding: "2px 6px", borderRadius: 3, fontFamily: MONO }}>
+              ~40 × 25 mm · Cellulose CF3 + LIG-E · 14 WE + CE + RE · Pyrene-ssDNA · SWV readout
             </span>
           </div>
         </>
@@ -953,191 +1122,141 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
       {mode === 2 && selectedPad && (
         <>
           {/* Info panel */}
-          <div style={{ position: "absolute", top: 12, left: 16, background: "rgba(255,255,255,0.95)", padding: "12px 16px", borderRadius: 8, border: "1px solid #E3E8EF", maxWidth: 300, backdropFilter: "blur(8px)" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#111827", fontFamily: HEADING }}>
+          <div style={{ position: "absolute", top: 12, left: 16, background: "rgba(255,255,255,0.95)", padding: "10px 14px", borderRadius: 8, border: "1px solid #E3E8EF", maxWidth: 280, backdropFilter: "blur(8px)" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", fontFamily: HEADING }}>
               {selectedPad.target} · <span style={{ color: DRUG_CSS[selDrug] || "#888" }}>{selDrug}</span>
             </div>
-            <div style={{ fontSize: 10, color: "#6B7280", fontFamily: MONO, marginTop: 4, lineHeight: 1.7 }}>
+            <div style={{ fontSize: 9, color: "#6B7280", fontFamily: MONO, marginTop: 3, lineHeight: 1.7 }}>
               S_eff = {selEff?.toFixed(3)}{selScore != null && ` · Score = ${selScore.toFixed(2)}`}{selDisc ? ` · D = ${selDisc.toFixed(1)}×` : ""}<br />
               {selStrat} detection
               {selR?.hasPrimers && <span style={{ color: "#16A34A" }}> · RPA primers</span>}
             </div>
             {selR && (
-              <div style={{ fontSize: 9, color: "#9CA3AF", fontFamily: MONO, marginTop: 4, lineHeight: 1.6, borderTop: "1px solid #E3E8EF", paddingTop: 4 }}>
+              <div style={{ fontSize: 8, color: "#9CA3AF", fontFamily: MONO, marginTop: 3, lineHeight: 1.6, borderTop: "1px solid #E3E8EF", paddingTop: 3 }}>
                 {selR.spacer && <div>crRNA: <span style={{ color: "#374151", letterSpacing: "0.5px" }}>{selR.spacer.slice(0, 20)}{selR.spacer.length > 20 ? "…" : ""}</span></div>}
                 {selR.pam && <div>PAM: <span style={{ color: "#374151" }}>{selR.pam}</span>{selR.pamVariant && <span> ({selR.pamVariant})</span>}</div>}
+                {selR.pamDisrupted != null && <div>PAM-overlap: <span style={{ color: selR.pamDisrupted ? "#7c3aed" : "#374151" }}>{selR.pamDisrupted ? "yes — binary disc" : "no"}</span></div>}
+                {selR.amplicon && <div>Amplicon: <span style={{ color: selR.amplicon <= 120 ? "#16A34A" : "#ef4444" }}>{selR.amplicon} bp</span>{selR.amplicon <= 120 ? " (cfDNA ✓)" : " (⚠ >120)"}</div>}
                 {deltaI != null && <div>Expected ΔI%: <span style={{ color: "#16A34A", fontWeight: 700 }}>{deltaI}%</span> @ {incubationMin} min</div>}
               </div>
             )}
           </div>
 
-          <button onClick={() => stateRef.current?._toMode1()} style={{ position: "absolute", top: 12, right: 16, fontSize: 11, fontWeight: 600, padding: "7px 16px", borderRadius: 6, border: "1px solid #E3E8EF", background: "#fff", cursor: "pointer", fontFamily: HEADING, color: "#374151" }}>
+          <button onClick={() => stateRef.current?._toMode1()} style={{ position: "absolute", top: 12, right: 16, fontSize: 10, fontWeight: 600, padding: "6px 14px", borderRadius: 6, border: "1px solid #E3E8EF", background: "#fff", cursor: "pointer", fontFamily: HEADING, color: "#374151" }}>
             ← Back to chip
           </button>
 
+          {/* Architecture toggle */}
+          <div style={{ position: "absolute", top: 42, right: 16, display: "flex", gap: 2 }}>
+            {["A", "B", "C"].map(a => (
+              <button key={a} onClick={() => setArch(a)} style={{
+                fontSize: 8, fontWeight: arch === a ? 700 : 500, padding: "2px 8px", borderRadius: 3,
+                border: arch === a ? "1px solid #374151" : "1px solid #D1D5DB", cursor: "pointer", fontFamily: MONO,
+                background: arch === a ? "#374151" : "rgba(255,255,255,0.9)",
+                color: arch === a ? "#fff" : "#6B7280",
+              }}>
+                {a}: {ARCH_META[a].short}
+              </button>
+            ))}
+          </div>
+
           {/* Layer labels */}
-          <div style={{ position: "absolute", left: 16, top: "36%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", gap: 3 }}>
-            {[
-              { label: "MB (E° = −0.22 V, n = 2e⁻)", color: "#2563eb", dim: "~1 nm" },
-              { label: "ssDNA reporter (12–20 nt, poly-T)", color: "#67e8f9", dim: "4–7 nm" },
-              { label: "S–Au thiol bond (~170 kJ/mol)", color: "#FFD700", dim: "" },
-              { label: "C6 spacer (~0.7 nm)", color: "#888", dim: "" },
-              { label: "MCH backfill (C6-OH, hydrophilic)", color: "#9ca3af", dim: "~0.8 nm" },
-              { label: "AuNPs (electrodeposited)", color: "#FFD700", dim: "10–50 nm" },
-              { label: "LIG (~30 Ω/□, ~340 m²/g)", color: "#2D2D2D", dim: "20–50 µm" },
-              { label: "Kapton HN polyimide", color: "#D4A843", dim: "125 µm" },
-            ].map(l => (
-              <div key={l.label} style={{ fontSize: 8, fontFamily: MONO, color: "#374151", background: "rgba(255,255,255,0.92)", padding: "2px 7px", borderRadius: 3, borderLeft: `3px solid ${l.color}`, lineHeight: 1.3 }}>
+          <div style={{ position: "absolute", left: 16, top: "36%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", gap: 2 }}>
+            {(LAYER_LABELS[arch] || []).map(l => (
+              <div key={l.label} style={{ fontSize: 7, fontFamily: MONO, color: "#374151", background: "rgba(255,255,255,0.92)", padding: "2px 6px", borderRadius: 3, borderLeft: `3px solid ${l.color}`, lineHeight: 1.3 }}>
                 ← {l.label}{l.dim && <span style={{ color: "#9CA3AF" }}> ({l.dim})</span>}
               </div>
             ))}
-            <div style={{ fontSize: 7, color: "#B0B0B0", fontFamily: MONO, fontStyle: "italic", marginTop: 2, paddingLeft: 4 }}>
+            <div style={{ fontSize: 6, color: "#B0B0B0", fontFamily: MONO, fontStyle: "italic", marginTop: 1, paddingLeft: 4 }}>
               ⚠ vertical scale exaggerated
             </div>
           </div>
 
           {/* ── Electrochemistry curves panel ── */}
           {curveData && (
-            <div style={{ position: "absolute", bottom: 60, right: 16, background: "rgba(255,255,255,0.96)", padding: "10px 14px", borderRadius: 8, border: "1px solid #E3E8EF", backdropFilter: "blur(8px)", minWidth: 200 }}>
-              {/* Curve mode tabs */}
-              <div style={{ display: "flex", gap: 2, marginBottom: 6 }}>
-                {["DPV", "SWV", "EIS"].map(m => (
+            <div style={{ position: "absolute", bottom: 55, right: 16, background: "rgba(255,255,255,0.96)", padding: "8px 12px", borderRadius: 8, border: "1px solid #E3E8EF", backdropFilter: "blur(8px)", minWidth: 190 }}>
+              <div style={{ display: "flex", gap: 2, marginBottom: 4 }}>
+                {["SWV", "EIS"].map(m => (
                   <button key={m} onClick={() => setCurveMode(m)} style={{
-                    fontSize: 8, fontWeight: curveMode === m ? 700 : 500, fontFamily: MONO,
-                    padding: "2px 10px", borderRadius: 3, border: "none", cursor: "pointer",
+                    fontSize: 7, fontWeight: curveMode === m ? 700 : 500, fontFamily: MONO,
+                    padding: "2px 8px", borderRadius: 3, border: "none", cursor: "pointer",
                     background: curveMode === m ? "#374151" : "#F3F4F6",
                     color: curveMode === m ? "#fff" : "#6B7280",
                   }}>{m}</button>
                 ))}
+                <span style={{ fontSize: 6, color: "#B0B0B0", marginLeft: 4, fontFamily: MONO }}>Signal-{am.sig}</span>
               </div>
 
-              <svg width={200} height={100} viewBox="0 0 200 100">
-                {curveMode !== "EIS" ? (
+              <svg width={190} height={90} viewBox="0 0 190 90">
+                {curveMode === "SWV" ? (
                   <>
-                    <path d={svgPathVolt(curveData.before, 200, 100)} fill="none" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3,2" />
-                    <path d={svgPathVolt(curveData.after, 200, 100)} fill="none" stroke="#ef4444" strokeWidth="1.5" />
-                    <line x1="0" y1="96" x2="200" y2="96" stroke="#D1D5DB" strokeWidth="0.5" />
-                    <text x="2" y="95" fontSize="6" fill="#9CA3AF">−0.05</text>
-                    <text x="160" y="95" fontSize="6" fill="#9CA3AF">−0.40 V</text>
-                    {/* MB peak annotation at -0.22 V */}
-                    <line x1="100" y1="0" x2="100" y2="100" stroke="#E5E7EB" strokeWidth="0.5" strokeDasharray="2,2" />
-                    <text x="102" y="8" fontSize="5.5" fill="#9CA3AF">−0.22 V (MB)</text>
-                    {/* ΔI% annotation */}
-                    {deltaI && <text x="140" y="20" fontSize="7" fill="#ef4444" fontWeight="bold">ΔI = {deltaI}%</text>}
-                    {/* Threshold lines */}
-                    <line x1="0" y1={100 - 5} x2="200" y2={100 - 5} stroke="#d4d4d4" strokeWidth="0.3" strokeDasharray="1,2" />
-                    <text x="170" y={100 - 6} fontSize="4" fill="#d4d4d4">5%</text>
-                    <line x1="0" y1={100 - 30} x2="200" y2={100 - 30} stroke="#d4d4d4" strokeWidth="0.3" strokeDasharray="1,2" />
-                    <text x="170" y={100 - 31} fontSize="4" fill="#d4d4d4">30%</text>
+                    <path d={svgPathVolt(curveData.before, 190, 90)} fill="none" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3,2" />
+                    <path d={svgPathVolt(curveData.after, 190, 90)} fill="none" stroke="#ef4444" strokeWidth="1.5" />
+                    <line x1="0" y1="86" x2="190" y2="86" stroke="#D1D5DB" strokeWidth="0.5" />
+                    <text x="2" y="85" fontSize="5" fill="#9CA3AF">{am.eRange.split(" to ")[0]}</text>
+                    <text x="140" y="85" fontSize="5" fill="#9CA3AF">{am.eRange.split(" to ")[1]} V</text>
+                    <line x1="95" y1="0" x2="95" y2="90" stroke="#E5E7EB" strokeWidth="0.5" strokeDasharray="2,2" />
+                    <text x="97" y="8" fontSize="5" fill="#9CA3AF">{am.peak} ({am.label})</text>
+                    {deltaI && <text x="130" y="20" fontSize="6.5" fill="#ef4444" fontWeight="bold">ΔI = {deltaI}%</text>}
                   </>
                 ) : (
                   <>
-                    <path d={svgPathEIS(curveData.before, 200, 100)} fill="none" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3,2" />
-                    <path d={svgPathEIS(curveData.after, 200, 100)} fill="none" stroke="#ef4444" strokeWidth="1.5" />
-                    <line x1="0" y1="96" x2="200" y2="96" stroke="#D1D5DB" strokeWidth="0.5" />
-                    <text x="2" y="95" fontSize="6" fill="#9CA3AF">Z' (Ω)</text>
-                    <line x1="2" y1="0" x2="2" y2="96" stroke="#D1D5DB" strokeWidth="0.5" />
-                    <text x="4" y="8" fontSize="6" fill="#9CA3AF">−Z'' (Ω)</text>
-                    {/* Randles circuit label */}
-                    <text x="100" y="94" fontSize="5" fill="#B0B0B0" textAnchor="middle">Rs — [Cdl ‖ (Rct — Zw)]</text>
+                    <path d={svgPathEIS(curveData.before, 190, 90)} fill="none" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3,2" />
+                    <path d={svgPathEIS(curveData.after, 190, 90)} fill="none" stroke="#ef4444" strokeWidth="1.5" />
+                    <line x1="0" y1="86" x2="190" y2="86" stroke="#D1D5DB" strokeWidth="0.5" />
+                    <text x="2" y="85" fontSize="5" fill="#9CA3AF">Z' (Ω)</text>
+                    <line x1="2" y1="0" x2="2" y2="86" stroke="#D1D5DB" strokeWidth="0.5" />
+                    <text x="4" y="8" fontSize="5" fill="#9CA3AF">−Z'' (Ω)</text>
                   </>
                 )}
               </svg>
 
-              {/* Legend */}
-              <div style={{ fontSize: 7, color: "#9CA3AF", fontFamily: MONO, display: "flex", gap: 10, marginTop: 3 }}>
+              <div style={{ fontSize: 6, color: "#9CA3AF", fontFamily: MONO, display: "flex", gap: 8, marginTop: 2 }}>
                 <span><span style={{ color: "#93C5FD" }}>---</span> baseline</span>
                 <span><span style={{ color: "#ef4444" }}>—</span> t={incubationMin}m</span>
               </div>
-              {/* Parameters */}
-              <div style={{ fontSize: 6.5, color: "#C0C0C0", fontFamily: MONO, marginTop: 2, lineHeight: 1.4 }}>
-                {curveMode === "DPV" && "Pulse: 50 mV | Width: 50 ms | Step: 4 mV | Window: −0.5 to 0 V"}
-                {curveMode === "SWV" && "Freq: 50 Hz | Amp: 25 mV | Step: 4 mV"}
-                {curveMode === "EIS" && "0.1 Hz – 100 kHz | 10 mV AC | Bias: OCP"}
+              <div style={{ fontSize: 5.5, color: "#C0C0C0", fontFamily: MONO, marginTop: 1 }}>
+                Freq: {am.freq} | Amp: {am.amp} | Step: {am.step}
               </div>
             </div>
           )}
 
-          {/* ── Molecular inset: Thiol-Au bond ── */}
-          <div style={{ position: "absolute", bottom: 60, left: 16, background: "rgba(255,255,255,0.94)", padding: "6px 10px", borderRadius: 6, border: "1px solid #E3E8EF", backdropFilter: "blur(8px)" }}>
-            <div style={{ fontSize: 7, fontWeight: 700, color: "#374151", fontFamily: MONO, marginBottom: 3 }}>Thiol–Au Anchor</div>
-            <svg width={90} height={50} viewBox="0 0 90 50">
-              {/* Au lattice (FCC) */}
-              {[0, 12, 24, 36].map((x, i) => [0, 12].map((y, j) => (
-                <circle key={`au-${i}-${j}`} cx={8 + x} cy={40 - y} r={5} fill="#FFD700" opacity={0.7} />
-              ))).flat()}
-              {/* S atom */}
-              <circle cx={20} cy={22} r={4} fill="#CCAA00" />
-              <text x={20} y={24} fontSize="5" fill="#fff" textAnchor="middle" fontWeight="bold">S</text>
-              {/* C6 spacer */}
-              <line x1={20} y1={18} x2={40} y2={10} stroke="#888" strokeWidth="1.5" />
-              <text x={30} y={8} fontSize="4" fill="#9CA3AF">C6</text>
-              {/* First nucleotide */}
-              <circle cx={45} cy={8} r={3} fill="#67e8f9" />
-              <text x={45} y={9.5} fontSize="3.5" fill="#fff" textAnchor="middle">T</text>
-              <line x1={48} y1={8} x2={60} y2={6} stroke="#67e8f9" strokeWidth="1" />
-              <text x={65} y={7} fontSize="4" fill="#67e8f9">ssDNA →</text>
-              {/* Dimensions */}
-              <text x={5} y={48} fontSize="3.5" fill="#B0B0B0">Au(111)</text>
-              <text x={15} y={16} fontSize="3.5" fill="#CCAA00">170 kJ/mol</text>
-              <text x={28} y={15} fontSize="3.5" fill="#888">0.7 nm</text>
-            </svg>
-          </div>
-
           {/* ── Electron transfer inset ── */}
-          <div style={{ position: "absolute", bottom: 115, left: 16, background: "rgba(255,255,255,0.94)", padding: "6px 10px", borderRadius: 6, border: "1px solid #E3E8EF", backdropFilter: "blur(8px)" }}>
-            <div style={{ fontSize: 7, fontWeight: 700, color: "#374151", fontFamily: MONO, marginBottom: 3 }}>e⁻ Transfer Mechanism</div>
-            <svg width={90} height={35} viewBox="0 0 90 35">
-              {/* Gold surface */}
-              <rect x={0} y={28} width={90} height={7} fill="#FFD700" rx={1} opacity={0.5} />
-              {/* Bent reporter (close — transfers) */}
-              <path d="M20,28 Q18,18 22,12" fill="none" stroke="#67e8f9" strokeWidth="1" />
-              <circle cx={22} cy={12} r={3} fill="#2563eb" />
-              <text x={22} y={13.5} fontSize="3" fill="#fff" textAnchor="middle">MB</text>
-              <text x={10} y={22} fontSize="3.5" fill="#16A34A">⚡ e⁻</text>
-              <text x={5} y={8} fontSize="3.5" fill="#16A34A">&lt;2 nm</text>
-              {/* Extended reporter (far — no transfer) */}
-              <path d="M65,28 Q63,20 68,4" fill="none" stroke="#67e8f9" strokeWidth="1" />
-              <circle cx={68} cy={4} r={3} fill="#2563eb" />
-              <text x={68} y={5.5} fontSize="3" fill="#fff" textAnchor="middle">MB</text>
-              <text x={74} y={10} fontSize="3.5" fill="#ef4444">✗ too far</text>
-              <text x={74} y={15} fontSize="3.5" fill="#ef4444">&gt;3 nm</text>
-              {/* Label */}
-              <text x={45} y={33} fontSize="3.5" fill="#B0B0B0" textAnchor="middle">Au surface</text>
-            </svg>
+          <div style={{ position: "absolute", bottom: 55, left: 16, background: "rgba(255,255,255,0.94)", padding: "5px 8px", borderRadius: 6, border: "1px solid #E3E8EF", backdropFilter: "blur(8px)" }}>
+            <div style={{ fontSize: 6.5, fontWeight: 700, color: "#374151", fontFamily: MONO, marginBottom: 2 }}>e⁻ Transfer — Arch {arch}</div>
+            {eTransferSVG[arch]}
           </div>
 
-          {/* ── Cas12a controls + slider ── */}
-          <div style={{ position: "absolute", bottom: 12, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 12, alignItems: "center", background: "rgba(255,255,255,0.95)", padding: "8px 18px", borderRadius: 8, border: "1px solid #E3E8EF", flexWrap: "wrap", justifyContent: "center", backdropFilter: "blur(8px)" }}>
+          {/* ── Cas12a controls ── */}
+          <div style={{ position: "absolute", bottom: 10, left: "50%", transform: "translateX(-50%)", display: "flex", gap: 10, alignItems: "center", background: "rgba(255,255,255,0.95)", padding: "6px 14px", borderRadius: 8, border: "1px solid #E3E8EF", flexWrap: "wrap", justifyContent: "center", backdropFilter: "blur(8px)" }}>
             <button onClick={() => setCas12aActive(!cas12aActive)} style={{
-              fontSize: 11, fontWeight: 700, padding: "7px 16px", borderRadius: 6, cursor: "pointer", fontFamily: MONO,
-              background: cas12aActive ? "#DC2626" : "#16A34A", color: "#fff", border: "none", transition: "background 0.2s",
+              fontSize: 10, fontWeight: 700, padding: "5px 14px", borderRadius: 6, cursor: "pointer", fontFamily: MONO,
+              background: cas12aActive ? "#DC2626" : "#16A34A", color: "#fff", border: "none",
             }}>
-              {cas12aActive ? "Reset reporters" : "Activate Cas12a"}
+              {cas12aActive ? "Reset" : "Activate Cas12a"}
             </button>
             {cas12aActive && (
-              <div style={{ fontSize: 10, fontFamily: MONO, color: "#6B7280", display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ fontSize: 9, fontFamily: MONO, color: "#6B7280", display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={{ fontWeight: 700, color: "#16A34A" }}>ΔI% = {deltaI}%</span>
-                <span style={{ color: "#9CA3AF" }}>·</span>
-                <span style={{ color: "#33AA55" }}>{cleavedCount}/{reporters.length} cleaved</span>
+                <span style={{ color: "#33AA55" }}>{cleavedCount}/{allReporters.length} cleaved</span>
               </div>
             )}
-            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 9, color: "#6B7280", fontFamily: MONO }}>t =</span>
-              <input type="range" min="0" max="30" step="1" value={incubationMin} onChange={e => setIncubationMin(+e.target.value)} style={{ width: 90, accentColor: "#374151" }} />
-              <span style={{ fontSize: 10, fontWeight: 700, fontFamily: MONO, color: "#374151", minWidth: 36 }}>{incubationMin} min</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontSize: 8, color: "#6B7280", fontFamily: MONO }}>t =</span>
+              <input type="range" min="0" max="30" step="1" value={incubationMin} onChange={e => setIncubationMin(+e.target.value)} style={{ width: 80, accentColor: "#374151" }} />
+              <span style={{ fontSize: 9, fontWeight: 700, fontFamily: MONO, color: "#374151", minWidth: 32 }}>{incubationMin} min</span>
             </div>
           </div>
 
           {/* Solution-phase legend */}
           {cas12aActive && (
-            <div style={{ position: "absolute", right: 16, top: "38%", display: "flex", flexDirection: "column", gap: 3 }}>
+            <div style={{ position: "absolute", right: 16, top: "36%", display: "flex", flexDirection: "column", gap: 2 }}>
               {[
-                { label: "Cas12a:crRNA RNP (~1250 turnovers/hr)", color: "#33AA55" },
-                { label: "Cleaved MB (diffusing away)", color: "#2563eb" },
-                { label: "RPA amplicon dsDNA (~150 bp)", color: "#5577CC" },
+                { label: "Cas12a RNP (in situ, ~1250 t/hr)", color: "#33AA55" },
+                { label: arch === "B" ? "Detached Ag (signal loss)" : "Cleaved MB (diffusing)", color: arch === "B" ? "#C0C0C0" : "#2563eb" },
+                { label: "RPA amplicon (≤120 bp, cfDNA)", color: "#5577CC" },
               ].map(l => (
-                <div key={l.label} style={{ fontSize: 7, fontFamily: MONO, color: "#374151", background: "rgba(255,255,255,0.9)", padding: "2px 6px", borderRadius: 3, borderLeft: `3px solid ${l.color}` }}>
+                <div key={l.label} style={{ fontSize: 6.5, fontFamily: MONO, color: "#374151", background: "rgba(255,255,255,0.9)", padding: "2px 5px", borderRadius: 3, borderLeft: `3px solid ${l.color}` }}>
                   {l.label}
                 </div>
               ))}
@@ -1152,16 +1271,16 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
           <div style={{ position: "absolute", top: 12, left: 16, fontSize: 14, fontWeight: 700, color: "#111827", fontFamily: HEADING, textShadow: "0 1px 3px rgba(255,255,255,0.9)" }}>
             Side Profile — Layer Assembly
           </div>
-          <button onClick={() => { setMode(1); }} style={{ position: "absolute", top: 12, right: 16, fontSize: 11, fontWeight: 600, padding: "7px 16px", borderRadius: 6, border: "1px solid #E3E8EF", background: "#fff", cursor: "pointer", fontFamily: HEADING, color: "#374151" }}>
+          <button onClick={() => setMode(1)} style={{ position: "absolute", top: 12, right: 16, fontSize: 10, fontWeight: 600, padding: "6px 14px", borderRadius: 6, border: "1px solid #E3E8EF", background: "#fff", cursor: "pointer", fontFamily: HEADING, color: "#374151" }}>
             ← Back to chip
           </button>
-          <div style={{ position: "absolute", bottom: 12, left: 16, background: "rgba(255,255,255,0.94)", padding: "8px 14px", borderRadius: 8, border: "1px solid #E3E8EF" }}>
-            <div style={{ fontSize: 8, fontFamily: MONO, color: "#374151", lineHeight: 1.8 }}>
-              <div style={{ borderLeft: "3px solid #D4A843", paddingLeft: 6, marginBottom: 3 }}>Kapton HN polyimide — 125 µm (DuPont commercial)</div>
-              <div style={{ borderLeft: "3px solid #2D2D2D", paddingLeft: 6, marginBottom: 3 }}>LIG — CO₂ laser 10.6 µm, 20–50 µm, sp³→sp²</div>
-              <div style={{ borderLeft: "3px solid #1a2744", paddingLeft: 6, marginBottom: 3 }}>SU-8 passivation — 10–50 µm, circular openings at WE</div>
-              <div style={{ borderLeft: "3px solid #e8e8e8", paddingLeft: 6, marginBottom: 3 }}>COC microfluidic lid — injection-molded, ~1 mm</div>
-              <div style={{ borderLeft: "3px solid #c5a03f", paddingLeft: 6 }}>Contact pads — reader pogo pins connect here</div>
+          <div style={{ position: "absolute", bottom: 12, left: 16, background: "rgba(255,255,255,0.94)", padding: "8px 12px", borderRadius: 8, border: "1px solid #E3E8EF" }}>
+            <div style={{ fontSize: 7.5, fontFamily: MONO, color: "#374151", lineHeight: 1.8 }}>
+              <div style={{ borderLeft: "3px solid #F5F0E8", paddingLeft: 6, marginBottom: 2 }}>Cellulose CF3 paper — 390 µm (Cytiva, ~11 µm pores)</div>
+              <div style={{ borderLeft: "3px solid #888", paddingLeft: 6, marginBottom: 2 }}>Pre-treatment: 0.8 M ammonium sulfamate</div>
+              <div style={{ borderLeft: "3px solid #2D2D2D", paddingLeft: 6, marginBottom: 2 }}>LIG-E — CO₂ 4.8 W, 16 cm/s, 10 mm defocus, N₂, 23 Ω/sq</div>
+              <div style={{ borderLeft: "3px solid #3D2B1F", paddingLeft: 6, marginBottom: 2 }}>Wax barriers — hydrophobic zone isolation</div>
+              <div style={{ borderLeft: "3px solid #555", paddingLeft: 6 }}>Contact pads — reader pogo pins connect here</div>
             </div>
           </div>
         </>
@@ -1169,13 +1288,13 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
 
       {/* ═══ TOOLTIP ═══ */}
       {tooltipInfo && mode === 1 && (
-        <div style={{ position: "absolute", left: tooltipPos.x + 14, top: tooltipPos.y - 12, pointerEvents: "none", background: "rgba(255,255,255,0.96)", border: "1px solid #E3E8EF", borderRadius: 6, padding: "8px 12px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)", zIndex: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: MONO, color: DRUG_CSS[tooltipInfo.drug] || "#333" }}>{tooltipInfo.target}</div>
-          <div style={{ fontSize: 10, color: "#6B7280", marginTop: 2 }}>
+        <div style={{ position: "absolute", left: tooltipPos.x + 14, top: tooltipPos.y - 12, pointerEvents: "none", background: "rgba(255,255,255,0.96)", border: "1px solid #E3E8EF", borderRadius: 6, padding: "6px 10px", boxShadow: "0 2px 10px rgba(0,0,0,0.1)", zIndex: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, fontFamily: MONO, color: DRUG_CSS[tooltipInfo.drug] || "#333" }}>{tooltipInfo.target}</div>
+          <div style={{ fontSize: 9, color: "#6B7280", marginTop: 1 }}>
             {tooltipInfo.drug} · S_eff = {getEfficiency(tooltipInfo.target).toFixed(3)}
             {(() => { const r = results.find(x => x.label === tooltipInfo.target); return r?.disc && r.disc < 900 ? ` · D = ${r.disc.toFixed(1)}×` : ""; })()}
           </div>
-          <div style={{ fontSize: 9, color: "#9CA3AF", marginTop: 1 }}>{targetStrategy(tooltipInfo.target)} detection · Click to inspect</div>
+          <div style={{ fontSize: 8, color: "#9CA3AF", marginTop: 1 }}>{targetStrategy(tooltipInfo.target)} · Click to inspect</div>
         </div>
       )}
     </div>
