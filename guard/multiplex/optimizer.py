@@ -331,25 +331,46 @@ class MultiplexOptimizer:
         self,
         selected: list[ScoredCandidate],
         seed_end: int,
+        amplicons: Optional[dict[str, str]] = None,
     ) -> list[list[float]]:
         """Compute pairwise cross-reactivity between selected candidates.
 
-        Returns an NxN symmetric matrix where C[i,j] is the probability
-        of crRNA_i activating on crRNA_j's amplicon.
+        Returns an NxN symmetric matrix where C[i,j] is the predicted
+        off-target activity of crRNA_i on crRNA_j's amplicon.
+
+        When amplicon sequences are available, uses the position-weighted
+        mismatch model from cross_reactivity.py for biophysically accurate
+        scoring. Falls back to seed-weighted spacer similarity otherwise.
         """
         n = len(selected)
         matrix = [[0.0] * n for _ in range(n)]
 
         for i in range(n):
             for j in range(i + 1, n):
-                sim = _spacer_similarity(
-                    selected[i].candidate.spacer_seq,
-                    selected[j].candidate.spacer_seq,
-                    seed_end,
-                )
-                # Convert similarity to cross-reactivity risk
-                # Only high similarity (>0.7) poses real risk
-                risk = max(0.0, (sim - 0.5) / 0.5) if sim > 0.5 else 0.0
+                spacer_i = selected[i].candidate.spacer_seq
+                spacer_j = selected[j].candidate.spacer_seq
+                label_i = selected[i].candidate.target_label
+                label_j = selected[j].candidate.target_label
+
+                # Try position-weighted model with amplicons
+                risk = None
+                if amplicons:
+                    amp_j = amplicons.get(label_j)
+                    amp_i = amplicons.get(label_i)
+                    if amp_j and amp_i:
+                        try:
+                            from guard.scoring.cross_reactivity import _best_off_target_score
+                            ij = _best_off_target_score(spacer_i, amp_j)
+                            ji = _best_off_target_score(spacer_j, amp_i)
+                            risk = max(ij["activity"], ji["activity"])
+                        except Exception:
+                            pass
+
+                if risk is None:
+                    # Fallback: seed-weighted spacer similarity
+                    sim = _spacer_similarity(spacer_i, spacer_j, seed_end)
+                    risk = max(0.0, (sim - 0.5) / 0.5) if sim > 0.5 else 0.0
+
                 matrix[i][j] = risk
                 matrix[j][i] = risk
 

@@ -167,6 +167,109 @@ def compute_asrpa_discrimination(
     }
 
 
+# ---------------------------------------------------------------------------
+# Penultimate substitution ΔΔG table
+# The penultimate mismatch bonus depends on the specific substitution.
+# Different mismatches at N-1 have different destabilisation effects.
+# Values from Ayyadevara et al. (2000) and RPA empirical data.
+# Key: (original_base, substitution_base) → ΔΔG bonus (kcal/mol)
+# ---------------------------------------------------------------------------
+
+_PENULTIMATE_SUBSTITUTION_DDG: Dict[tuple[str, str], float] = {
+    # Strong destabilisers (purine↔pyrimidine transversions)
+    ("A", "C"): 3.0, ("A", "T"): 2.8,
+    ("T", "G"): 3.0, ("T", "A"): 2.5,
+    ("G", "T"): 2.8, ("G", "A"): 2.2,
+    ("C", "A"): 3.2, ("C", "G"): 2.5,
+    # Weaker destabilisers (transitions)
+    ("A", "G"): 1.8, ("G", "C"): 1.5,
+    ("T", "C"): 1.5, ("C", "T"): 1.8,
+}
+
+
+def optimize_penultimate_mismatch(
+    primer_seq: str,
+    wt_template_base: str,
+    penultimate_template_base: str,
+) -> Dict[str, Any]:
+    """Test all 3 possible penultimate substitutions and return the best.
+
+    For each non-original base at the N-1 position:
+      1. Compute the specific ΔΔG bonus for that substitution
+      2. Add it to the terminal mismatch ΔΔG
+      3. Return the substitution that maximizes total ΔΔG (discrimination)
+
+    Parameters
+    ----------
+    primer_seq : str
+        Full primer sequence (5'→3'). Last base is the 3' terminal;
+        second-to-last is the penultimate position.
+    wt_template_base : str
+        WT template base at the primer 3' end (creates the terminal mismatch).
+    penultimate_template_base : str
+        Template base at the penultimate (N-1) position.
+
+    Returns
+    -------
+    dict with keys:
+        best_substitution : str       the base to use at N-1
+        original_base : str           the original N-1 base
+        ddg_bonus : float             ΔΔG from the penultimate mismatch
+        total_ddg : float             terminal + penultimate combined
+        disc_ratio : float            predicted fold-discrimination
+        block_class : str
+        all_substitutions : list      results for all 3 options
+    """
+    primer_3prime = primer_seq[-1].upper()
+    original_penult = primer_seq[-2].upper() if len(primer_seq) >= 2 else "N"
+    bases = {"A", "T", "G", "C"}
+
+    # Terminal mismatch base ΔΔG
+    terminal_ddg = _TERMINAL_PENALTY.get((primer_3prime, wt_template_base.upper()), 0.0)
+
+    # Try all 3 non-original substitutions at N-1
+    candidates = []
+    for sub_base in sorted(bases - {original_penult}):
+        # The penultimate mismatch ΔΔG depends on what substitution we make
+        pen_ddg = _PENULTIMATE_SUBSTITUTION_DDG.get(
+            (original_penult, sub_base), _PENULTIMATE_MM_BONUS
+        )
+        total = terminal_ddg + pen_ddg
+        ratio = math.exp(total / _RT_37C)
+        ratio = max(_RATIO_FLOOR, min(_RATIO_CAP, ratio))
+
+        candidates.append({
+            "substitution": sub_base,
+            "penultimate_ddg": round(pen_ddg, 2),
+            "total_ddg": round(total, 2),
+            "disc_ratio": round(ratio, 1),
+            "block_class": _classify_block(total),
+        })
+
+    # Also test no penultimate mismatch (original base)
+    no_pen = {
+        "substitution": original_penult,
+        "penultimate_ddg": 0.0,
+        "total_ddg": round(terminal_ddg, 2),
+        "disc_ratio": round(max(_RATIO_FLOOR, min(_RATIO_CAP, math.exp(terminal_ddg / _RT_37C))), 1),
+        "block_class": _classify_block(terminal_ddg),
+    }
+
+    # Pick the best (highest discrimination ratio)
+    best = max(candidates, key=lambda c: c["disc_ratio"])
+
+    return {
+        "best_substitution": best["substitution"],
+        "original_base": original_penult,
+        "ddg_bonus": best["penultimate_ddg"],
+        "total_ddg": best["total_ddg"],
+        "disc_ratio": best["disc_ratio"],
+        "block_class": best["block_class"],
+        "no_penultimate": no_pen,
+        "all_substitutions": candidates,
+    }
+
+
 def score_panel_asrpa(
     members: Sequence[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:

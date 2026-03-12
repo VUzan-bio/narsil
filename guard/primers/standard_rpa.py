@@ -53,6 +53,11 @@ logger = logging.getLogger(__name__)
 
 _VALID_BASES = {"A", "T", "G", "C"}
 
+# Maximum self-folding ΔG (kcal/mol) for primer acceptance.
+# Primers more negative than this form stable hairpins that compete
+# with recombinase binding and reduce RPA efficiency.
+_SELF_FOLD_DG_THRESHOLD = -8.0
+
 
 class StandardRPADesigner:
     """Design flanking RPA primers for DIRECT detection candidates."""
@@ -140,11 +145,28 @@ class StandardRPADesigner:
                 if crrna_start < amp_start or crrna_end > amp_end:
                     continue
 
-                pairs.append(RPAPrimerPair(
+                # Self-folding check: reject primers with stable hairpins
+                fwd_dg = self._self_fold_dg(fwd.seq)
+                if fwd_dg is not None and fwd_dg < _SELF_FOLD_DG_THRESHOLD:
+                    continue
+                rev_dg = self._self_fold_dg(rev.seq)
+                if rev_dg is not None and rev_dg < _SELF_FOLD_DG_THRESHOLD:
+                    continue
+
+                # Amplicon GC window check: extract amplicon and flag extremes
+                amp_seq = genome_seq[amp_start:amp_end].upper() if amp_end <= len(genome_seq) else ""
+                gc_extremes = self.amplicon_gc_extremes(amp_seq) if amp_seq else []
+                # Skip if >3 extreme GC windows (likely un-amplifiable)
+                if len(gc_extremes) > 3:
+                    continue
+
+                pair = RPAPrimerPair(
                     fwd=fwd,
                     rev=rev,
+                    amplicon_seq=amp_seq,
                     detection_strategy=DetectionStrategy.DIRECT,
-                ))
+                )
+                pairs.append(pair)
 
         # Rank by score
         pairs.sort(key=self._pair_score, reverse=True)
@@ -212,6 +234,30 @@ class StandardRPADesigner:
         return primers[:20]
 
     @staticmethod
+    def _self_fold_dg(seq: str) -> Optional[float]:
+        """Estimate self-folding ΔG for a primer using ViennaRNA RNAfold.
+
+        Returns ΔG in kcal/mol, or None if ViennaRNA is unavailable.
+        More negative = more stable hairpin = worse for RPA.
+        """
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["RNAfold", "--noPS"],
+                input=seq.upper(),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            lines = result.stdout.strip().split("\n")
+            if len(lines) >= 2:
+                mfe_str = lines[1].split("(")[-1].rstrip(")")
+                return float(mfe_str.strip())
+        except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, IndexError):
+            pass
+        return None
+
+    @staticmethod
     def _pair_score(pair: RPAPrimerPair) -> float:
         """Score a standard RPA pair. Higher = better.
 
@@ -233,3 +279,48 @@ class StandardRPADesigner:
                 / (RPA_AMPLICON_MAX - RPA_AMPLICON_SOFT_PENALTY_START)
             )
         return fwd_tm + rev_tm + amp - cfdna_penalty
+
+    @staticmethod
+    def amplicon_gc_extremes(
+        amplicon_seq: str,
+        window: int = 15,
+        gc_max: float = 0.85,
+        gc_min: float = 0.15,
+    ) -> list[dict]:
+        """Identify locally extreme GC regions in an amplicon.
+
+        Sliding window of `window` nt across the amplicon. Regions with
+        GC > gc_max or < gc_min are problematic:
+          - High GC windows cause polymerase stalling and RPA dropout
+          - Low GC windows cause unstable R-loop binding for Cas12a
+
+        Returns a list of {start, end, gc, type} dicts for flagged windows.
+        Empty list = no extreme regions.
+        """
+        seq = amplicon_seq.upper()
+        if len(seq) < window:
+            return []
+
+        flagged = []
+        for i in range(len(seq) - window + 1):
+            w = seq[i:i + window]
+            gc = sum(1 for nt in w if nt in ("G", "C")) / window
+            if gc > gc_max:
+                flagged.append({"start": i, "end": i + window, "gc": round(gc, 3), "type": "high"})
+            elif gc < gc_min:
+                flagged.append({"start": i, "end": i + window, "gc": round(gc, 3), "type": "low"})
+
+        # Merge overlapping flagged windows of same type
+        if not flagged:
+            return []
+
+        merged = [flagged[0]]
+        for f in flagged[1:]:
+            prev = merged[-1]
+            if f["type"] == prev["type"] and f["start"] <= prev["end"]:
+                prev["end"] = f["end"]
+                prev["gc"] = max(prev["gc"], f["gc"]) if f["type"] == "high" else min(prev["gc"], f["gc"])
+            else:
+                merged.append(f)
+
+        return merged

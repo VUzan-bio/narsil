@@ -38,6 +38,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+from guard.core.constants import ASCAS12A_PAM, ENASCAS12A_PAMS, pam_matches
 from guard.core.types import (
     CrRNACandidate,
     OffTargetHit,
@@ -45,6 +46,9 @@ from guard.core.types import (
 )
 
 logger = logging.getLogger(__name__)
+
+# All recognized Cas12a PAMs — a hit must have one of these upstream to be a real off-target
+_ALL_PAMS = (ASCAS12A_PAM, *ENASCAS12A_PAMS)
 
 
 @dataclass
@@ -64,6 +68,14 @@ class OffTargetScreener:
       Tier 1: Bowtie2 alignment (fast, accurate, standard tool)
       Tier 2: Heuristic fallback (when Bowtie2 unavailable)
 
+    PAM verification:
+      After Bowtie2 alignment, each hit is checked for a functional Cas12a
+      PAM (TTTV or enAsCas12a expanded PAMs) in the 4 nt upstream of the
+      hit. Hits without a PAM are marked has_functional_pam=False and are
+      excluded from the risky hit count. This dramatically reduces false
+      off-target calls in high-GC genomes like M.tb where random PAM
+      occurrence is rare (~0.5% of 4-mers).
+
     Usage:
         screener = OffTargetScreener(
             databases=[ScreeningDatabase("mtb", Path("data/bt2/H37Rv"))],
@@ -78,6 +90,7 @@ class OffTargetScreener:
         max_mismatches: int = 3,
         seed_length: int = 20,
         bowtie2_path: Optional[str] = None,
+        reference_fasta: Optional[Path] = None,
     ) -> None:
         self.databases = databases or []
         self.max_mismatches = max_mismatches
@@ -122,6 +135,73 @@ class OffTargetScreener:
                 )
         self._valid_dbs = valid_dbs
 
+        # Load reference genome for PAM verification at hit sites
+        self._ref_seqs: dict[str, str] = {}
+        if reference_fasta and Path(reference_fasta).exists():
+            self._ref_seqs = self._load_fasta(Path(reference_fasta))
+            logger.info(
+                "Reference FASTA loaded for PAM verification: %d sequences",
+                len(self._ref_seqs),
+            )
+        else:
+            logger.info(
+                "No reference FASTA — PAM verification at off-target hits disabled"
+            )
+
+    @staticmethod
+    def _load_fasta(path: Path) -> dict[str, str]:
+        """Load a FASTA file into a dict of {chrom: sequence}."""
+        seqs: dict[str, str] = {}
+        current_id = ""
+        parts: list[str] = []
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith(">"):
+                    if current_id and parts:
+                        seqs[current_id] = "".join(parts)
+                    current_id = line[1:].split()[0]
+                    parts = []
+                else:
+                    parts.append(line.upper())
+        if current_id and parts:
+            seqs[current_id] = "".join(parts)
+        return seqs
+
+    def _verify_pam_at_hit(self, hit: OffTargetHit) -> bool:
+        """Check whether a functional Cas12a PAM exists upstream of a hit.
+
+        Cas12a PAM is 4 nt immediately 5' of the spacer on the target strand.
+        We check both orientations (hit could be on + or - strand).
+        Returns True if any recognized PAM pattern is found.
+        """
+        ref_seq = self._ref_seqs.get(hit.hit_chrom)
+        if ref_seq is None:
+            return True  # can't verify → assume functional (conservative)
+
+        seq_len = len(ref_seq)
+        spacer_len = hit.hit_end - hit.hit_start
+
+        # Check plus strand: PAM is 4 nt upstream of hit_start
+        pam_start_plus = hit.hit_start - 4
+        if pam_start_plus >= 0:
+            pam_plus = ref_seq[pam_start_plus:pam_start_plus + 4]
+            for pattern in _ALL_PAMS:
+                if pam_matches(pam_plus, pattern):
+                    return True
+
+        # Check minus strand: PAM is 4 nt downstream of hit_end (reverse complement)
+        pam_start_minus = hit.hit_end
+        if pam_start_minus + 4 <= seq_len:
+            pam_minus_raw = ref_seq[pam_start_minus:pam_start_minus + 4]
+            _comp = {"A": "T", "T": "A", "G": "C", "C": "G"}
+            pam_minus = "".join(_comp.get(nt, "N") for nt in reversed(pam_minus_raw))
+            for pattern in _ALL_PAMS:
+                if pam_matches(pam_minus, pattern):
+                    return True
+
+        return False
+
     @staticmethod
     def _to_wsl_path(win_path: str) -> str:
         """Convert a Windows path to WSL /mnt/... path."""
@@ -156,6 +236,11 @@ class OffTargetScreener:
                 for h in hits
                 if not self._is_on_target(h, candidate)
             ]
+
+            # PAM verification: mark hits without a functional PAM
+            if self._ref_seqs:
+                for h in hits:
+                    h.has_functional_pam = self._verify_pam_at_hit(h)
 
             if db.category == "mtb":
                 all_mtb.extend(hits)
@@ -234,6 +319,11 @@ class OffTargetScreener:
                 hits = hits_by_id.get(cid, [])
                 # Filter on-target
                 hits = [h for h in hits if not self._is_on_target(h, cand)]
+
+                # PAM verification
+                if self._ref_seqs:
+                    for h in hits:
+                        h.has_functional_pam = self._verify_pam_at_hit(h)
 
                 if db.category == "mtb":
                     id_to_hits[cid]["mtb"].extend(hits)

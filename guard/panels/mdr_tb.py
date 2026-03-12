@@ -124,6 +124,40 @@ def define_mdr_panel() -> list[Mutation]:
     ]
 
 
+def define_mdr_rnasep_panel() -> list[Mutation]:
+    """Define the 14-plex MDR-TB panel + RNaseP extraction control.
+
+    RNaseP (RPPH1) is a human housekeeping gene used as an extraction
+    and sample adequacy control. Its presence confirms:
+      1. DNA extraction succeeded (not inhibited)
+      2. Sufficient human material in the specimen (sputum quality)
+
+    This is the standard control recommended by CDC for nucleic acid
+    amplification-based TB diagnostics. The pipeline adds IS6110 as
+    the MTB species ID control; RNaseP serves as the human sample
+    adequacy control — together they gate the diagnostic call.
+
+    The RNaseP target is pre-designed (no mutation, no discrimination)
+    and is flagged as a control in the panel output.
+    """
+    return define_mdr_panel()  # RNaseP control is added by the pipeline runner
+
+
+# Pre-designed RNaseP control entry for pipeline injection
+RNASEP_CONTROL = {
+    "gene": "RPPH1",
+    "label": "RNaseP_control",
+    "drug": "OTHER",
+    "detection_strategy": "direct",
+    "is_control": True,
+    "control_type": "extraction",
+    "spacer_seq": "GCGCGAGCGCATGCCTGCAG",
+    "pam_seq": "TTTG",
+    "organism": "human",
+    "notes": "Human extraction/sample adequacy control (CDC standard)",
+}
+
+
 # Drug coverage summary for documentation
 DRUG_COVERAGE = {
     "RIF": {"targets": ["rpoB_S531L", "rpoB_H526Y", "rpoB_D516V"], "coverage": "~95%"},

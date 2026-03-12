@@ -21,14 +21,29 @@ SPACER_LENGTH_MAX = 24
 SPACER_LENGTH_DEFAULT = 20
 SEED_REGION_END = 8
 
+# Cas12a direct repeat (crRNA scaffold) — 19-nt mature DR after processing.
+# Used for full crRNA MFE computation: DR + spacer folds as one molecule.
+# The DR forms a conserved pseudoknot that Cas12a recognises; spacer nucleotides
+# adjacent to the DR can form unintended base-pairs that compete with R-loop formation.
+# Zetsche et al., Cell 2015; Fonfara et al., Nature 2016.
+CAS12A_DR = "UAAUUUCUACUAAGUGUAGA"  # RNA sequence, 5'→3'
+
 TRUNCATED_SPACER_LENGTH = 17
 WOBBLE_POSITION = 14
 
 # ---------------------------------------------------------------------------
 # Hard filter thresholds (Module 2)
+# Defaults are for generic organisms; organism-specific bounds are in
+# candidates/filters.py OrganismPresets.
 # ---------------------------------------------------------------------------
 GC_MIN = 0.40
 GC_MAX = 0.60
+
+# TB-specific GC optimum — M.tb genome is 65.6% GC, so the scoring
+# optimum shifts from 0.50 to 0.55 (Kim et al. 2018 shows Cas12a
+# tolerates higher GC well).
+GC_OPTIMAL_DEFAULT = 0.50
+GC_OPTIMAL_MTB = 0.55
 HOMOPOLYMER_MAX = 4
 MFE_THRESHOLD = -2.0
 
@@ -158,3 +173,19 @@ IS6110_COPIES_PER_GENOME = "6-16"
 IS6110_FWD_PRIMER = "GATCGTCTCGATCTGCGTAAAGGTGGACTACCAGGGTATCTGCGT"
 IS6110_REV_PRIMER = "CCGCTTCCAGCCCAGTGACGAGCGTAAGCCTCAACTACCACAGT"
 IS6110_AMPLICON_LENGTH = 143
+
+# ---------------------------------------------------------------------------
+# RNaseP — Human extraction/sample adequacy control
+# Detects human RNaseP (RPPH1) gene in the sample as proof that:
+#   1. DNA extraction succeeded
+#   2. Sufficient human material is present (sputum / blood)
+# This is the standard CDC extraction control used in TB diagnostics.
+# Coordinates from GRCh38 RPPH1 locus (chr14:20,811,208-20,811,520).
+# ---------------------------------------------------------------------------
+RNASEP_SPACER = "GCGCGAGCGCATGCCTGCAG"   # 20-nt spacer targeting RPPH1 exon
+RNASEP_PAM = "TTTG"
+RNASEP_FWD_PRIMER = "AGATTTGGACCTGCGAGCGCTCGAGCAGGACG"
+RNASEP_REV_PRIMER = "GAGCGGCTGTCTCCACAAGTCCGCCTCGACGA"
+RNASEP_AMPLICON_LENGTH = 95
+RNASEP_GENE = "RPPH1"
+RNASEP_ORGANISM = "human"

@@ -97,6 +97,10 @@ class CandidateSummary(BaseModel):
     mm_position_pam: Optional[int] = None  # Mismatch position relative to PAM (1-20)
     pam_penalty: Optional[float] = None       # PAM activity penalty (1.0 = canonical, <1.0 = expanded)
     is_canonical_pam: Optional[bool] = None   # True if TTTV
+    activity_qc: Optional[float] = None       # Biophysical quality sub-score (GC, structure, homopolymer, offtarget)
+    discrimination_qc: Optional[float] = None # SNP discrimination sub-score (seed pos, mismatch type, flanking GC)
+    mismatch_type_score: Optional[float] = None  # Transversion (1.0) vs transition (0.5) at mutation site
+    flanking_gc_score: Optional[float] = None    # Local GC around mismatch (lower = better discrimination)
     enzyme_id: Optional[str] = None           # Cas12a variant used
     pam_disrupted: Optional[bool] = None       # SNP disrupts PAM consensus → binary discrimination
     pam_disruption_type: Optional[str] = None  # "wt_pam_broken" | "mut_pam_broken" | None

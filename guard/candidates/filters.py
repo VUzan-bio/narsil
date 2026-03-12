@@ -928,8 +928,21 @@ class CandidateFilter:
     def _check_mfe(
         self, spacer: str, candidate: CrRNACandidate,
     ) -> FilterDecision:
-        """Secondary structure check via ViennaRNA RNAfold."""
-        mfe = self._compute_mfe(spacer)
+        """Secondary structure check via ViennaRNA RNAfold.
+
+        Folds the full crRNA (DR + spacer) as one molecule to detect
+        unintended base-pairing between the spacer and the direct repeat.
+        Spacer-only MFE misses DR-spacer interactions that can sequester
+        the spacer's seed region and reduce Cas12a activity.
+        """
+        from guard.core.constants import CAS12A_DR
+
+        # Convert spacer DNA to RNA for folding
+        _dna_to_rna = {"A": "A", "T": "U", "G": "G", "C": "C"}
+        spacer_rna = "".join(_dna_to_rna.get(nt.upper(), "N") for nt in spacer)
+        full_crrna = CAS12A_DR + spacer_rna
+
+        mfe = self._compute_mfe(full_crrna)
         if mfe is None:
             # ViennaRNA not available — skip gracefully
             return FilterDecision(
@@ -940,17 +953,24 @@ class CandidateFilter:
                 reason=None,
             )
 
+        # The DR itself contributes ~-5.5 kcal/mol from its pseudoknot.
+        # We subtract this baseline so the threshold applies to the
+        # additional structure caused by the spacer sequence.
+        DR_BASELINE_MFE = -5.5
+        spacer_contribution = mfe - DR_BASELINE_MFE
+
         # Store on candidate for downstream scoring
-        candidate.mfe = mfe
-        ok = mfe >= self.mfe_threshold  # less negative = less structure = better
-        penalty = 0.0 if ok else min(1.0, (self.mfe_threshold - mfe) / 3.0)
+        candidate.mfe = spacer_contribution
+        ok = spacer_contribution >= self.mfe_threshold
+        penalty = 0.0 if ok else min(1.0, (self.mfe_threshold - spacer_contribution) / 3.0)
         return FilterDecision(
             filter_name=FilterName.SECONDARY_STRUCTURE,
             passed=ok,
-            value=mfe,
+            value=spacer_contribution,
             threshold=self.mfe_threshold,
             reason=None if ok else (
-                f"MFE={mfe:.1f} kcal/mol < threshold={self.mfe_threshold:.1f}"
+                f"Full crRNA MFE={mfe:.1f} kcal/mol (spacer contribution="
+                f"{spacer_contribution:.1f}) < threshold={self.mfe_threshold:.1f}"
             ),
             penalty=penalty,
         )

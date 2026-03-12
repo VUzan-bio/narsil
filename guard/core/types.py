@@ -392,6 +392,7 @@ class OffTargetHit(BaseModel):
     gene_annotation: Optional[str] = None           # gene overlapping the hit
     is_coding: bool = False                         # hit is in a coding region
     database: str = "mtb"                           # "mtb" | "human" | "cross_reactivity"
+    has_functional_pam: Optional[bool] = None       # True if a recognized PAM exists upstream
 
 
 class OffTargetReport(BaseModel):
@@ -404,8 +405,12 @@ class OffTargetReport(BaseModel):
 
     @property
     def total_risky_hits(self) -> int:
+        """Count hits with ≤3 mismatches AND a functional PAM (if PAM was checked)."""
         all_hits = self.mtb_hits + self.human_hits + self.cross_reactivity_hits
-        return len([h for h in all_hits if h.mismatches <= 3])
+        return len([
+            h for h in all_hits
+            if h.mismatches <= 3 and h.has_functional_pam is not False
+        ])
 
     @property
     def worst_mtb_mismatches(self) -> int:
@@ -441,10 +446,15 @@ class HeuristicScore(BaseModel):
     composite: float                                # weighted sum
     proximity_bonus: float = 0.0                    # bonus for nearby proximity (smaller dist)
     pam_penalty: float = 1.0                        # PAM activity penalty (Kleinstiver 2019)
+    # Split QC sub-scores (Module 5 refinement)
+    activity_qc: Optional[float] = None             # biophysical quality: GC, structure, homopolymer, offtarget
+    discrimination_qc: Optional[float] = None       # SNP discrimination: seed position, mismatch type, flanking GC
+    mismatch_type_score: Optional[float] = None     # transversion > transition
+    flanking_gc_score: Optional[float] = None       # local GC around mismatch position
 
     @property
     def breakdown(self) -> dict[str, float]:
-        return {
+        d = {
             "seed": self.seed_position_score,
             "gc": self.gc_penalty,
             "structure": self.structure_penalty,
@@ -454,6 +464,11 @@ class HeuristicScore(BaseModel):
             "pam_penalty": self.pam_penalty,
             "composite": self.composite,
         }
+        if self.activity_qc is not None:
+            d["activity_qc"] = self.activity_qc
+        if self.discrimination_qc is not None:
+            d["discrimination_qc"] = self.discrimination_qc
+        return d
 
 
 class MLScore(BaseModel):
