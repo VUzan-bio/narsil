@@ -10,7 +10,7 @@ Validation checks:
      first RPA cycle, but non-displaced strand gives faster kinetics)
   3. For PROXIMITY: at least one allele-specific primer present (HARD)
   4. Primer-dimer ΔG above threshold (HARD if below -6.0 kcal/mol)
-  5. Amplicon length within RPA-optimal range (SOFT, 100-200 bp preferred)
+  5. Amplicon length within cfDNA-compatible range (SOFT, 80-120 bp preferred)
   6. crRNA not overlapping primer binding sites (HARD)
 
 RPA mechanism context:
@@ -101,7 +101,7 @@ class CoselectionValidator:
     def __init__(
         self,
         amplicon_min: int = 80,
-        amplicon_max: int = 250,
+        amplicon_max: int = 120,  # Blood cfDNA hard cap
         dimer_dg_threshold: float = -6.0,
         primer_crrna_min_gap: int = 5,  # min bp between primer end and crRNA start
     ) -> None:

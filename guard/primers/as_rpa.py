@@ -14,7 +14,8 @@ AS-RPA design rules (Ye et al., Biosens Bioelectron 2019):
   - 3' terminal base = mutant allele (locked)
   - Position -2: deliberate mismatch (C→A or similar strong disruption)
   - Tm 60-65°C including mismatches (use nearest-neighbour correction)
-  - Amplicon 100-200 bp encompassing the crRNA target site
+  - Amplicon 80-120 bp encompassing the crRNA target site
+    (blood cfDNA: fragments ~100–160 bp, hard cap 120 bp)
 
 Bell et al. (Sci Adv 2025) — Asymmetric primer ratios:
   - AS primer at lower concentration (200 nM vs 480 nM standard)
@@ -39,6 +40,7 @@ from Bio.SeqUtils import MeltingTemp as mt
 from guard.core.constants import (
     RPA_AMPLICON_MAX,
     RPA_AMPLICON_MIN,
+    RPA_AMPLICON_SOFT_PENALTY_START,
     RPA_PRIMER_LENGTH_MAX,
     RPA_PRIMER_LENGTH_MIN,
     RPA_TM_MAX,
@@ -408,7 +410,12 @@ class ASRPADesigner:
 
     @staticmethod
     def _pair_score(pair: RPAPrimerPair) -> float:
-        """Score an AS-RPA pair. Higher = better."""
+        """Score an AS-RPA pair. Higher = better.
+
+        Includes cfDNA soft penalty: amplicons > 100 bp receive a linear
+        penalty of 0.3 × (length − 100) / (120 − 100), reflecting reduced
+        template capture probability on fragmented circulating DNA.
+        """
         tm_opt = 64.5  # Optimal for M.tb (65.6% GC)
         fwd_tm = 1.0 - abs(pair.fwd.tm - tm_opt) / 8.0
         rev_tm = 1.0 - abs(pair.rev.tm - tm_opt) / 8.0
@@ -416,4 +423,11 @@ class ASRPADesigner:
             RPA_AMPLICON_MAX - RPA_AMPLICON_MIN
         )
         as_bonus = 0.3 if pair.has_allele_specific_primer else 0.0
-        return fwd_tm + rev_tm + amp + as_bonus
+        # cfDNA soft penalty: linear ramp above SOFT_PENALTY_START
+        cfdna_penalty = 0.0
+        if pair.amplicon_length > RPA_AMPLICON_SOFT_PENALTY_START:
+            cfdna_penalty = 0.3 * (
+                (pair.amplicon_length - RPA_AMPLICON_SOFT_PENALTY_START)
+                / (RPA_AMPLICON_MAX - RPA_AMPLICON_SOFT_PENALTY_START)
+            )
+        return fwd_tm + rev_tm + amp + as_bonus - cfdna_penalty

@@ -48,13 +48,19 @@ OFFTARGET_TAIL_WEIGHT = 0.5
 # Widened for M.tb (65.6% GC genome): rpoB RRDR ~70%, gyrA QRDR ~72%.
 # RPA uses recombinase at 37°C — much more Tm-tolerant than PCR.
 # Published M.tb RPA assays use Tm 62–70°C (Ai et al. 2019, Cao et al. 2018).
+#
+# BRIDGE project: blood cfDNA input. Circulating free DNA fragments are
+# ~100–160 bp (median ~140 bp, Lo et al. 2010; Mouliere et al. 2018).
+# Hard cap at 120 bp ensures the full amplicon fits within a single cfDNA
+# fragment — longer amplicons span fragment junctions and fail to amplify.
 # ---------------------------------------------------------------------------
 RPA_PRIMER_LENGTH_MIN = 25
 RPA_PRIMER_LENGTH_MAX = 38
 RPA_TM_MIN = 57.0
 RPA_TM_MAX = 72.0
 RPA_AMPLICON_MIN = 80
-RPA_AMPLICON_MAX = 150  # Tightened for high-GC M.tb RPA (>65% GC degrades >150bp)
+RPA_AMPLICON_MAX = 120  # Blood cfDNA: fragments ~100–160 bp, hard cap at 120 bp
+RPA_AMPLICON_SOFT_PENALTY_START = 100  # bp — linear penalty above this threshold
 PRIMER_DIMER_DG_THRESHOLD = -6.0
 
 # Allele-specific RPA (Ye et al. 2019)

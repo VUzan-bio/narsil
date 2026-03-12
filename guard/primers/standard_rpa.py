@@ -2,19 +2,26 @@
 
 For DIRECT detection candidates the crRNA spacer overlaps the mutation site,
 so discrimination comes from Cas12a mismatch intolerance — not from primers.
-Primers simply need to amplify an 80–250 bp region that contains the crRNA
+Primers simply need to amplify an 80–120 bp region that contains the crRNA
 binding site.
+
+Blood cfDNA constraint (BRIDGE project):
+  Circulating free DNA fragments are ~100–160 bp (median ~140 bp).
+  Amplicons >120 bp risk spanning fragment junctions → amplification failure.
+  Soft penalty applied above 100 bp; hard reject above 120 bp.
 
 Design rules:
   - Primer length 25–38 nt (widened for M.tb 65.6% GC genome)
   - Tm 57–72°C (RPA uses recombinase at 37°C, tolerant of Tm variation)
-  - Amplicon 80–250 bp containing the full crRNA target site
+  - Amplicon 80–120 bp containing the full crRNA target site
   - Spacer binding site ≥15 bp from each primer 3' end
   - Both primers are standard/symmetrical — no allele-specificity needed
 
 References:
   - Piepenburg et al., PLoS Biol 2006 (RPA mechanism)
   - Li et al., Cell Rep Med 2022 (RPA-CRISPR design rules)
+  - Lo et al., Sci Transl Med 2010 (cfDNA fragment sizes)
+  - Mouliere et al., Sci Transl Med 2018 (cfDNA size profiling)
 """
 
 from __future__ import annotations
@@ -28,6 +35,7 @@ from Bio.Seq import Seq
 from guard.core.constants import (
     RPA_AMPLICON_MAX,
     RPA_AMPLICON_MIN,
+    RPA_AMPLICON_SOFT_PENALTY_START,
     RPA_PRIMER_LENGTH_MAX,
     RPA_PRIMER_LENGTH_MIN,
     RPA_TM_MAX,
@@ -205,11 +213,23 @@ class StandardRPADesigner:
 
     @staticmethod
     def _pair_score(pair: RPAPrimerPair) -> float:
-        """Score a standard RPA pair. Higher = better."""
+        """Score a standard RPA pair. Higher = better.
+
+        Includes cfDNA soft penalty: amplicons > 100 bp receive a linear
+        penalty of 0.3 × (length − 100) / (120 − 100), reflecting reduced
+        template capture probability on fragmented circulating DNA.
+        """
         tm_opt = 64.5  # Optimal for M.tb (65.6% GC)
         fwd_tm = 1.0 - abs(pair.fwd.tm - tm_opt) / 8.0
         rev_tm = 1.0 - abs(pair.rev.tm - tm_opt) / 8.0
         amp = 1.0 - (pair.amplicon_length - RPA_AMPLICON_MIN) / (
             RPA_AMPLICON_MAX - RPA_AMPLICON_MIN
         )
-        return fwd_tm + rev_tm + amp
+        # cfDNA soft penalty: linear ramp above SOFT_PENALTY_START
+        cfdna_penalty = 0.0
+        if pair.amplicon_length > RPA_AMPLICON_SOFT_PENALTY_START:
+            cfdna_penalty = 0.3 * (
+                (pair.amplicon_length - RPA_AMPLICON_SOFT_PENALTY_START)
+                / (RPA_AMPLICON_MAX - RPA_AMPLICON_SOFT_PENALTY_START)
+            )
+        return fwd_tm + rev_tm + amp - cfdna_penalty

@@ -6,7 +6,7 @@ import {
   Folder, GitBranch, Grid3x3, Layers, List, Loader2,
   Lock, Menu, Package, PanelLeft, PanelLeftClose, Play, Plus, RefreshCw, Search, Settings, Target,
   TrendingUp, X, Zap, Shield, Crosshair, Brain, Cpu, Wifi, WifiOff,
-  AlertTriangle, CheckCircle, Info, Map,
+  AlertTriangle, CheckCircle, Info, Map, Droplet,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -1383,13 +1383,21 @@ const HomePage = ({ goTo, connected }) => {
                   ["PAM Patterns", enzymeId === "enAsCas12a" ? "TTTV + 8 expanded (incl. TTTT)" : "TTTV only"],
                   ["Spacer Lengths", "18–23 nt"], ["GC Range", "30–70%"],
                   ["Min Discrimination", "2.0×"], ["SM Enhancement", "Enabled"],
-                  ["RPA Amplicon", "100–200 bp"],
+                  ["RPA Amplicon", "80–120 bp (blood cfDNA)"],
                   ["Scoring Model", scorer === "guard_net" ? "GUARD-Net" : "Heuristic"],
                   ["PAM Penalty", enzymeId === "enAsCas12a" ? "Kleinstiver 2019" : "N/A (canonical only)"],
                 ].map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.borderLight}`, fontSize: "12px" }}>
-                    <span style={{ color: T.textSec }}>{k}</span>
-                    <span style={{ fontWeight: 600, color: T.text, fontFamily: MONO, fontSize: "11px" }}>{v}</span>
+                  <div key={k}>
+                    <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0", borderBottom: `1px solid ${T.borderLight}`, fontSize: "12px" }}>
+                      <span style={{ color: T.textSec }}>{k}</span>
+                      <span style={{ fontWeight: 600, color: T.text, fontFamily: MONO, fontSize: "11px" }}>{v}</span>
+                    </div>
+                    {k === "RPA Amplicon" && (
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: "6px", padding: "6px 0 8px", fontSize: "10px", color: T.textTer, lineHeight: 1.5 }}>
+                        <Droplet size={10} color={T.textTer} strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span>Capped at 120 bp — cfDNA fragments in blood are ~100–160 bp. Shorter amplicons maximise template capture from fragmented circulating DNA.</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -1863,7 +1871,7 @@ const HomePage = ({ goTo, connected }) => {
           ["GC range", "30–70%", "Below 30% weak R-loop; above 70% self-structure"],
           ["Max homopolymer", "4 nt", "Poly-T ≥5 causes Cas12a R-loop stalling; also reduces primer specificity"],
           ["Off-target", "≤3 mismatches", "Bowtie2 against full genome"],
-          ["RPA amplicon", "100–200 bp", "Optimal RPA range"],
+          ["RPA amplicon", "80–120 bp", "Blood cfDNA: fragments ~100–160 bp, shorter amplicons maximise template capture"],
           ["Primer Tm", "57–72 \u00B0C", "Primer melting temperature (not reaction temperature). RPA runs at 37\u00B0C; high Tm ensures stable primer hybridisation."],
           ["Discrimination min", "2.0\u00D7", "Minimum acceptable. \u22653.0\u00D7 for electrochemical/LFA. \u22655.0\u00D7 for robust clinical readout."],
         ].map(([param, value, rationale], i, arr) => (
@@ -4099,9 +4107,15 @@ const PrimersTab = ({ results }) => {
           <div style={{ fontSize: "14px", fontWeight: 700, color: T.primaryDark, fontFamily: HEADING, marginBottom: "4px" }}>Recombinase Polymerase Amplification (RPA)</div>
           <p style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6, margin: 0, opacity: 0.85 }}>
             RPA is an isothermal amplification method (37°C) that replaces PCR thermocycling. Each crRNA target needs a pair of
-            30–35 nt primers flanking a 100–200 bp amplicon containing the crRNA binding site. The amplified product is then
+            30–35 nt primers flanking an 80–120 bp amplicon containing the crRNA binding site. The amplified product is then
             detected by Cas12a <em>trans</em>-cleavage of MB-ssDNA reporters on the electrochemical platform (SWV signal decrease on LIG electrodes).
           </p>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginTop: "10px", padding: "8px 12px", background: "rgba(255,255,255,0.5)", borderRadius: "6px", border: `1px solid ${T.primary}22` }}>
+            <Droplet size={14} color={T.primaryDark} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
+            <span style={{ fontSize: "11px", color: T.primaryDark, lineHeight: 1.5, opacity: 0.85 }}>
+              Capped at 120 bp — cfDNA fragments in blood are ~100–160 bp (median ~140 bp). Shorter amplicons maximise template capture from fragmented circulating DNA.
+            </span>
+          </div>
         </div>
       </div>
 
@@ -4144,6 +4158,7 @@ const PrimersTab = ({ results }) => {
             <p style={{ fontSize: "12px", color: "#991B1B", lineHeight: 1.5, margin: "0 0 8px", opacity: 0.85 }}>
               These targets could not have primers designed, typically due to extreme GC content in flanking regions
               (M. tuberculosis is 65.6% GC) preventing primers from meeting the 60–65°C Tm constraint.
+              Tight amplicon constraint (≤120 bp for blood cfDNA) may further limit primer placement in GC-rich regions.
             </p>
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
               {withoutPrimers.map(r => (
@@ -4183,7 +4198,7 @@ const PrimersTab = ({ results }) => {
                 </td>
                 <td style={{ padding: "10px 14px" }}><Seq s={r.fwd} /></td>
                 <td style={{ padding: "10px 14px" }}><Seq s={r.rev} /></td>
-                <td style={{ padding: "10px 14px", fontFamily: FONT }}>{r.amplicon} bp</td>
+                <td style={{ padding: "10px 14px", fontFamily: FONT, fontWeight: 600, color: r.amplicon <= 100 ? T.success : r.amplicon <= 120 ? T.warning : T.danger }}>{r.amplicon} bp</td>
                 <td style={{ padding: "10px 14px" }}><Badge variant={r.hasSM ? "primary" : "default"}>{r.hasSM ? "Yes" : "No"}</Badge></td>
               </tr>
             ))}
@@ -4756,6 +4771,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             In situ RNP formation is integral to the per-pad one-pot architecture. Cas12a protein arrives in the sample buffer
             and encounters pad-specific lyophilized crRNA upon rehydration. Gradual RNP formation (Lesinski et al. 2024, <em>Anal. Chem.</em>)
             limits early cis-cleavage competition with RPA — critical at the low template concentrations expected from blood cfDNA.
+            RPA amplicons designed at ≤120 bp to fit within cfDNA fragment size distribution (median ~140 bp, range 100–160 bp).
           </p>
 
           <div style={{ overflowX: "auto", marginBottom: "16px" }}>
