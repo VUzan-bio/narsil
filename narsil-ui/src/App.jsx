@@ -4123,7 +4123,7 @@ const CrossReactivityMatrix = () => {
                   Activity: {(hovCell.activity * 100).toFixed(2)}% of on-target (<span style={{ fontWeight: 600, color: hovCell.risk === "none" ? T.success : hovCell.risk === "low" ? "#D97706" : hovCell.risk === "medium" ? "#EA580C" : T.danger }}>{hovCell.risk.toUpperCase()}</span>)<br />
                   Mismatches: {hovCell.mismatches}<br />
                   PAM valid: {hovCell.pam_valid ? "yes" : "no"}
-                  {hovCell.note && <><br /><span style={{ color: T.primary, fontStyle: "italic" }}>{hovCell.note}</span></>}
+                  {hovCell.note && <><br /><span style={{ color: T.primary }}>{hovCell.note}</span></>}
                 </div>
               </>
             )}
@@ -4152,7 +4152,7 @@ const CrossReactivityMatrix = () => {
         <div style={{ fontSize: 11, color: T.text, fontFamily: MONO, lineHeight: 1.8 }}>
           <strong>{data.n_pairs} / {data.n_pairs}</strong> pairs tested<br />
           <strong>{data.none_count}</strong> pairs: no cross-reactivity (&lt; 1%)<br />
-          <strong>{data.same_gene_pairs.length}</strong> pairs: low\u2013medium cross-reactivity (same-gene overlapping amplicons)
+          <strong>{data.same_gene_pairs.length}</strong> pairs: low{"\u2013"}medium cross-reactivity (same-gene overlapping amplicons)
         </div>
         <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6 }}>
           <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 4, fontSize: 10, fontWeight: 600,
@@ -4168,10 +4168,10 @@ const CrossReactivityMatrix = () => {
             <strong>Same-gene pairs with residual cross-reactivity:</strong>
             {data.same_gene_pairs.filter(p => p.sourceIdx < p.targetIdx || !data.same_gene_pairs.find(q => q.sourceIdx === p.targetIdx && q.targetIdx === p.sourceIdx && q.sourceIdx < q.targetIdx)).map(p => (
               <div key={`${p.source}-${p.target}`} style={{ fontFamily: MONO, marginLeft: 8, fontSize: 9 }}>
-                \u2022 {p.source} \u2194 {p.target}: {(p.activity * 100).toFixed(1)}% ({p.risk.toUpperCase()}) \u2014 {p.note}
+                {"\u2022"} {p.source} {"\u2194"} {p.target}: {(p.activity * 100).toFixed(1)}% ({p.risk.toUpperCase()}) {"\u2014"} {p.note}
               </div>
             ))}
-            <div style={{ marginTop: 6, fontSize: 9, color: T.textTer, fontStyle: "italic" }}>
+            <div style={{ marginTop: 6, fontSize: 9, color: T.textTer }}>
               Managed by spatial separation: each crRNA contacts only its own amplicon within its physically isolated detection zone.
             </div>
           </div>
@@ -5215,7 +5215,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
 
       {/* ═══════════ SECTION 2: Predicted Electrochemical Readout ═══════════ */}
-      <CollapsibleSection title="Predicted Electrochemical Readout" defaultOpen={true} badge={{ text: "computed", bg: "#FFFBEB", color: "#2563EB" }}>
+      <CollapsibleSection title="Predicted Electrochemical Readout" defaultOpen={true} badge={{ text: "computed", bg: T.primaryLight, color: T.primary }}>
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "16px" : "24px", marginBottom: "24px" }}>
           {/* Header description — architecture-dependent */}
           <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "20px", lineHeight: 1.6 }}>
@@ -5340,7 +5340,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   <input type="range" min={0.1} max={10} step={0.1} value={echemIscale} onChange={e => setEchemIscale(+e.target.value)}
                     style={{ width: "100%", marginTop: "4px", accentColor: T.primary }} />
                 </div>
-                <div style={{ fontSize: "10px", color: T.textTer, fontStyle: "italic", width: "100%" }}>
+                <div style={{ fontSize: "10px", color: T.textTer, width: "100%" }}>
                   These only affect absolute current, NOT {"\u0394"}I% predictions. {"\u0394"}I% depends only on NARSIL data + k_trans + time.
                 </div>
               </div>
@@ -5533,8 +5533,20 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   );
                 })()}
               </div>
-              {/* Physics equation — architecture-dependent */}
-              <div style={{ fontSize: "9px", color: T.textTer, marginTop: "4px", fontFamily: FONT, fontStyle: "italic" }}>
+              {/* Interpretation block — Panel A */}
+              <div style={{ marginTop: "8px", padding: "10px 14px", borderRadius: "4px", background: T.primaryLight, fontSize: "11px", color: T.primaryDark, lineHeight: 1.6 }}>
+                <strong>Interpretation:</strong>{" "}
+                {echemMeta.deltaI > 50
+                  ? `Strong signal reduction (${"\u0394"}I = ${echemMeta.deltaI}%). Trans-cleavage of MB reporters produces a clearly resolvable voltammetric shift at ${echemTime} min. The ${echemCandidateData.label} crRNA yields sufficient on-target activity for unambiguous electrochemical detection.`
+                  : echemMeta.deltaI > 15
+                  ? `Moderate signal reduction (${"\u0394"}I = ${echemMeta.deltaI}%). The ${echemCandidateData.label} crRNA generates a detectable but sub-optimal peak shift at ${echemTime} min. Extending incubation time or increasing k_trans via electrode surface optimization would improve signal-to-noise.`
+                  : `Weak signal reduction (${"\u0394"}I = ${echemMeta.deltaI}%). At ${echemTime} min, the trans-cleavage signal for ${echemCandidateData.label} is near the detection limit. Consider increasing reporter density, incubation time, or optimizing surface chemistry to enhance k_trans.`
+                }
+                {echemCandidateData.discrimination <= 2.0 && echemCandidateData.discrimination < 900 &&
+                  ` Note: D = ${echemCandidateData.discrimination.toFixed(1)}\u00d7 indicates poor crRNA-level discrimination \u2014 allelic specificity depends on AS-RPA primer selectivity.`
+                }
+              </div>
+              <div style={{ fontSize: "9px", color: T.textTer, marginTop: "4px", fontFamily: MONO }}>
                 {archCfg.peak_shape === "sech2"
                   ? (echemTechnique === "SWV" ? "i_net = i_fwd \u2212 i_rev ; i \u221d \u0393 \u00b7 sech\u00b2[(nF/2RT)(E\u2212E\u00b0\u00b1E_sw)]"
                     : echemTechnique === "DPV" ? "i_p = (n\u00b2F\u00b2\u0393A\u0394E) / (4RT) \u00b7 sech\u00b2[(nF/2RT)(E\u2212E\u00b0)]"
@@ -5633,7 +5645,23 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   );
                 })()}
               </div>
-              <div style={{ fontSize: "9px", color: T.textTer, marginTop: "4px", fontFamily: FONT, fontStyle: "italic" }}>
+              {/* Interpretation block — Panel B */}
+              <div style={{ marginTop: "8px", padding: "10px 14px", borderRadius: "4px", background: "#F0FDF4", fontSize: "11px", color: "#166534", lineHeight: 1.6 }}>
+                <strong>Interpretation:</strong>{" "}
+                {echemTimeCourse.timeMut != null && echemTimeCourse.timeMut <= 20
+                  ? `Rapid detection: MUT signal crosses the 3\u03c3 threshold at ~${echemTimeCourse.timeMut} min, well within the WHO TPP target of <120 min. `
+                  : echemTimeCourse.timeMut != null
+                  ? `Detection at ~${echemTimeCourse.timeMut} min. Signal accumulation is slower than ideal \u2014 increasing k_trans or extending RPA amplification could accelerate time-to-result. `
+                  : `MUT signal does not reach the 3\u03c3 threshold within 60 min at current k_trans. Surface optimization required. `
+                }
+                {echemTimeCourse.timeWt != null && echemTimeCourse.timeMut != null && echemTimeCourse.timeWt > echemTimeCourse.timeMut
+                  ? `A ${echemTimeCourse.timeWt - echemTimeCourse.timeMut}-min discrimination window separates MUT from WT detection, enabling time-gated allelic discrimination.`
+                  : echemTimeCourse.timeWt == null
+                  ? `WT remains below threshold throughout, providing clean allelic discrimination at all time points.`
+                  : `WT crosses threshold near MUT \u2014 allelic discrimination relies on AS-RPA primer specificity rather than crRNA kinetics.`
+                }
+              </div>
+              <div style={{ fontSize: "9px", color: T.textTer, marginTop: "4px", fontFamily: MONO }}>
                 {"\u0394"}I% = (1 {"\u2212"} {"\u0393"}(t)/{"\u0393\u2080"}) {"\u00d7"} 100 ; {"\u0393"}(t) = {"\u0393\u2080"} exp({"\u2212"}k_trans {"\u00b7"} S_eff {"\u00b7"} {"\u222b"}f_RNP dt) ; lag {"\u2248"} 5{"\u2013"}10 min (in situ RNP formation)
               </div>
             </div>
@@ -5774,7 +5802,19 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   );
                 })()}
               </div>
-              <div style={{ fontSize: "9px", color: T.textTer, fontStyle: "italic", marginTop: "4px", fontFamily: FONT }}>
+              {/* Interpretation block — Panel C */}
+              <div style={{ marginTop: "8px", padding: "10px 14px", borderRadius: "4px", background: "#FDF4FF", fontSize: "11px", color: "#6B21A8", lineHeight: 1.6 }}>
+                <strong>Interpretation:</strong>{" "}
+                {echemDiscOverlay.measuredDisc >= 3
+                  ? `Diagnostic-grade allelic discrimination (D = ${echemDiscOverlay.measuredDisc === Infinity ? "\u221e" : echemDiscOverlay.measuredDisc + "\u00d7"}). The voltammetric \u0394I% difference between MUT and WT alleles is clearly resolvable, enabling reliable genotyping from electrochemical signal alone.`
+                  : echemDiscOverlay.measuredDisc >= 1.5
+                  ? `Moderate allelic discrimination (D = ${echemDiscOverlay.measuredDisc}\u00d7). The MUT/WT peak height difference is detectable but marginal \u2014 AS-RPA primer specificity provides additional discrimination at the amplification stage.`
+                  : echemDiscOverlay.measuredDisc >= 1
+                  ? `Poor discrimination (D = ${echemDiscOverlay.measuredDisc}\u00d7). crRNA alone cannot distinguish alleles electrochemically. Clinical specificity depends entirely on AS-RPA allele-specific primer blocking.`
+                  : `Inverted discrimination (D < 1): WT allele activates Cas12a more efficiently than MUT. This crRNA design requires redesign or relies exclusively on AS-RPA primer selectivity for correct genotyping.`
+                }
+              </div>
+              <div style={{ fontSize: "9px", color: T.textTer, marginTop: "4px", fontFamily: MONO }}>
                 Discrimination ratio = {"\u0394"}I%_MUT / {"\u0394"}I%_WT {"\u2014"} independent of k_trans and {"\u0393\u2080"}, depends only on mismatch biophysics predicted by NARSIL.
               </div>
             </div>
@@ -5825,8 +5865,8 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
               </tbody>
             </table>
           </div>
-          <div style={{ fontSize: "10px", color: T.textTer, marginTop: "8px", fontStyle: "italic" }}>
-            Discrimination ratios computed via Boltzmann conversion: exp(\u0394\u0394G / RT) at 37 \u00b0C. Ratios &gt; 100\u00d7 capped \u2014 kinetic effects dominate at high \u0394\u0394G.
+          <div style={{ fontSize: "10px", color: T.textTer, marginTop: "8px" }}>
+            Discrimination ratios computed via Boltzmann conversion: exp({"\u0394\u0394"}G / RT) at 37 {"\u00b0"}C. Ratios &gt; 100{"\u00d7"} capped {"\u2014"} kinetic effects dominate at high {"\u0394\u0394"}G.
           </div>
         </div>
       </CollapsibleSection>
