@@ -1304,7 +1304,7 @@ const HomePage = ({ goTo, connected }) => {
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                   <span style={{ fontSize: "15px", fontWeight: 600, color: scorer === s.id ? T.primaryDark : T.text, fontFamily: HEADING }}>{s.label}</span>
-                  <span style={{ fontSize: "10px", fontWeight: 600, fontFamily: MONO, color: s.id === "narsil_ml" ? T.primary : T.textTer }}>{s.tag}</span>
+                  <span style={{ fontSize: "10px", fontWeight: 600, fontFamily: MONO, padding: "2px 8px", borderRadius: "3px", background: s.id === "narsil_ml" ? T.primaryLight : T.bgSub, color: s.id === "narsil_ml" ? T.primary : T.textTer }}>{s.tag}</span>
                 </div>
                 <div style={{ fontSize: "13px", color: scorer === s.id ? T.primaryDark : T.textSec, lineHeight: 1.5 }}>{s.desc}</div>
               </button>
