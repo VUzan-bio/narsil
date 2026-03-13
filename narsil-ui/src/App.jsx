@@ -401,7 +401,8 @@ const Btn = ({ children, variant = "primary", onClick, disabled, icon: Icon, ful
       cursor: disabled ? "not-allowed" : "pointer", display: "inline-flex",
       alignItems: "center", gap: "8px", fontFamily: FONT, opacity: disabled ? 0.5 : 1,
       width: full ? "100%" : "auto", justifyContent: "center",
-    }}>{Icon && <Icon size={15} />}{children}</button>
+      transition: "background 120ms ease-out, border-color 120ms ease-out, opacity 120ms ease-out",
+    }}>{Icon && <Icon size={14} />}{children}</button>
   );
 };
 
@@ -451,7 +452,7 @@ const ToastProvider = ({ children }) => {
           {toasts.map((t) => (
             <div key={t.id} style={{
               background: t.type === "success" ? "#065F46" : t.type === "error" ? "#DC2626" : "#111827",
-              color: "#fff", padding: "10px 18px", borderRadius: "4px", fontSize: "13px", fontWeight: 500,
+              color: "#fff", padding: "8px 16px", borderRadius: "4px", fontSize: "13px", fontWeight: 500,
               fontFamily: FONT, boxShadow: "0 1px 3px rgba(0,0,0,0.1)", display: "flex", alignItems: "center", gap: "8px",
               animation: "toastIn 0.25s ease-out",
             }}>
@@ -681,7 +682,7 @@ const CandidateViewer = ({ r, onClose }) => {
             { l: "PAM", v: r.pam, c: T.text, badge: r.pamVariant && r.pamVariant !== "TTTV" ? r.pamVariant : null, penalty: r.pamPenalty },
           ].map((s, i) => (
             <div key={s.l} style={{ flex: mobile ? "1 1 40%" : 1, textAlign: "center", borderLeft: !mobile && i > 0 ? `1px dashed ${T.border}` : "none", minWidth: mobile ? "30%" : "auto" }}>
-              <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{s.l}</div>
+              <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>{s.l}</div>
               <div style={{ fontSize: mobile ? "15px" : "18px", fontWeight: 600, color: s.c, fontFamily: FONT }}>{s.v}</div>
               {s.badge && <div style={{ marginTop: "3px", display: "inline-block", padding: "1px 5px", borderRadius: "4px", fontSize: "9px", fontWeight: 600, fontFamily: FONT, background: s.penalty >= 0.5 ? "#FEF3C7" : "#FEF2F2", color: s.penalty >= 0.5 ? "#1D4ED8" : "#DC2626" }}>{s.badge} {s.penalty != null ? `${s.penalty}×` : ""}</div>}
             </div>
@@ -906,16 +907,18 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
       {/* Nav groups */}
       <nav style={{ flex: 1, padding: isCollapsed ? "12px 6px" : "8px 12px", overflowY: "auto" }}>
         {NAV.map((g) => (
-          <div key={g.section} style={{ marginBottom: "16px" }}>
-            {!isCollapsed && <div style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", padding: "0 8px", marginBottom: "4px" }}>{g.section}</div>}
+          <div key={g.section} style={{ marginBottom: "20px" }}>
+            {!isCollapsed && <div style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", padding: "0 8px", marginBottom: "4px" }}>{g.section}</div>}
             {g.items.map((it) => {
               const active = page === it.id;
               return (
                 <button key={it.id} onClick={() => handleNav(it.id)} title={isCollapsed ? it.label : undefined} style={{
-                  display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "flex-start", gap: "10px", width: "100%", padding: isCollapsed ? "8px 0" : "8px 12px",
+                  display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "flex-start", gap: "8px", width: "100%", padding: isCollapsed ? "8px 0" : "8px 12px",
                   borderRadius: "4px", border: "none", cursor: "pointer", fontFamily: FONT, fontSize: "13px",
                   fontWeight: active ? 500 : 400, background: active ? T.sidebarActive : "transparent",
-                  color: active ? T.primary : T.sidebarText, marginBottom: "1px",
+                  color: active ? T.primary : T.sidebarText, marginBottom: "2px",
+                  borderLeft: active && !isCollapsed ? `2px solid ${T.primary}` : "2px solid transparent",
+                  transition: "background 120ms ease-out, color 120ms ease-out, border-color 120ms ease-out",
                 }}>
                   <it.icon size={16} strokeWidth={active ? 2 : 1.5} />
                   {!isCollapsed && it.label}
@@ -927,7 +930,7 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
       </nav>
       {/* Footer */}
       {!isCollapsed && (
-        <div style={{ padding: "16px", borderTop: `1px solid ${T.border}`, fontSize: "11px", color: T.textTer, textAlign: "center" }}>
+        <div style={{ padding: "12px 16px", borderTop: `1px solid ${T.border}`, fontSize: "10px", color: T.borderStrong, textAlign: "center", fontFamily: MONO }}>
           v2.0
         </div>
       )}
@@ -953,22 +956,23 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
 const CollapsibleSection = ({ title, children, defaultOpen = false, badge }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ marginBottom: "16px", border: `1px solid ${T.border}`, borderRadius: "4px", overflow: "hidden" }}>
+    <div style={{ marginBottom: "12px", border: `1px solid ${T.border}`, borderRadius: "4px", overflow: "hidden" }}>
       <button onClick={() => setOpen(!open)} style={{
         display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "12px 16px",
         background: T.bgSub, border: "none", cursor: "pointer", fontFamily: FONT, fontSize: "13px",
         fontWeight: 600, color: T.text, textAlign: "left", justifyContent: "space-between",
+        transition: "background 120ms ease-out",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <ChevronRight size={14} style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: "transform 200ms ease-out" }} />
           {title}
           {badge && (
-            <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 4, background: badge.bg || T.primaryLight, color: badge.color || T.primary, fontFamily: MONO }}>{badge.text}</span>
+            <span style={{ fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: "3px", background: badge.bg || T.primaryLight, color: badge.color || T.primary, fontFamily: MONO }}>{badge.text}</span>
           )}
         </div>
         <span style={{ fontSize: 10, color: T.textTer, fontWeight: 400 }}>{open ? "collapse" : "expand"}</span>
       </button>
-      {open && <div style={{ padding: "16px" }}>{children}</div>}
+      {open && <div style={{ padding: "16px", borderTop: `1px solid ${T.border}` }}>{children}</div>}
     </div>
   );
 };
@@ -982,7 +986,7 @@ const FigureSection = ({ title, children, defaultOpen = true }) => {
         display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none",
         cursor: "pointer", padding: "4px 0", marginBottom: open ? "8px" : 0, fontFamily: FONT,
         fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase",
-        letterSpacing: "0.05em",
+        letterSpacing: "0.04em",
       }}>
         <ChevronDown size={12} style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
         {title}
@@ -1197,7 +1201,7 @@ const HomePage = ({ goTo, connected }) => {
     <div style={{ padding: mobile ? "24px 16px" : "32px 40px", maxWidth: "1100px" }}>
       {/* Page title */}
       <div style={{ marginBottom: "24px" }}>
-        <h1 style={{ fontSize: "20px", fontWeight: 600, color: T.text, margin: 0, fontFamily: HEADING }}>Pipeline Configuration</h1>
+        <h1 style={{ fontSize: "20px", fontWeight: 600, color: T.text, margin: 0, fontFamily: HEADING, letterSpacing: "-0.01em" }}>Pipeline Configuration</h1>
         <p style={{ fontSize: "13px", color: T.textSec, marginTop: "4px", margin: "4px 0 0" }}>Design multiplexed CRISPR-Cas12a diagnostic panels for drug-resistant TB</p>
       </div>
 
@@ -1274,7 +1278,7 @@ const HomePage = ({ goTo, connected }) => {
                 display: "flex", flexDirection: "column", transition: "border-color 0.12s, background 0.12s",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>{p.name}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>{p.name}</span>
                   {p.targets && <span style={{ fontSize: "13px", fontWeight: 500, fontFamily: MONO, color: panel === p.id ? T.primary : T.textTer }}>{p.targets}</span>}
                 </div>
                 <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.5, flex: 1, marginBottom: p.meta.length ? "8px" : "0" }}>{p.desc}</div>
@@ -1303,7 +1307,7 @@ const HomePage = ({ goTo, connected }) => {
                 background: scorer === s.id ? T.primaryLight : T.bg, transition: "all 0.15s",
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "15px", fontWeight: 600, color: scorer === s.id ? T.primaryDark : T.text, fontFamily: HEADING }}>{s.label}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: scorer === s.id ? T.primaryDark : T.text, fontFamily: HEADING }}>{s.label}</span>
                   <span style={{ fontSize: "10px", fontWeight: 600, fontFamily: MONO, padding: "2px 8px", borderRadius: "3px", background: s.id === "narsil_ml" ? T.primaryLight : T.bgSub, color: s.id === "narsil_ml" ? T.primary : T.textTer }}>{s.tag}</span>
                 </div>
                 <div style={{ fontSize: "13px", color: scorer === s.id ? T.primaryDark : T.textSec, lineHeight: 1.5 }}>{s.desc}</div>
@@ -1357,7 +1361,7 @@ const HomePage = ({ goTo, connected }) => {
                   <thead>
                     <tr style={{ background: T.bg }}>
                       {(panel === "custom" ? ["", "Gene", "Mutation", "Drug", "WHO Confidence", "Tier"] : ["Gene", "Mutation", "Drug", "WHO Confidence", "Tier"]).map(h => (
-                        <th key={h} style={{ textAlign: "left", padding: "10px 12px", fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
+                        <th key={h} style={{ textAlign: "left", padding: "10px 12px", fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1584,9 +1588,16 @@ const HomePage = ({ goTo, connected }) => {
                       <span style={{ fontSize: "10px", color: T.textTer, fontFamily: MONO }}>{pipeStep + 1} of {effectiveModules.length} modules</span>
                     </div>
                   </div>
-                  {/* Progress bar */}
-                  <div style={{ width: "100%", height: "4px", borderRadius: "2px", background: T.bgHover, marginTop: "10px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", borderRadius: "2px", background: T.primary, width: `${pct}%`, transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)" }} />
+                  {/* Segmented progress dots */}
+                  <div style={{ display: "flex", gap: "3px", marginTop: "12px" }}>
+                    {effectiveModules.map((_, i) => (
+                      <div key={i} style={{
+                        flex: 1, height: "4px", borderRadius: "2px",
+                        background: i < pipeStep ? T.primary : i === pipeStep ? T.primary : T.bgHover,
+                        opacity: i === pipeStep ? (0.4 + 0.6 * intraStep) : 1,
+                        transition: "background 200ms ease-out, opacity 300ms ease-out",
+                      }} />
+                    ))}
                   </div>
                   {/* Time estimate hint — appears after 5s on same step */}
                   {stepElapsed > 5 && (() => {
@@ -1745,7 +1756,7 @@ const MethodsPage = () => {
 
       {/* ═══ Page Header ═══ */}
       <div style={{ marginBottom: "28px" }}>
-        <h1 style={{ fontSize: "20px", fontWeight: 600, color: T.text, fontFamily: HEADING, margin: 0 }}>Methods</h1>
+        <h1 style={{ fontSize: "20px", fontWeight: 600, color: T.text, fontFamily: HEADING, margin: 0, letterSpacing: "-0.01em" }}>Methods</h1>
         <p style={{ fontSize: "13px", color: T.textSec, marginTop: "4px", lineHeight: 1.5 }}>
           How NARSIL designs, scores, and validates CRISPR-Cas12a diagnostic panels for drug-resistant tuberculosis.
         </p>
@@ -1809,7 +1820,7 @@ const MethodsPage = () => {
         </div>
 
         {/* Multi-task callout */}
-        <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: "14px 18px", fontSize: "13px", color: T.primaryDark, lineHeight: 1.6, marginBottom: "20px" }}>
+        <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: "12px 16px", fontSize: "13px", color: T.primaryDark, lineHeight: 1.6, marginBottom: "20px" }}>
           <strong>Multi-task learning</strong> — Efficiency and discrimination are predicted jointly. Discrimination (the MUT/WT cleavage ratio) determines whether a guide can distinguish resistant from susceptible bacteria at single-nucleotide resolution.
         </div>
 
@@ -1827,7 +1838,7 @@ const MethodsPage = () => {
         </div>
 
         {/* Benchmark callout */}
-        <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "14px 18px", fontSize: "12px", color: T.textSec, lineHeight: 1.65 }}>
+        <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "12px 16px", fontSize: "12px", color: T.textSec, lineHeight: 1.65 }}>
           <strong style={{ color: T.text }}>Benchmark:</strong> Models trained only on cis-cleavage data show {"\u03c1"} = 0.04 for diagnostic trans-cleavage. The production model with trans-cleavage training achieves {"\u03c1"} = 0.55 — an order-of-magnitude improvement.
         </div>
       </Section>
@@ -1892,7 +1903,7 @@ const MethodsPage = () => {
             { label: "Acceptable", val: "\u2265 2\u00d7", desc: "Requires confirmatory readout or dual-target.", color: T.warning },
             { label: "Insufficient", val: "< 2\u00d7", desc: "Synthetic mismatch enhancement needed.", color: T.danger },
           ].map((t, i) => (
-            <div key={t.label} style={{ padding: "18px 16px", borderLeft: i > 0 && !mobile ? `1px solid ${T.border}` : "none", borderTop: i >= 2 && mobile ? `1px solid ${T.border}` : "none" }}>
+            <div key={t.label} style={{ padding: "16px 16px", borderLeft: i > 0 && !mobile ? `1px solid ${T.border}` : "none", borderTop: i >= 2 && mobile ? `1px solid ${T.border}` : "none" }}>
               <div style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: MONO, marginBottom: "2px" }}>{t.val}</div>
               <div style={{ fontSize: "11px", fontWeight: 600, color: t.color, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "6px" }}>{t.label}</div>
               <div style={{ fontSize: "11px", color: T.textSec, lineHeight: 1.5 }}>{t.desc}</div>
@@ -1901,7 +1912,7 @@ const MethodsPage = () => {
         </div>
 
         {/* Synthetic mismatch enhancement */}
-        <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "14px 18px" }}>
+        <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "12px 16px" }}>
           <div style={{ fontSize: "12px", fontWeight: 600, color: T.text, marginBottom: "4px" }}>Synthetic Mismatch Enhancement</div>
           <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6 }}>
             For candidates with insufficient discrimination, deliberate mismatches within the seed region (positions 1{"\u2013"}8) destabilize wildtype binding while preserving mutant recognition. Published improvements range from 2{"\u00d7"} to {">"}50{"\u00d7"} (Kohabir et al. 2024).
@@ -2163,20 +2174,20 @@ const RiskMatrix = ({ results }) => {
   const axisNames = { activity: "Activity", discrimination: "Disc", primers: "Primers", gc_risk: "GC", off_target: "Off-T" };
   return (
     <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", overflow: "hidden", marginBottom: "24px" }}>
-      <div style={{ padding: "18px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Risk Assessment Matrix</div>
+      <div style={{ padding: "16px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+        <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Risk Assessment Matrix</div>
         <div style={{ fontSize: "12px", color: T.textTer }}>{sorted.length} targets</div>
       </div>
       <div style={{ overflowX: "auto", padding: "8px 0" }}>
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "2px 2px", fontSize: "12px" }}>
           <thead>
             <tr>
-              <th style={{ padding: "8px 16px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", width: mobile ? 100 : 140 }}>Target</th>
+              <th style={{ padding: "8px 16px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em", width: mobile ? 100 : 140 }}>Target</th>
               {axes.map(a => (
-                <th key={a} style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", width: 52 }}>{axisNames[a]}</th>
+                <th key={a} style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em", width: 52 }}>{axisNames[a]}</th>
               ))}
-              <th style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", width: 52 }}>Overall</th>
-              <th style={{ padding: "8px 14px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", width: 50 }}>#</th>
+              <th style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em", width: 52 }}>Overall</th>
+              <th style={{ padding: "8px 14px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em", width: 50 }}>#</th>
             </tr>
           </thead>
           <tbody>
@@ -2239,7 +2250,7 @@ const ReadinessChart = ({ results }) => {
     <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "24px 24px 20px", marginBottom: "24px" }}>
       <div style={{ marginBottom: "12px", display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "8px" }}>
         <div>
-          <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Diagnostic Readiness Score</div>
+          <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Diagnostic Readiness Score</div>
           <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px" }}>Each line is one candidate across 5 readiness axes. Strong candidates stay high. Colored by drug class.</div>
         </div>
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
@@ -2514,7 +2525,7 @@ const UMAPPanel = ({ jobId }) => {
     <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "20px" : "28px 32px", marginBottom: "24px", position: "relative" }}>
       <div style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
         <div>
-          <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Candidate Embedding Space</div>
+          <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Candidate Embedding Space</div>
           <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5 }}>
             UMAP of {umapData.n_total.toLocaleString()} scored candidates (Narsil-ML 128-dim RLPA embeddings).
             {" "}{umapData.n_selected} panel members highlighted. Proximity in this space reflects learned sequence similarity.
@@ -2755,7 +2766,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                   <span style={{ fontSize: "13px", fontWeight: 600, color: T.textSec, fontFamily: FONT }}>{modelAgreement}</span>
                 </div>
               )}
-              <div style={{ fontSize: "10px", color: T.textTer, marginTop: "2px", paddingLeft: "18px" }}>
+              <div style={{ fontSize: "10px", color: T.textTer, marginTop: "2px", paddingLeft: "16px" }}>
                 Disc model: {discModel}
               </div>
             </div>
@@ -2774,7 +2785,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                     <AlertTriangle size={12} color={T.warning} strokeWidth={1.8} />
                     {missingPrimers.length} target{missingPrimers.length > 1 ? "s" : ""} need primers
                   </div>
-                  <div style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO, paddingLeft: "18px" }}>{missingPrimers.map(r => r.label).join(", ")}</div>
+                  <div style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO, paddingLeft: "16px" }}>{missingPrimers.map(r => r.label).join(", ")}</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: T.success }}>
@@ -2788,7 +2799,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                     <AlertTriangle size={12} color={T.warning} strokeWidth={1.8} />
                     {belowThreshold.length} below readiness threshold
                   </div>
-                  <div style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO, paddingLeft: "18px" }}>{belowThreshold.map(r => r.label).join(", ")}</div>
+                  <div style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO, paddingLeft: "16px" }}>{belowThreshold.map(r => r.label).join(", ")}</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: T.success }}>
@@ -2805,7 +2816,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                       <TrendingUp size={12} color={T.warning} strokeWidth={1.8} />
                       {lowDisc.length} below 3× discrimination
                     </div>
-                    <div style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO, paddingLeft: "18px" }}>{lowDisc.map(r => r.label).join(", ")}</div>
+                    <div style={{ fontSize: "11px", color: T.textTer, fontFamily: MONO, paddingLeft: "16px" }}>{lowDisc.map(r => r.label).join(", ")}</div>
                   </div>
                 );
               })()}
@@ -2889,13 +2900,13 @@ const OverviewTab = ({ results, scorer, jobId }) => {
           <FigureSection title="Score vs Discrimination">
           <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "28px 32px", marginBottom: "0" }}>
             <div style={{ marginBottom: "16px" }}>
-              <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Score vs Discrimination</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Score vs Discrimination</div>
               <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px" }}>
                 Each candidate plotted by efficiency score (x) and discrimination ratio (y).
                 Top-right quadrant = diagnostic-ready.{hasReadiness ? " Dot size reflects diagnostic readiness score (larger = higher readiness)." : " Dot size reflects primer availability."}
               </div>
             </div>
-            <div style={{ position: "relative", borderRadius: 8, padding: "12px 8px 4px 0" }}>
+            <div style={{ position: "relative", borderRadius: 4, padding: "12px 8px 4px 0" }}>
               <ResponsiveContainer width="100%" height={360}>
                 <ScatterChart margin={{ top: 20, right: 20, bottom: 25, left: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
@@ -2927,9 +2938,9 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                 </ScatterChart>
               </ResponsiveContainer>
               {/* Quadrant labels */}
-              <div style={{ position: "absolute", top: "24px", right: "28px", fontSize: "9px", fontWeight: 600, color: "#059669", opacity: 0.8, textTransform: "uppercase", letterSpacing: "0.05em" }}>Diagnostic-ready</div>
-              <div style={{ position: "absolute", top: "24px", left: "60px", fontSize: "9px", fontWeight: 600, color: "#9CA3AF", opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Low score</div>
-              <div style={{ position: "absolute", bottom: "42px", right: "28px", fontSize: "9px", fontWeight: 600, color: "#9CA3AF", opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.05em" }}>Low discrimination</div>
+              <div style={{ position: "absolute", top: "24px", right: "28px", fontSize: "9px", fontWeight: 600, color: "#059669", opacity: 0.8, textTransform: "uppercase", letterSpacing: "0.04em" }}>Diagnostic-ready</div>
+              <div style={{ position: "absolute", top: "24px", left: "60px", fontSize: "9px", fontWeight: 600, color: "#9CA3AF", opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.04em" }}>Low score</div>
+              <div style={{ position: "absolute", bottom: "42px", right: "28px", fontSize: "9px", fontWeight: 600, color: "#9CA3AF", opacity: 0.5, textTransform: "uppercase", letterSpacing: "0.04em" }}>Low discrimination</div>
             </div>
             {/* Legend */}
             <div style={{ display: "flex", alignItems: "center", gap: "12px", marginTop: "8px", flexWrap: "wrap" }}>
@@ -3002,7 +3013,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
           <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "28px 32px", marginBottom: "0" }}>
             <div style={{ marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
               <div>
-                <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Scoring Model Comparison</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Scoring Model Comparison</div>
                 <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5 }}>
                   Biophysical QC (x) vs Narsil-ML activity (y) per candidate. Points near the diagonal indicate model agreement.
                   Candidates above the line have higher activity than their QC score suggests; below indicates biophysical concerns.
@@ -3017,7 +3028,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
                 </div>
               </div>
             </div>
-            <div style={{ borderRadius: 8, padding: "12px 8px 4px 0" }}>
+            <div style={{ borderRadius: 4, padding: "12px 8px 4px 0" }}>
             <ResponsiveContainer width="100%" height={340}>
               <ScatterChart margin={{ top: 10, right: 20, bottom: 25, left: 10 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
@@ -3081,8 +3092,8 @@ const OverviewTab = ({ results, scorer, jobId }) => {
       {/* Drug coverage table */}
       <FigureSection title="Drug Coverage">
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", overflow: "hidden" }}>
-        <div style={{ padding: "18px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-          <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Drug Coverage</div>
+        <div style={{ padding: "16px 24px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+          <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Drug Coverage</div>
           <div style={{ fontSize: "12px", color: T.textTer }}>{drugs.length} classes</div>
         </div>
         <div style={{ overflowX: "auto" }}>
@@ -3090,7 +3101,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
           <thead>
             <tr>
               {["Drug", "Candidates", "Avg Score", "Avg Disc (Direct)", "Primers"].map((h) => (
-                <th key={h} style={{ padding: "10px 24px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
+                <th key={h} style={{ padding: "10px 24px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -3423,7 +3434,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
           { l: "Strategy", v: r.strategy, c: r.strategy === "Direct" ? T.success : T.purple },
         ].map((s, i) => (
           <div key={s.l} style={{ flex: 1, textAlign: "center", borderLeft: i > 0 ? `1px dashed ${T.border}` : "none", minWidth: mobile ? "30%" : "auto" }}>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{s.l}</div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>{s.l}</div>
             <div style={{ fontSize: "16px", fontWeight: 600, color: s.c, fontFamily: FONT }}>{s.v}</div>
           </div>
         ))}
@@ -3431,7 +3442,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
 
       {/* PROXIMITY explanation block */}
       {r.strategy === "Proximity" && (
-        <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "4px", padding: "14px 18px", marginBottom: "16px" }}>
+        <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "4px", padding: "12px 16px", marginBottom: "16px" }}>
           <div style={{ fontSize: "12px", fontWeight: 600, color: T.purple, fontFamily: HEADING, marginBottom: "4px" }}>Proximity Detection — PAM Desert</div>
           <div style={{ fontSize: "11px", color: "#2563EB", lineHeight: 1.5 }}>
             crRNA binds a conserved site {r.proximityDistance ? `${r.proximityDistance} bp` : "near"} the mutation. Discrimination via AS-RPA primers.
@@ -3466,7 +3477,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {interpretation.map((line, i) => (
-            <div key={i} style={{ fontSize: "11.5px", color: T.primaryDark, lineHeight: 1.65, paddingLeft: "22px", position: "relative" }}>
+            <div key={i} style={{ fontSize: "11.5px", color: T.primaryDark, lineHeight: 1.65, paddingLeft: "20px", position: "relative" }}>
               <span style={{ position: "absolute", left: 0, top: "1px", width: "14px", height: "14px", borderRadius: "50%", background: T.primarySub, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "8px", fontWeight: 600, color: T.primary }}>{i + 1}</span>
               {line}
             </div>
@@ -3495,13 +3506,13 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
           {openTab === "amplicon" && (
             <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Amplicon Map</div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Amplicon Map</div>
                 <div style={{ background: T.bgSub, borderRadius: "4px", padding: "8px 4px", border: `1px solid ${T.borderLight}` }}>
                   <AmpliconMap r={r} />
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>MUT vs WT Mismatch</div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>MUT vs WT Mismatch</div>
                 <div style={{ background: T.bgSub, borderRadius: "4px", padding: "12px", border: `1px solid ${T.borderLight}`, overflowX: "auto" }}>
                   <MismatchProfile spacer={displaySpacer} wtSpacer={r.wtSpacer} strategy={r.strategy} />
                 </div>
@@ -3553,7 +3564,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
             <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px" }}>
               {ref && (
                 <div>
-                  <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Clinical Evidence</div>
+                  <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Clinical Evidence</div>
                   <div style={{ background: T.bgSub, border: `1px solid ${T.borderLight}`, borderRadius: "4px", overflow: "hidden" }}>
                     {[
                       ["WHO Classification", ref.who],
@@ -3570,7 +3581,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
                 </div>
               )}
               <div>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>Assay Parameters</div>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Assay Parameters</div>
                 <div style={{ background: T.bgSub, border: `1px solid ${T.borderLight}`, borderRadius: "4px", overflow: "hidden" }}>
                   {[
                     ["Drug Class", r.drug],
@@ -3684,7 +3695,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
   return (
     <div>
       {/* Explainer box — blue */}
-      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", padding: mobile ? "14px" : "16px 22px", marginBottom: "16px" }}>
+      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", padding: mobile ? "14px" : "16px 20px", marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
           <List size={16} color={T.primary} strokeWidth={1.8} />
           <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Candidate Scoring</span>
@@ -3788,7 +3799,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
             <tr style={{ background: T.bgSub }}>
               <th style={{ padding: "10px 8px", borderBottom: `1px solid ${T.border}`, width: 28 }} />
               {cols.map((c) => (
-                <th key={c.key} onClick={() => toggleSort(c.key)} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.border}`, cursor: "pointer", width: c.w, userSelect: "none" }}>
+                <th key={c.key} onClick={() => toggleSort(c.key)} style={{ padding: "10px 12px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: `1px solid ${T.border}`, cursor: "pointer", width: c.w, userSelect: "none" }}>
                   {c.label} {sortKey === c.key ? (sortDir > 0 ? "↑" : "↓") : ""}
                 </th>
               ))}
@@ -3884,7 +3895,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                               <thead>
                                 <tr style={{ background: T.bgSub }}>
                                   {["Rank", "Spacer", "Score", "Disc", "Primers", "Tradeoff"].map(h => (
-                                    <th key={h} style={{ padding: "6px 12px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
+                                    <th key={h} style={{ padding: "6px 12px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
                                   ))}
                                 </tr>
                               </thead>
@@ -4112,7 +4123,7 @@ const CrossReactivityMatrix = () => {
       </div>
 
       {/* Interpretation */}
-      <div style={{ background: T.bg, border: `1px solid ${T.borderLight}`, borderRadius: 8, padding: "12px 16px", fontSize: 10, color: T.textSec, lineHeight: 1.7 }}>
+      <div style={{ background: T.bg, border: `1px solid ${T.borderLight}`, borderRadius: 4, padding: "12px 16px", fontSize: 10, color: T.textSec, lineHeight: 1.7 }}>
         <div style={{ fontWeight: 600, color: T.text, marginBottom: 4 }}>Interpretation</div>
         Cross-reactivity is assessed by scoring each crRNA against all non-self amplicons in the 14-target panel.
         For the paper-based spatially multiplexed electrode array (Bezinge et al., <em>Adv. Mater.</em> 2023),
@@ -4168,7 +4179,7 @@ const DiscriminationTab = ({ results }) => {
           { label: "Insufficient", val: "< 2×", count: insufficient, color: "#dc2626", desc: "SM enhancement required" },
         ].map(t => (
           <div key={t.label} style={{ background: T.bg, borderRadius: "4px", padding: "16px 18px", border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>{t.label}</div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>{t.label}</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec }}>{t.val}</div>
               <div style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: FONT }}>{t.count}</div>
@@ -4196,7 +4207,7 @@ const DiscriminationTab = ({ results }) => {
         return (
           <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "20px" : "28px 32px", marginBottom: "24px" }}>
             <div style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Discrimination Ratio — Direct Detection</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Discrimination Ratio — Direct Detection</div>
               <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px" }}>
                 {directCands.length} candidates using crRNA mismatch discrimination. Sorted highest to lowest.
               </div>
@@ -5063,7 +5074,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   return (
     <div>
       {/* ── Explainer box ── */}
-      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: mobile ? "14px" : "16px 22px", marginBottom: "16px" }}>
+      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: mobile ? "14px" : "16px 20px", marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
           <Grid3x3 size={16} color={T.primary} strokeWidth={1.8} />
           <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Multiplex Engineering</span>
@@ -5148,7 +5159,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             WHO TPP target: {kinetics.totals?.who_tpp_target || "< 120 min"}. Estimated total: {kinetics.totals?.total_electrode || "30\u201350 min"} — <strong style={{ color: T.success }}>within target</strong> with 2-4× margin.
           </div>
 
-          <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "14px 18px" }}>
+          <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "12px 16px" }}>
             <div style={{ fontSize: "11px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>Key Insights</div>
             {(kinetics.insights || []).map((ins, i) => (
               <div key={i} style={{ marginBottom: i < (kinetics.insights || []).length - 1 ? "8px" : 0 }}>
@@ -6128,7 +6139,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
   return (
     <div>
       {/* ── Explainer box ── */}
-      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: mobile ? "14px" : "16px 22px", marginBottom: "16px" }}>
+      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: mobile ? "14px" : "16px 20px", marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
           <Settings size={16} color={T.primary} strokeWidth={1.8} />
           <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Sensitivity-Specificity Optimization</span>
@@ -6144,7 +6155,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           {presets.map(p => (
             <button key={p.name} onClick={() => setActivePreset(p.name)} style={{
-              padding: "10px 18px", borderRadius: "4px", cursor: "pointer", fontFamily: FONT, fontSize: "13px", fontWeight: 600,
+              padding: "8px 16px", borderRadius: "4px", cursor: "pointer", fontFamily: FONT, fontSize: "13px", fontWeight: 600,
               transition: "all 0.15s", border: activePreset === p.name ? `2px solid ${T.primary}` : `1px solid ${T.border}`,
               background: activePreset === p.name ? T.primaryLight : T.bg, color: activePreset === p.name ? T.primaryDark : T.text,
             }}>
@@ -6198,7 +6209,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               <div key={card.label} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "16px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
                   <card.icon size={14} color={card.color} />
-                  <span style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em" }}>{card.label}</span>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em" }}>{card.label}</span>
                 </div>
                 <div style={{ fontSize: "18px", fontWeight: 600, color: card.color, fontFamily: FONT, lineHeight: 1 }}>{card.value}</div>
               </div>
@@ -6220,7 +6231,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             });
             if (filtered.length < 2) return (
               <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "24px 28px", marginBottom: "24px" }}>
-                <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>MUT vs WT Predicted Activity</div>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>MUT vs WT Predicted Activity</div>
                 <div style={{ fontSize: "12px", color: T.textSec, padding: "20px 0", textAlign: "center" }}>
                   Only {filtered.length} candidate{filtered.length === 1 ? "" : "s"} pass the <strong>{PRESET_LABELS[activePreset] || activePreset}</strong> thresholds (eff ≥ {effT}, disc ≥ {discT}×). Need ≥ 2 to plot distribution. Try a less stringent preset.
                 </div>
@@ -6258,7 +6269,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "24px 28px", marginBottom: "24px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
                   <div>
-                    <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>MUT vs WT Predicted Activity</div>
+                    <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>MUT vs WT Predicted Activity</div>
                     <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px", lineHeight: 1.5, maxWidth: "540px" }}>
                       Density from <strong>{plotResults.length}</strong>/{results.filter(r => r.gene !== "IS6110").length} candidates passing <strong>{PRESET_LABELS[activePreset] || activePreset}</strong> thresholds (eff ≥ {effT}, disc ≥ {discT}×). Greater separation = better discrimination. Direct targets: A<sub>WT</sub> = A<sub>MUT</sub> / Cas12a disc. Proximity targets: A<sub>WT</sub> = A<sub>MUT</sub> / AS-RPA disc (WT not amplified → near-zero signal).
                     </div>
@@ -6324,15 +6335,15 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <div style={{ display: "flex", gap: "20px" }}>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ MUT</div>
-                      <div style={{ fontSize: "15px", fontWeight: 600, color: "#4338CA", fontFamily: FONT }}>{meanMut}</div>
+                      <div style={{ fontSize: "14px", fontWeight: 600, color: "#4338CA", fontFamily: FONT }}>{meanMut}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>μ WT</div>
-                      <div style={{ fontSize: "15px", fontWeight: 600, color: "#9CA3AF", fontFamily: FONT }}>{meanWt}</div>
+                      <div style={{ fontSize: "14px", fontWeight: 600, color: "#9CA3AF", fontFamily: FONT }}>{meanWt}</div>
                     </div>
                     <div style={{ textAlign: "center" }}>
                       <div style={{ fontSize: "9px", color: T.textTer, fontWeight: 600 }}>SEPARATION</div>
-                      <div style={{ fontSize: "15px", fontWeight: 600, color: separation >= 0.15 ? T.success : T.warning, fontFamily: FONT }}>{separation}</div>
+                      <div style={{ fontSize: "14px", fontWeight: 600, color: separation >= 0.15 ? T.success : T.warning, fontFamily: FONT }}>{separation}</div>
                     </div>
                   </div>
                 </div>
@@ -6398,7 +6409,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             const specPassing = whoEntries.filter(([, d]) => d.meets_specificity).length;
             return (
             <div style={{ marginBottom: "24px", border: `1px solid ${T.border}`, borderRadius: "4px", overflow: "hidden" }}>
-              <div style={{ background: T.bgSub, padding: "14px 18px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+              <div style={{ background: T.bgSub, padding: "12px 16px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
                 <Shield size={14} color={T.primary} />
                 <span style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>WHO TPP Compliance by Drug Class</span>
                 <Badge variant={sensPassing === whoEntries.length ? "success" : "warning"}>
@@ -6416,7 +6427,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <thead>
                     <tr style={{ background: T.bgSub }}>
                       {["Drug Class", "Sensitivity", "WHO Target", "Coverage", "Avg Disc", "Specificity", "Sens. Status", "Spec. Status"].map(h => (
-                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, color: T.textSec, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, color: T.textSec, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -6596,7 +6607,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                                         <thead>
                                           <tr>
                                             {["Rank", "Score", "Disc", "OT", "Spacer (20-nt)", "Tradeoff vs selected"].map(h => (
-                                              <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
+                                              <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.04em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
                                             ))}
                                           </tr>
                                         </thead>
@@ -7010,7 +7021,7 @@ const PanelsPage = ({ connected }) => {
         {panels.map((p) => (
           <div key={p.id || p.name} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-              <div style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>{p.name}</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>{p.name}</div>
               <Badge variant="primary">{(p.mutations || []).length} mutations</Badge>
             </div>
             {p.description && <div style={{ fontSize: "12px", color: T.textSec, marginBottom: "8px" }}>{p.description}</div>}
@@ -7169,7 +7180,7 @@ const ScoringPage = ({ connected }) => {
         </p>
 
         {/* Architecture branches */}
-        <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Branch Ablation (Kim 2018 cross-library)</div>
+        <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Branch Ablation (Kim 2018 cross-library)</div>
         <div style={{ background: T.bgSub, borderRadius: "4px", overflow: "hidden", marginBottom: "20px" }}>
           {[
             { name: "CNN only (baseline)", rho: "0.496", delta: null },
@@ -7189,7 +7200,7 @@ const ScoringPage = ({ connected }) => {
         </div>
 
         {/* Architecture details */}
-        <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Architecture</div>
+        <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Architecture</div>
         <div style={{ background: T.bgSub, borderRadius: "4px", overflow: "hidden" }}>
           {[
             ["Architecture", "CNN + RNA-FM → RLPA Attention → Fusion → Dense"],
@@ -7229,7 +7240,7 @@ const ScoringPage = ({ connected }) => {
             { label: "Target ρ", value: "> 0.60" },
           ].map(s => (
             <div key={s.label} style={{ background: T.bgSub, borderRadius: "4px", padding: "12px", textAlign: "center" }}>
-              <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{s.label}</div>
+              <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "4px" }}>{s.label}</div>
               <div style={{ fontSize: "16px", fontWeight: 600, color: T.text, fontFamily: FONT }}>{s.value}</div>
             </div>
           ))}
@@ -7247,7 +7258,7 @@ const ScoringPage = ({ connected }) => {
           Gradient-boosted model (XGBoost) trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a).
           Predicts the discrimination ratio (\u0394log-k between perfect-match and single-mismatch targets) from 15 thermodynamic features encoding mismatch position, chemistry, R-loop energetics, and sequence context.
         </p>
-        <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Performance (3-fold stratified CV, guide-level split)</div>
+        <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Performance (3-fold stratified CV, guide-level split)</div>
         <div style={{ background: T.bgSub, borderRadius: "4px", overflow: "hidden", marginBottom: "16px" }}>
           {[
             { name: "Heuristic baseline", rmse: "0.641", corr: "0.298", delta: null },
@@ -7266,7 +7277,7 @@ const ScoringPage = ({ connected }) => {
             </div>
           ))}
         </div>
-        <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Top Features (by importance)</div>
+        <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>Top Features (by importance)</div>
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(5, 1fr)", gap: "8px", marginBottom: "12px" }}>
           {[
             { label: "Seed \u0394G", desc: "R-loop stability at seed" },
@@ -7458,19 +7469,19 @@ const ResearchPage = ({ connected }) => {
             <div>
               {/* Summary metrics */}
               <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
-                <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "14px 18px" }}>
+                <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "12px 16px" }}>
                   <div style={{ fontSize: "11px", color: RS.muted, fontWeight: 600, marginBottom: "4px" }}>KENDALL TAU</div>
                   <div style={{ fontSize: "18px", fontWeight: 600, color: RS.text, fontFamily: FONT }}>{summary.kendall_tau?.toFixed(3) ?? "—"}</div>
                   <div style={{ fontSize: "10px", color: RS.muted, marginTop: "2px" }}>1.0 = identical ranking, 0 = unrelated</div>
                 </div>
-                <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "14px 18px" }}>
+                <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "12px 16px" }}>
                   <div style={{ fontSize: "11px", color: RS.muted, fontWeight: 600, marginBottom: "4px" }}>MEAN SCORE DELTA</div>
                   <div style={{ fontSize: "18px", fontWeight: 600, color: summary.mean_score_delta > 0 ? RS.positive : summary.mean_score_delta < 0 ? RS.negative : RS.text, fontFamily: FONT }}>
                     {summary.mean_score_delta > 0 ? "+" : ""}{summary.mean_score_delta?.toFixed(4) || "0"}
                   </div>
                   <div style={{ fontSize: "10px", color: RS.muted, marginTop: "2px" }}>Average score change (B - A)</div>
                 </div>
-                <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "14px 18px" }}>
+                <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "12px 16px" }}>
                   <div style={{ fontSize: "11px", color: RS.muted, fontWeight: 600, marginBottom: "4px" }}>DIAGNOSTIC IMPACT</div>
                   <div style={{ fontSize: "13px", fontWeight: 600, color: RS.text, lineHeight: 1.5 }}>
                     {summary.dropped.length === 0 && summary.gained.length === 0
@@ -7598,7 +7609,7 @@ const ResearchPage = ({ connected }) => {
               <div>
                 <div style={{ marginBottom: "6px" }}>Enter a DNA spacer sequence (15–30 nt) to compute the R-loop free energy profile:</div>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <input value={thermoStandaloneSeq} onChange={(e) => setThermoStandaloneSeq(e.target.value.toUpperCase().replace(/[^ATCG]/g, ""))} placeholder="e.g. TCGGTCAACCCCGACAGC" style={{ ...selectStyle, flex: 1, maxWidth: "320px", fontFamily: MONO, letterSpacing: "0.05em" }} />
+                  <input value={thermoStandaloneSeq} onChange={(e) => setThermoStandaloneSeq(e.target.value.toUpperCase().replace(/[^ATCG]/g, ""))} placeholder="e.g. TCGGTCAACCCCGACAGC" style={{ ...selectStyle, flex: 1, maxWidth: "320px", fontFamily: MONO, letterSpacing: "0.04em" }} />
                   <button onClick={handleThermoStandalone} disabled={thermoStandaloneSeq.trim().length < 15} style={{ ...btnStyle, opacity: thermoStandaloneSeq.trim().length < 15 ? 0.5 : 1 }}>Compute</button>
                 </div>
                 <div style={{ fontSize: "10px", color: "#a3a3a3", marginTop: "4px" }}>Pre-filled: rpoB_S531L spacer (18 nt). No panel run needed.</div>
@@ -7886,7 +7897,7 @@ const ResearchPage = ({ connected }) => {
               )}
 
               {/* Insight box */}
-              <div style={{ padding: "14px 18px", background: RS.seedBg, borderRadius: "4px", fontSize: "12px", color: RS.text, lineHeight: 1.7, marginBottom: "16px" }}>
+              <div style={{ padding: "12px 16px", background: RS.seedBg, borderRadius: "4px", fontSize: "12px", color: RS.text, lineHeight: 1.7, marginBottom: "16px" }}>
                 <strong>Key finding:</strong> Models optimised for cis-cleavage gene editing (Kim 2018 benchmark) show near-zero predictive value for diagnostic trans-cleavage (rho = 0.04). The production checkpoint (multi-dataset, no domain adversarial) achieves rho = 0.55 on trans-cleavage while retaining rho = 0.49 on cis-cleavage — the best all-rounder across both benchmarks. Domain-adversarial training (Ganin et al., JMLR 2016) is counter-productive: forcing domain invariance destroys trans-cleavage-specific signal.
               </div>
 
@@ -8343,7 +8354,7 @@ const ResearchPage = ({ connected }) => {
         })()}
 
         {/* Scientific insight box */}
-        <div style={{ background: `${RS.barrier}10`, border: `1px solid ${RS.barrier}30`, borderRadius: "4px", padding: "14px 18px", marginTop: "8px" }}>
+        <div style={{ background: `${RS.barrier}10`, border: `1px solid ${RS.barrier}30`, borderRadius: "4px", padding: "12px 16px", marginTop: "8px" }}>
           <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
             <AlertTriangle size={16} color={RS.barrier} style={{ flexShrink: 0, marginTop: 2 }} />
             <div>
