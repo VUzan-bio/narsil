@@ -2802,52 +2802,33 @@ const OverviewTab = ({ results, scorer, jobId }) => {
           <Brain size={16} color={T.primary} strokeWidth={1.8} />
           <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Panel Interpretation</span>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px", fontSize: "13px", color: T.primaryDark, lineHeight: 1.6 }}>
-          <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-            <Target size={14} color={T.primary} strokeWidth={1.8} style={{ marginTop: "3px", flexShrink: 0 }} />
-            <span>
-              <strong>{assayReady}/{totalTargets} targets are assay-ready</strong> across {drugs.length} drug classes ({drugs.join(", ")}). {directCount} use direct crRNA discrimination, {proximityCount} rely on AS-RPA primer selectivity for allelic specificity.
-            </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", color: T.primaryDark, lineHeight: 1.6 }}>
+          <div><strong>{assayReady}/{totalTargets} targets are assay-ready</strong> across {drugs.length} drug classes ({drugs.join(", ")}). {directCount} use direct crRNA discrimination, {proximityCount} rely on AS-RPA primer selectivity for allelic specificity.</div>
+          <div>
+            {avgActivity >= 0.8
+              ? `Mean predicted activity of ${avgActivity} indicates strong Cas12a trans-cleavage efficiency. Activity range ${minScore}\u2013${maxScore} suggests all candidates should produce detectable electrochemical signal.`
+              : avgActivity >= 0.6
+              ? `Mean predicted activity of ${avgActivity} is moderate. Weaker candidates (activity < 0.6) may require extended incubation or surface chemistry optimisation to reach detection threshold.`
+              : `Mean predicted activity of ${avgActivity} is below optimal. Consider re-running with relaxed GC or expanded spacer lengths to improve candidate quality.`
+            }
+            {avgPamAdj != null && avgPamAdj < avgActivity * 0.85 ? ` PAM-adjusted average (${avgPamAdj}) reflects activity penalties from non-canonical enAsCas12a PAM sites.` : ""}
           </div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-            <Activity size={14} color={T.primary} strokeWidth={1.8} style={{ marginTop: "3px", flexShrink: 0 }} />
-            <span>
-              {avgActivity >= 0.8
-                ? `Mean predicted activity of ${avgActivity} indicates strong Cas12a trans-cleavage efficiency. Activity range ${minScore}\u2013${maxScore} suggests all candidates should produce detectable electrochemical signal.`
-                : avgActivity >= 0.6
-                ? `Mean predicted activity of ${avgActivity} is moderate. Weaker candidates (activity < 0.6) may require extended incubation or surface chemistry optimisation to reach detection threshold.`
-                : `Mean predicted activity of ${avgActivity} is below optimal. Consider re-running with relaxed GC or expanded spacer lengths to improve candidate quality.`
-              }
-              {avgPamAdj != null && avgPamAdj < avgActivity * 0.85 ? ` PAM-adjusted average (${avgPamAdj}) reflects activity penalties from non-canonical enAsCas12a PAM sites.` : ""}
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-            <TrendingUp size={14} color={T.primary} strokeWidth={1.8} style={{ marginTop: "3px", flexShrink: 0 }} />
-            <span>
-              {highDisc >= directCount * 0.8
-                ? `${highDisc}/${directResults.length} direct candidates exceed the 3\u00d7 diagnostic-grade discrimination threshold (avg ${avgDisc}\u00d7). Panel is well-suited for single-nucleotide resistance genotyping.`
-                : highDisc >= directCount * 0.5
-                ? `${highDisc}/${directResults.length} direct candidates meet diagnostic-grade discrimination (\u22653\u00d7). Targets below threshold may benefit from synthetic mismatch enhancement or AS-RPA primer redesign.`
-                : `Only ${highDisc}/${directResults.length} direct candidates reach diagnostic-grade discrimination. Synthetic mismatch enhancement is recommended for low-discrimination targets.`
-              }
-            </span>
+          <div>
+            {highDisc >= directCount * 0.8
+              ? `${highDisc}/${directResults.length} direct candidates exceed the 3\u00d7 diagnostic-grade discrimination threshold (avg ${avgDisc}\u00d7). Panel is well-suited for single-nucleotide resistance genotyping.`
+              : highDisc >= directCount * 0.5
+              ? `${highDisc}/${directResults.length} direct candidates meet diagnostic-grade discrimination (\u22653\u00d7). Targets below threshold may benefit from synthetic mismatch enhancement or AS-RPA primer redesign.`
+              : `Only ${highDisc}/${directResults.length} direct candidates reach diagnostic-grade discrimination. Synthetic mismatch enhancement is recommended for low-discrimination targets.`
+            }
           </div>
           {(missingPrimers.length > 0 || belowThreshold.length > 0) && (
-            <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-              <AlertTriangle size={14} color={T.primary} strokeWidth={1.8} style={{ marginTop: "3px", flexShrink: 0 }} />
-              <span>
-                {missingPrimers.length > 0 ? `${missingPrimers.length} target${missingPrimers.length > 1 ? "s" : ""} lack RPA primers \u2014 these cannot be amplified and are not deployable. ` : ""}
-                {belowThreshold.length > 0 ? `${belowThreshold.length} target${belowThreshold.length > 1 ? "s" : ""} fall below readiness threshold (${belowThreshold.map(r => r.label).join(", ")}). Consider alternative spacers or backup candidates.` : ""}
-              </span>
+            <div>
+              {missingPrimers.length > 0 ? `${missingPrimers.length} target${missingPrimers.length > 1 ? "s" : ""} lack RPA primers \u2014 these cannot be amplified and are not deployable. ` : ""}
+              {belowThreshold.length > 0 ? `${belowThreshold.length} target${belowThreshold.length > 1 ? "s" : ""} fall below readiness threshold (${belowThreshold.map(r => r.label).join(", ")}). Consider alternative spacers or backup candidates.` : ""}
             </div>
           )}
           {withPrimers === totalTargets && belowThreshold.length === 0 && (
-            <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
-              <Check size={14} color={T.success} strokeWidth={2} style={{ marginTop: "3px", flexShrink: 0 }} />
-              <span style={{ color: T.success }}>
-                <strong>All {totalTargets} targets have primers and pass readiness threshold.</strong> Panel is ready for experimental validation on the LIG electrode array.
-              </span>
-            </div>
+            <div style={{ color: T.success }}><strong>All {totalTargets} targets have primers and pass readiness threshold.</strong> Panel is ready for experimental validation on the LIG electrode array.</div>
           )}
         </div>
       </div>
@@ -3686,6 +3667,10 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
     <div>
       {/* Explainer box — blue */}
       <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", padding: mobile ? "14px" : "16px 22px", marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+          <List size={16} color={T.primary} strokeWidth={1.8} />
+          <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Candidate Scoring</span>
+        </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", color: T.primaryDark, lineHeight: 1.6 }}>
           <div><strong>Activity</strong> — Narsil-ML predicted Cas12a on-target efficiency (0–1). <strong>PAM-adj</strong> = Activity × PAM penalty (actual signal strength).</div>
           <div><strong>Disc</strong> — MUT/WT fold-difference. <span style={{ color: T.success }}>≥3×</span> diagnostic-grade. <span style={{ color: T.danger }}>&lt;2×</span> insufficient.</div>
@@ -4138,8 +4123,11 @@ const DiscriminationTab = ({ results }) => {
     <div>
       {/* Blue explainer */}
       <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", padding: mobile ? "16px" : "20px 24px", marginBottom: "24px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING, marginBottom: "6px" }}>Can this guide tell apart resistant from normal?</div>
-        <div style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.7, opacity: 0.85 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+          <TrendingUp size={16} color={T.primary} strokeWidth={1.8} />
+          <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Can this guide tell apart resistant from normal?</span>
+        </div>
+        <div style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.7 }}>
           <p style={{ margin: "0 0 8px" }}>
             Each crRNA is designed to perfectly match the <strong>resistance mutation</strong> (MUT). When it encounters <strong>normal/wildtype DNA</strong> (WT),
             mismatches at the mutation site reduce Cas12a cleavage. The <strong>discrimination ratio</strong> is how many times stronger the signal
@@ -5056,6 +5044,17 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
   return (
     <div>
+      {/* ── Explainer box ── */}
+      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: mobile ? "14px" : "16px 22px", marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+          <Grid3x3 size={16} color={T.primary} strokeWidth={1.8} />
+          <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Multiplex Engineering</span>
+        </div>
+        <div style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6 }}>
+          Spatially-addressed 14-plex electrode array with per-pad crRNA, predicted electrochemical readout (SWV/DPV/CV), cross-reactivity analysis, and in situ RNP formation kinetics. Each detection zone is physically isolated by wax-printed hydrophobic barriers {"\u2014"} enabling simultaneous detection of {drugs.length} drug resistance classes from a single blood sample.
+        </div>
+      </div>
+
       {/* ═══════════ SECTION 0: 3D Interactive Chip Render ═══════════ */}
       <CollapsibleSection title="Device Architecture · 3D" defaultOpen={true} badge={{ text: "interactive", bg: "#FFFBEB", color: "#2563EB" }}>
         <ChipRender3D
@@ -6110,6 +6109,17 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
 
   return (
     <div>
+      {/* ── Explainer box ── */}
+      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: mobile ? "14px" : "16px 22px", marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+          <Settings size={16} color={T.primary} strokeWidth={1.8} />
+          <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Sensitivity-Specificity Optimization</span>
+        </div>
+        <div style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6 }}>
+          Evaluate panel performance against WHO Target Product Profile thresholds across three operating modes. Per-drug sensitivity and specificity are computed from discrimination ratios and primer coverage. Adjust the optimization profile to balance field deployment (high sensitivity) versus reference laboratory (high specificity) requirements.
+        </div>
+      </div>
+
       {/* A: Preset Selector */}
       <div style={{ marginBottom: "24px" }}>
         <div style={{ fontSize: "11px", fontWeight: 600, color: T.primary, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>Optimization Profile</div>
