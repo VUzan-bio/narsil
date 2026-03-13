@@ -4042,7 +4042,7 @@ const CrossReactivityMatrix = () => {
   return (
     <div>
       {/* Toggle */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", justifyContent: "center" }}>
         <button onClick={() => setShowPamFilter(!showPamFilter)} style={{
           fontSize: 10, fontWeight: 600, padding: "4px 12px", borderRadius: 4,
           border: `1px solid ${showPamFilter ? T.primary : T.border}`, cursor: "pointer", fontFamily: MONO,
@@ -4056,8 +4056,8 @@ const CrossReactivityMatrix = () => {
       </div>
 
       {/* Heatmap */}
-      <div style={{ overflowX: "auto", marginBottom: 16, position: "relative" }}>
-        <svg width={totalW + 10} height={totalH + 10} style={{ display: "block" }}
+      <div style={{ overflowX: "auto", marginBottom: 16, position: "relative", display: "flex", justifyContent: "center" }}>
+        <svg width={totalW + 10} height={totalH + 10} style={{ display: "block", maxWidth: "100%" }}
           onMouseLeave={() => setHovCell(null)}>
           {/* Column headers (rotated 45°) */}
           {labels.map((l, j) => (
@@ -4140,7 +4140,7 @@ const CrossReactivityMatrix = () => {
       </div>
 
       {/* Color legend */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap", alignItems: "center", justifyContent: "center" }}>
         {[
           { label: "On-target", color: "#1e293b" },
           { label: "None (<1%)", color: "#F5F3EE" },
@@ -5158,8 +5158,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
       {/* ═══════════ SECTION 6: In Situ RNP Formation Kinetics ═══════════ */}
       <CollapsibleSection title="In Situ RNP Formation Kinetics" defaultOpen={false} badge={{ text: kinetics.totals?.total_electrode || "30\u201350 min", bg: "#22c55e20", color: "#22c55e" }}>
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "24px", marginBottom: "24px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>In Situ RNP Formation Kinetics</div>
+        <div style={{ padding: "0", marginBottom: "24px" }}>
           <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
             In situ RNP formation is integral to the per-pad one-pot architecture. Cas12a protein arrives in the sample buffer
             and encounters pad-specific lyophilized crRNA upon rehydration. Gradual RNP formation (Lesinski et al. 2024, <em>Anal. Chem.</em>)
@@ -5178,10 +5177,10 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
               </thead>
               <tbody>
                 {(kinetics.phases || []).map((phase, i) => (
-                  <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}`, background: phase.is_bottleneck ? "#B4530908" : "transparent" }}>
-                    <td style={{ padding: "8px 12px", fontWeight: phase.is_bottleneck ? 600 : 400 }}>
+                  <tr key={i} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
+                    <td style={{ padding: "8px 12px", fontWeight: phase.is_bottleneck ? 500 : 400 }}>
                       {phase.phase}
-                      {phase.is_bottleneck && <span style={{ fontSize: "9px", fontWeight: 600, color: "#4338CA", marginLeft: "8px", padding: "1px 6px", background: "#B4530915", borderRadius: "4px" }}>RATE-LIMITING</span>}
+                      {phase.is_bottleneck && <span style={{ fontSize: "9px", fontWeight: 500, color: T.textSec, marginLeft: "8px", padding: "1px 6px", background: T.bgSub, borderRadius: "4px", border: `1px solid ${T.borderLight}` }}>RATE-LIMITING</span>}
                     </td>
                     <td style={{ textAlign: "center", padding: "8px 12px", color: T.textSec, fontFamily: FONT }}>{phase.solution_bound}</td>
                     <td style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600, fontFamily: FONT }}>{phase.on_electrode}</td>
@@ -5206,16 +5205,16 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             </table>
           </div>
 
-          <div style={{ marginBottom: "16px", padding: "8px 14px", borderRadius: "4px", background: "#22c55e12", borderLeft: `3px solid ${T.success}`, fontSize: "12px", color: T.textSec }}>
-            WHO TPP target: {kinetics.totals?.who_tpp_target || "< 120 min"}. Estimated total: {kinetics.totals?.total_electrode || "30\u201350 min"} — <strong style={{ color: T.success }}>within target</strong> with 2-4\u00d7 margin.
+          <div style={{ marginBottom: "16px", padding: "8px 14px", borderRadius: "4px", background: "#22c55e0a", fontSize: "12px", color: T.textSec }}>
+            WHO TPP target: {kinetics.totals?.who_tpp_target || "< 120 min"}. Estimated total: {kinetics.totals?.total_electrode || "30\u201350 min"} — <strong style={{ color: T.success }}>within target</strong> with 2-4× margin.
           </div>
 
-          <div style={{ background: "#FFFBEB", border: "1px solid #FDE68A", borderRadius: "4px", padding: "14px 18px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 600, color: "#4338CA", fontFamily: HEADING, marginBottom: "8px" }}>Key Insights</div>
+          <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "14px 18px" }}>
+            <div style={{ fontSize: "11px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>Key Insights</div>
             {(kinetics.insights || []).map((ins, i) => (
               <div key={i} style={{ marginBottom: i < (kinetics.insights || []).length - 1 ? "8px" : 0 }}>
-                <div style={{ fontSize: "11px", fontWeight: 600, color: "#4338CA", opacity: 0.9 }}>{i + 1}. {ins.title}</div>
-                <p style={{ fontSize: "11px", color: "#3730A3", lineHeight: 1.6, margin: "2px 0 0", opacity: 0.8 }}>{ins.text}</p>
+                <div style={{ fontSize: "11px", fontWeight: 600, color: T.text }}>{i + 1}. {ins.title}</div>
+                <p style={{ fontSize: "11px", color: T.textSec, lineHeight: 1.6, margin: "2px 0 0" }}>{ins.text}</p>
               </div>
             ))}
           </div>
@@ -5791,9 +5790,8 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       {/* ═══════════ SECTION 8: AS-RPA Thermodynamic Discrimination ═══════════ */}
       {results.some(r => r.asrpaDiscrimination) && (
       <CollapsibleSection title="AS-RPA Thermodynamic Discrimination" defaultOpen={false} badge={{ text: `${proximityCount} proximity`, bg: "#FFFBEB", color: "#4338CA" }}>
-        <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "24px", marginBottom: "24px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "8px" }}>AS-RPA Thermodynamic Discrimination</div>
-          <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "8px", lineHeight: 1.6 }}>
+        <div style={{ padding: "0", marginBottom: "24px" }}>
+          <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "12px", lineHeight: 1.6 }}>
             Proximity candidates use allele-specific RPA primers for discrimination. The 3\u2032 terminal mismatch
             identity determines extension blocking strength. AS-RPA discrimination happens during <strong>amplification</strong>,
             not on the electrode pad. The pad only detects whether amplicon was produced.
@@ -5802,8 +5800,8 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${T.border}` }}>
-                  {["Target", "Pad", "Mismatch", "\u0394\u0394G", "Disc. Ratio", "Block", "Specificity"].map(h => (
-                    <th key={h} style={{ textAlign: "center", padding: "8px 12px", fontWeight: 600, fontFamily: HEADING, color: T.textSec }}>{h}</th>
+                  {["Target", "Pad", "Mismatch", "\u0394\u0394G", "Disc. Ratio", "Block", "Specificity"].map((h, i) => (
+                    <th key={h} style={{ textAlign: i === 0 ? "left" : "center", padding: "8px 12px", fontWeight: 600, fontFamily: HEADING, color: T.textSec, fontSize: "11px" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -5813,17 +5811,17 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   const blockColor = d.block_class === "strong" ? T.success : d.block_class === "moderate" ? T.warning : T.danger;
                   return (
                     <tr key={r.label} style={{ borderBottom: `1px solid ${T.borderLight}` }}>
-                      <td style={{ padding: "8px 12px", fontWeight: 600 }}>{r.label}</td>
+                      <td style={{ padding: "8px 12px", fontWeight: 600, fontSize: "11px", fontFamily: MONO }}>{r.label}</td>
                       <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: MONO, fontSize: "10px" }}>
                         {electrodeLayout.flat().indexOf(r.label) + 1 > 0 ? `P${electrodeLayout.flat().indexOf(r.label) + 1}` : "\u2014"}
                       </td>
-                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: MONO, fontWeight: 600 }}>{d.terminal_mismatch}</td>
-                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: FONT }}>{d.ddg_kcal.toFixed(1)} kcal/mol</td>
-                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: FONT, fontWeight: 600, color: d.disc_ratio >= 50 ? T.success : d.disc_ratio >= 10 ? T.warning : T.danger }}>{d.disc_ratio >= 100 ? "\u2265100" : d.disc_ratio.toFixed(0)}\u00d7</td>
+                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: MONO, fontWeight: 600, fontSize: "11px" }}>{d.terminal_mismatch}</td>
+                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: FONT, fontSize: "11px" }}>{d.ddg_kcal.toFixed(1)} kcal/mol</td>
+                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: FONT, fontWeight: 600, fontSize: "11px", color: d.disc_ratio >= 50 ? T.success : d.disc_ratio >= 10 ? T.warning : T.danger }}>{d.disc_ratio >= 100 ? "\u2265100" : d.disc_ratio.toFixed(0)}\u00d7</td>
                       <td style={{ padding: "8px 12px", textAlign: "center" }}>
-                        <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 600, background: blockColor + "20", color: blockColor, textTransform: "uppercase" }}>{d.block_class}</span>
+                        <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 500, background: blockColor + "15", color: blockColor, textTransform: "lowercase" }}>{d.block_class}</span>
                       </td>
-                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: FONT }}>{(d.estimated_specificity * 100).toFixed(1)}%</td>
+                      <td style={{ padding: "8px 12px", textAlign: "center", fontFamily: FONT, fontSize: "11px" }}>{(d.estimated_specificity * 100).toFixed(1)}%</td>
                     </tr>
                   );
                 })}
