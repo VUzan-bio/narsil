@@ -29,15 +29,15 @@ import {
    ═══════════════════════════════════════════════════════════════════ */
 const T = {
   bg: "#FFFFFF", bgSub: "#F9FAFB", bgHover: "#F3F4F6",
-  border: "#E5E7EB", borderLight: "#F3F4F6",
+  border: "#E5E7EB", borderLight: "#F3F4F6", borderStrong: "#D1D5DB",
   text: "#111827", textSec: "#6B7280", textTer: "#9CA3AF",
-  primary: "#4338CA", primaryLight: "#EEF2FF", primaryDark: "#3730A3", primarySub: "#C7D2FE",
+  primary: "#2563EB", primaryLight: "#EFF6FF", primaryDark: "#1D4ED8", primarySub: "#BFDBFE",
   success: "#059669", successLight: "#ECFDF5",
   warning: "#D97706", warningLight: "#FFFBEB",
   danger: "#DC2626", dangerLight: "#FEF2F2",
-  navy: "#4338CA", navyLight: "#EEF2FF",
-  purple: "#4338CA", purpleLight: "#EEF2FF",
-  sidebar: "#F9FAFB", sidebarActive: "#EEF2FF", sidebarHover: "#F3F4F6", sidebarText: "#374151",
+  navy: "#1E3A5F", navyLight: "#EFF6FF",
+  purple: "#7C3AED", purpleLight: "#F5F3FF",
+  sidebar: "#F9FAFB", sidebarActive: "#EFF6FF", sidebarHover: "#F3F4F6", sidebarText: "#6B7280",
   riskGreen: "#059669", riskGreenBg: "#ECFDF5",
   riskAmber: "#D97706", riskAmberBg: "#FFFBEB",
   riskRed: "#DC2626", riskRedBg: "#FEF2F2",
@@ -45,7 +45,7 @@ const T = {
 const FONT = "'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 const HEADING = "'Source Sans 3', sans-serif";
 const MONO = "'IBM Plex Mono', 'Menlo', 'Consolas', monospace";
-const NUC = { A: "#059669", T: "#DC2626", G: "#D97706", C: "#4338CA" };
+const NUC = { A: "#059669", T: "#DC2626", G: "#D97706", C: "#4338CA" }; // nucleotide colors (kept distinct from primary)
 const BP = 768; // responsive breakpoint
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -354,7 +354,7 @@ const BIBLIOGRAPHY = [
    UTILITY COMPONENTS
    ═══════════════════════════════════════════════════════════════════ */
 const DRUG_COLORS = {
-  RIF: { bg: "transparent", text: "#4338CA", border: "#4338CA" }, INH: { bg: "transparent", text: "#D97706", border: "#D97706" },
+  RIF: { bg: "transparent", text: "#1E3A5F", border: "#1E3A5F" }, INH: { bg: "transparent", text: "#D97706", border: "#D97706" },
   EMB: { bg: "transparent", text: "#059669", border: "#059669" }, FQ: { bg: "transparent", text: "#DC2626", border: "#DC2626" },
   AG: { bg: "transparent", text: "#7C3AED", border: "#7C3AED" }, PZA: { bg: "transparent", text: "#0891B2", border: "#0891B2" },
 };
@@ -367,7 +367,7 @@ const Badge = ({ children, variant = "default" }) => {
     success: { background: "#ECFDF5", color: "#059669", border: "1px solid #059669" },
     warning: { background: "#FFFBEB", color: "#D97706", border: "1px solid #D97706" },
     danger: { background: "#FEF2F2", color: "#DC2626", border: "1px solid #DC2626" },
-    purple: { background: "#EEF2FF", color: "#4338CA", border: "1px solid #4338CA" },
+    purple: { background: "#F5F3FF", color: "#7C3AED", border: "1px solid #7C3AED" },
   };
   return (
     <span style={{ ...(s[variant] || s.default), padding: "2px 8px", borderRadius: "3px", fontSize: "11px", fontWeight: 500, fontFamily: MONO, display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>{children}</span>
@@ -394,10 +394,10 @@ const Btn = ({ children, variant = "primary", onClick, disabled, icon: Icon, ful
     ghost: { background: "transparent", color: T.textSec, border: "none" },
     danger: { background: T.danger, color: "#fff", border: "none" },
   };
-  const sizes = { sm: { padding: "6px 12px", fontSize: "12px" }, md: { padding: "10px 20px", fontSize: "13px" }, lg: { padding: "12px 24px", fontSize: "14px" } };
+  const sizes = { sm: { padding: "6px 12px", fontSize: "12px" }, md: { padding: "10px 20px", fontSize: "14px" }, lg: { padding: "12px 24px", fontSize: "14px" } };
   return (
     <button onClick={onClick} disabled={disabled} style={{
-      ...styles[variant], ...sizes[size], borderRadius: "4px", fontWeight: 600,
+      ...styles[variant], ...sizes[size], borderRadius: "6px", fontWeight: 500,
       cursor: disabled ? "not-allowed" : "pointer", display: "inline-flex",
       alignItems: "center", gap: "8px", fontFamily: FONT, opacity: disabled ? 0.5 : 1,
       width: full ? "100%" : "auto", justifyContent: "center",
@@ -405,7 +405,7 @@ const Btn = ({ children, variant = "primary", onClick, disabled, icon: Icon, ful
   );
 };
 
-const tooltipStyle = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: "3px", fontSize: "12px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", fontFamily: MONO };
+const tooltipStyle = { background: "#fff", border: `1px solid ${T.border}`, borderRadius: "4px", fontSize: "12px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", fontFamily: MONO };
 
 /* Gaussian KDE for smooth density estimation */
 function gaussianKDE(data, bandwidth = 0.05, nPoints = 100) {
@@ -681,9 +681,9 @@ const CandidateViewer = ({ r, onClose }) => {
             { l: "PAM", v: r.pam, c: T.text, badge: r.pamVariant && r.pamVariant !== "TTTV" ? r.pamVariant : null, penalty: r.pamPenalty },
           ].map((s, i) => (
             <div key={s.l} style={{ flex: mobile ? "1 1 40%" : 1, textAlign: "center", borderLeft: !mobile && i > 0 ? `1px dashed ${T.border}` : "none", minWidth: mobile ? "30%" : "auto" }}>
-              <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>{s.l}</div>
+              <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{s.l}</div>
               <div style={{ fontSize: mobile ? "15px" : "18px", fontWeight: 600, color: s.c, fontFamily: FONT }}>{s.v}</div>
-              {s.badge && <div style={{ marginTop: "3px", display: "inline-block", padding: "1px 5px", borderRadius: "4px", fontSize: "9px", fontWeight: 600, fontFamily: FONT, background: s.penalty >= 0.5 ? "#FEF3C7" : "#FEF2F2", color: s.penalty >= 0.5 ? "#3730A3" : "#DC2626" }}>{s.badge} {s.penalty != null ? `${s.penalty}×` : ""}</div>}
+              {s.badge && <div style={{ marginTop: "3px", display: "inline-block", padding: "1px 5px", borderRadius: "4px", fontSize: "9px", fontWeight: 600, fontFamily: FONT, background: s.penalty >= 0.5 ? "#FEF3C7" : "#FEF2F2", color: s.penalty >= 0.5 ? "#1D4ED8" : "#DC2626" }}>{s.badge} {s.penalty != null ? `${s.penalty}×` : ""}</div>}
             </div>
           ))}
         </div>
@@ -692,7 +692,7 @@ const CandidateViewer = ({ r, onClose }) => {
         {r.strategy === "Proximity" && (
           <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "4px", padding: "16px 20px", marginBottom: "24px" }}>
             <div style={{ fontSize: "13px", fontWeight: 600, color: T.purple, fontFamily: HEADING, marginBottom: "6px" }}>Proximity Detection — PAM Desert Region</div>
-            <div style={{ fontSize: "12px", color: "#4338CA", lineHeight: 1.6 }}>
+            <div style={{ fontSize: "12px", color: "#2563EB", lineHeight: 1.6 }}>
               <p style={{ margin: "0 0 6px" }}>
                 The <strong>{r.gene} {r.ref}{r.pos}{r.alt}</strong> mutation sits in a high-GC region with no Cas12a PAM placing the SNP within any spacer.
                 Instead, the crRNA binds a conserved site <strong>{r.proximityDistance ? `${r.proximityDistance} bp` : "nearby"}</strong> from the mutation.
@@ -871,20 +871,20 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
 
   const inner = (
     <aside style={{
-      width: mobile ? "280px" : (isCollapsed ? 56 : 240), background: T.sidebar,
+      width: mobile ? "280px" : (isCollapsed ? 56 : 220), background: T.sidebar,
       borderRight: mobile ? "none" : `1px solid ${T.border}`,
       display: "flex", flexDirection: "column", flexShrink: 0,
       transition: "width 0.2s ease",
-      ...(mobile ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 9998, boxShadow: "1px 0 3px rgba(0,0,0,0.08)" } : {}),
+      ...(mobile ? { position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 9998 } : {}),
     }}>
       {/* Logo + Toggle */}
       <div style={{ padding: isCollapsed ? "16px 0" : "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "space-between", gap: "8px" }}>
         {!isCollapsed && (
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <img src="/narsil-logo.png" alt="NARSIL" style={{ height: "22px", objectFit: "contain" }} />
+            <img src="/narsil-logo.png" alt="NARSIL" style={{ height: "20px", objectFit: "contain" }} />
             {!connected && (
               <span style={{ fontSize: "10px", color: T.danger, fontWeight: 600, display: "flex", alignItems: "center", gap: "3px" }}>
-                <WifiOff size={10} /> API disconnected
+                <WifiOff size={10} /> offline
               </span>
             )}
           </div>
@@ -898,25 +898,40 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
           <button onClick={() => setMobileOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", marginLeft: "auto" }}><X size={20} color={T.textSec} /></button>
         ) : !isCollapsed && (
           <button onClick={() => setCollapsed(!collapsed)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", display: "flex", borderRadius: "4px" }} title="Collapse sidebar">
-            <PanelLeftClose size={18} color={T.textSec} />
+            <PanelLeftClose size={16} color={T.textTer} />
           </button>
         )}
       </div>
+
+      {/* Launch Pipeline button */}
+      {!isCollapsed && (
+        <div style={{ padding: "12px 16px" }}>
+          <button onClick={() => handleNav("home")} style={{
+            width: "100%", padding: "10px 16px", borderRadius: "6px",
+            background: T.primary, color: "#fff", border: "none",
+            fontSize: "13px", fontWeight: 500, fontFamily: FONT,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+          }}>
+            <Play size={14} /> Launch pipeline
+          </button>
+        </div>
+      )}
+
       {/* Nav groups */}
-      <nav style={{ flex: 1, padding: isCollapsed ? "12px 6px" : "12px 10px", overflowY: "auto" }}>
+      <nav style={{ flex: 1, padding: isCollapsed ? "12px 6px" : "8px 12px", overflowY: "auto" }}>
         {NAV.map((g) => (
-          <div key={g.section} style={{ marginBottom: "18px" }}>
-            {!isCollapsed && <div style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", padding: "0 10px", marginBottom: "4px" }}>{g.section}</div>}
+          <div key={g.section} style={{ marginBottom: "16px" }}>
+            {!isCollapsed && <div style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", padding: "0 8px", marginBottom: "4px" }}>{g.section}</div>}
             {g.items.map((it) => {
               const active = page === it.id;
               return (
                 <button key={it.id} onClick={() => handleNav(it.id)} title={isCollapsed ? it.label : undefined} style={{
-                  display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "flex-start", gap: "10px", width: "100%", padding: isCollapsed ? "7px 0" : "7px 10px",
-                  borderRadius: 0, border: "none", borderLeft: active ? `2px solid ${T.primary}` : "2px solid transparent", cursor: "pointer", fontFamily: FONT, fontSize: "13px",
-                  fontWeight: active ? 600 : 400, background: active ? T.sidebarActive : "transparent",
-                  color: active ? T.primary : T.sidebarText,
+                  display: "flex", alignItems: "center", justifyContent: isCollapsed ? "center" : "flex-start", gap: "10px", width: "100%", padding: isCollapsed ? "8px 0" : "8px 12px",
+                  borderRadius: "4px", border: "none", cursor: "pointer", fontFamily: FONT, fontSize: "13px",
+                  fontWeight: active ? 500 : 400, background: active ? T.sidebarActive : "transparent",
+                  color: active ? T.primary : T.sidebarText, marginBottom: "1px",
                 }}>
-                  <it.icon size={16} strokeWidth={active ? 2 : 1.6} />
+                  <it.icon size={16} strokeWidth={active ? 2 : 1.5} />
                   {!isCollapsed && it.label}
                 </button>
               );
@@ -926,7 +941,7 @@ const Sidebar = ({ page, setPage, connected, mobileOpen, setMobileOpen, collapse
       </nav>
       {/* Footer */}
       {!isCollapsed && (
-        <div style={{ padding: "16px", borderTop: `1px solid ${T.border}`, fontSize: "10px", color: T.textTer, lineHeight: 1.6, textAlign: "center" }}>
+        <div style={{ padding: "16px", borderTop: `1px solid ${T.border}`, fontSize: "11px", color: T.textTer, textAlign: "center" }}>
           v2.0
         </div>
       )}
@@ -981,7 +996,7 @@ const FigureSection = ({ title, children, defaultOpen = true }) => {
         display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none",
         cursor: "pointer", padding: "4px 0", marginBottom: open ? "8px" : 0, fontFamily: FONT,
         fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase",
-        letterSpacing: "0.06em",
+        letterSpacing: "0.05em",
       }}>
         <ChevronDown size={12} style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s" }} />
         {title}
@@ -1192,16 +1207,13 @@ const HomePage = ({ goTo, connected }) => {
       : m
   ), [scorer]);
 
-  const sectionTitle = (text) => (
-    <div style={{ fontSize: mobile ? "18px" : "22px", fontWeight: 600, color: T.text, marginBottom: "12px", marginTop: mobile ? "32px" : "48px", letterSpacing: "-0.02em", fontFamily: HEADING }}>{text}</div>
-  );
-
   return (
-    <div style={{ padding: mobile ? "24px 16px" : "48px 40px" }}>
-      {/* Hero subtitle */}
-      <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, maxWidth: "820px", margin: mobile ? "0 0 20px" : "0 0 28px" }}>
-        End-to-end computational pipeline for designing multiplexed CRISPR-Cas12a diagnostic panels — from WHO resistance mutations to assay-ready crRNA sequences, RPA primers, and clinical performance predictions. Designed for electrochemical readout on laser-induced graphene.
-      </p>
+    <div style={{ padding: mobile ? "24px 16px" : "32px 40px", maxWidth: "1100px" }}>
+      {/* Page title */}
+      <div style={{ marginBottom: "24px" }}>
+        <h1 style={{ fontSize: "20px", fontWeight: 600, color: T.text, margin: 0, fontFamily: HEADING }}>Pipeline Configuration</h1>
+        <p style={{ fontSize: "13px", color: T.textSec, marginTop: "4px", margin: "4px 0 0" }}>Design multiplexed CRISPR-Cas12a diagnostic panels for drug-resistant TB</p>
+      </div>
 
       {/* ── Run Workflow ── */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", marginBottom: "24px", overflow: "hidden" }}>
@@ -1251,7 +1263,7 @@ const HomePage = ({ goTo, connected }) => {
 
         {/* Diagnostic Panel */}
         <div style={{ marginBottom: "28px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "10px" }}>Diagnostic Panel</div>
+          <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "12px" }}>Diagnostic Panel</div>
 
           {/* Preset cards — 2×2 */}
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px", marginBottom: "16px" }}>
@@ -1270,18 +1282,18 @@ const HomePage = ({ goTo, connected }) => {
                 meta: [] },
             ].map(p => (
               <div key={p.id} onClick={() => selectPanel(p.id)} style={{
-                padding: "20px", borderRadius: "4px", cursor: "pointer",
-                border: `2px solid ${panel === p.id ? T.primary : T.border}`,
+                padding: "16px 20px", borderRadius: "4px", cursor: "pointer",
+                border: panel === p.id ? `2px solid ${T.primary}` : `1px solid ${T.border}`,
                 background: panel === p.id ? T.primaryLight : T.bg,
                 display: "flex", flexDirection: "column", transition: "border-color 0.12s, background 0.12s",
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>{p.name}</span>
-                  {p.targets && <span style={{ fontSize: "11px", fontWeight: 600, color: T.primary }}>{p.targets}</span>}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "15px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>{p.name}</span>
+                  {p.targets && <span style={{ fontSize: "13px", fontWeight: 500, fontFamily: MONO, color: panel === p.id ? T.primary : T.textTer }}>{p.targets}</span>}
                 </div>
-                <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.5, flex: 1, marginBottom: p.meta.length ? "10px" : "0" }}>{p.desc}</div>
+                <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.5, flex: 1, marginBottom: p.meta.length ? "8px" : "0" }}>{p.desc}</div>
                 {p.meta.length > 0 && (
-                  <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: T.textTer, borderTop: `1px solid ${panel === p.id ? T.primary + "30" : T.borderLight}`, paddingTop: "8px" }}>
+                  <div style={{ display: "flex", gap: "12px", fontSize: "12px", color: T.textTer, borderTop: `1px solid ${panel === p.id ? T.primary + "30" : T.borderLight}`, paddingTop: "8px" }}>
                     {p.meta.map((label, j) => <span key={j}>{label}</span>)}
                   </div>
                 )}
@@ -1293,22 +1305,22 @@ const HomePage = ({ goTo, connected }) => {
 
         {/* Scoring Model */}
         <div style={{ marginBottom: "28px" }}>
-          <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, marginBottom: "10px" }}>Scoring Model</div>
+          <div style={{ fontSize: "12px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "12px" }}>Scoring Model</div>
           <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
             {[
               { id: "heuristic", label: "Heuristic", desc: "Position-weighted composite across 5 biophysical features.", tag: "Baseline" },
               { id: "narsil_ml", label: "Narsil-ML", desc: "Dual-branch CNN & RNA-FM with R-loop propagation attention.", tag: "Recommended" },
             ].map(s => (
               <button key={s.id} onClick={() => setScorer(s.id)} style={{
-                padding: "16px", borderRadius: "4px", cursor: "pointer", fontFamily: FONT, textAlign: "left",
-                border: `2px solid ${scorer === s.id ? T.primary : T.border}`,
+                padding: "16px 20px", borderRadius: "4px", cursor: "pointer", fontFamily: FONT, textAlign: "left",
+                border: scorer === s.id ? `2px solid ${T.primary}` : `1px solid ${T.border}`,
                 background: scorer === s.id ? T.primaryLight : T.bg, transition: "all 0.15s",
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "14px", fontWeight: 600, color: scorer === s.id ? T.primaryDark : T.text, fontFamily: HEADING }}>{s.label}</span>
-                  <span style={{ fontSize: "9px", fontWeight: 600, color: scorer === s.id ? T.primary : T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", padding: "2px 8px", borderRadius: "4px", background: scorer === s.id ? T.primary + "15" : T.bgSub }}>{s.tag}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "15px", fontWeight: 600, color: scorer === s.id ? T.primaryDark : T.text, fontFamily: HEADING }}>{s.label}</span>
+                  <span style={{ fontSize: "10px", fontWeight: 600, fontFamily: MONO, color: s.id === "narsil_ml" ? T.primary : T.textTer }}>{s.tag}</span>
                 </div>
-                <div style={{ fontSize: "12px", color: scorer === s.id ? T.primaryDark : T.textSec, lineHeight: 1.5, opacity: 0.85 }}>{s.desc}</div>
+                <div style={{ fontSize: "13px", color: scorer === s.id ? T.primaryDark : T.textSec, lineHeight: 1.5 }}>{s.desc}</div>
               </button>
             ))}
           </div>
@@ -1359,7 +1371,7 @@ const HomePage = ({ goTo, connected }) => {
                   <thead>
                     <tr style={{ background: T.bg }}>
                       {(panel === "custom" ? ["", "Gene", "Mutation", "Drug", "WHO Confidence", "Tier"] : ["Gene", "Mutation", "Drug", "WHO Confidence", "Tier"]).map(h => (
-                        <th key={h} style={{ textAlign: "left", padding: "10px 12px", fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
+                        <th key={h} style={{ textAlign: "left", padding: "10px 12px", fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1520,15 +1532,12 @@ const HomePage = ({ goTo, connected }) => {
         {/* Summary + Launch */}
         {error && <div style={{ color: T.danger, fontSize: "12px", marginBottom: "12px" }}>{error}</div>}
         <div style={{ display: "flex", alignItems: mobile ? "stretch" : "center", flexDirection: mobile ? "column" : "row", justifyContent: "space-between", gap: mobile ? "12px" : "16px" }}>
-          <div style={{ display: "flex", gap: "16px", fontSize: "12px", flexWrap: "wrap", alignItems: "center" }}>
-            <span style={{ color: T.textSec }}><strong style={{ color: T.text }}>{selected.size}</strong> targets</span>
-            <span style={{ color: T.textSec }}><strong style={{ color: T.text }}>{[...new Set([...selected].map(i => MUTATIONS[i]?.drug))].length}</strong> drug classes</span>
-            <span style={{ color: T.textSec }}><strong style={{ color: T.text }}>{mode === "custom" ? selectedModules.size : MODULES.length}</strong> modules</span>
-            {scorer && (
-              <span style={{ padding: "2px 8px", borderRadius: "4px", background: scorer === "narsil_ml" ? T.primaryLight : T.bgSub, color: scorer === "narsil_ml" ? T.primaryDark : T.textSec, fontSize: "11px", fontWeight: 600 }}>
-                {scorer === "narsil_ml" ? "Narsil-ML" : "Heuristic"}
-              </span>
-            )}
+          <div style={{ display: "flex", gap: "16px", fontSize: "13px", flexWrap: "wrap", alignItems: "center", color: T.textSec }}>
+            <span>{selected.size} targets</span>
+            <span style={{ color: T.borderStrong }}>·</span>
+            <span>{[...new Set([...selected].map(i => MUTATIONS[i]?.drug))].length} drug classes</span>
+            <span style={{ color: T.borderStrong }}>·</span>
+            <span>{mode === "custom" ? selectedModules.size : MODULES.length} modules</span>
           </div>
           <Btn icon={launching ? Loader2 : Play} onClick={launch} disabled={launching || selected.size === 0 || !scorer || !!pipeJobId}>
             {launching ? "Launching…" : pipeJobId ? (pipeDone ? "Complete" : "Running…") : "Launch Pipeline"}
@@ -1549,11 +1558,10 @@ const HomePage = ({ goTo, connected }) => {
 
         return (
           <div style={{
-            background: T.primaryLight,
-            border: `1px solid ${T.primary}33`,
+            background: T.bg,
+            border: `1px solid ${T.border}`,
             borderRadius: "4px",
             marginBottom: "24px", overflow: "hidden",
-            boxShadow: "none",
           }}>
             {/* Running state — module + dynamic substep cycling */}
             {!pipeDone && (() => {
@@ -1565,33 +1573,33 @@ const HomePage = ({ goTo, connected }) => {
               const intraStep = Math.min(0.95, 1 - Math.exp(-2.5 * stepElapsed / stepEstSec));
               const pct = ((pipeStep + intraStep) / effectiveModules.length) * 100;
               return (
-                <div style={{ padding: "20px 24px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                    <div style={{ width: 20, height: 20, display: "flex", alignItems: "center", justifyContent: "center", animation: "subtlePulse 2s ease-in-out infinite" }}>
-                      <ActiveIcon size={16} color={T.primary} strokeWidth={1.8} />
+                <div style={{ padding: "16px 20px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{ width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center", animation: "subtlePulse 2s ease-in-out infinite" }}>
+                      <ActiveIcon size={14} color={T.primary} strokeWidth={1.8} />
                     </div>
                     <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "2px" }}>
                       <div key={pipeStep} style={{ display: "flex", alignItems: "baseline", gap: "8px", animation: "stepSwipeUp 0.25s ease-out" }}>
-                        <span style={{ fontFamily: MONO, fontSize: "11px", color: T.primary }}>{activeModule.id}</span>
-                        <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark }}>{activeModule.name}</span>
+                        <span style={{ fontFamily: MONO, fontSize: "11px", color: T.textTer }}>{activeModule.id}</span>
+                        <span style={{ fontSize: "14px", fontWeight: 500, color: T.text }}>{activeModule.name}</span>
                       </div>
-                      <div key={`sub-${pipeStep}-${subIdx}`} style={{ fontSize: "11px", color: T.primary + "BB", lineHeight: 1.4, animation: "substepSwipe 0.35s ease-out", minHeight: "16px" }}>
+                      <div key={`sub-${pipeStep}-${subIdx}`} style={{ fontSize: "11px", color: T.textSec, lineHeight: 1.4, animation: "substepSwipe 0.35s ease-out", minHeight: "16px" }}>
                         {subs[subIdx]}
                       </div>
                     </div>
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px", flexShrink: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite" }}>
-                          <circle cx="8" cy="8" r="6" fill="none" stroke={T.primary + "33"} strokeWidth="2" />
+                        <svg width="14" height="14" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite" }}>
+                          <circle cx="8" cy="8" r="6" fill="none" stroke={T.border} strokeWidth="2" />
                           <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke={T.primary} strokeWidth="2" strokeLinecap="round" />
                         </svg>
-                        <span style={{ fontFamily: FONT, fontSize: "11px", color: T.primary, fontVariantNumeric: "tabular-nums" }}>{pipeElapsed.toFixed(1)}s</span>
+                        <span style={{ fontFamily: MONO, fontSize: "12px", color: T.textSec, fontVariantNumeric: "tabular-nums" }}>{pipeElapsed.toFixed(1)}s</span>
                       </div>
-                      <span style={{ fontSize: "10px", color: T.primary + "88", fontFamily: FONT }}>~{(() => { const remaining = effectiveModules.slice(pipeStep).reduce((s, m) => s + (m.estSec || 10), 0); return remaining >= 60 ? `${Math.ceil(remaining / 60)} min` : `${remaining}s`; })()}</span>
+                      <span style={{ fontSize: "10px", color: T.textTer, fontFamily: MONO }}>{pipeStep + 1} of {effectiveModules.length} modules</span>
                     </div>
                   </div>
-                  {/* Progress bar — outside keyed divs for smooth transitions */}
-                  <div style={{ width: "100%", height: "4px", borderRadius: "2px", background: T.primary + "22", marginTop: "10px", overflow: "hidden" }}>
+                  {/* Progress bar */}
+                  <div style={{ width: "100%", height: "4px", borderRadius: "2px", background: T.bgHover, marginTop: "10px", overflow: "hidden" }}>
                     <div style={{ height: "100%", borderRadius: "2px", background: T.primary, width: `${pct}%`, transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)" }} />
                   </div>
                 </div>
@@ -1600,45 +1608,43 @@ const HomePage = ({ goTo, connected }) => {
 
             {/* Complete state — summary + logs toggle + CTA */}
             {pipeDone && (
-              <div style={{ padding: "24px" }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <FlaskConical size={16} color={T.primary} strokeWidth={1.8} />
-                      <div style={{ fontSize: "15px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Pipeline Complete</div>
-                    </div>
-                    <div style={{ fontSize: "12px", color: T.primary + "AA", fontFamily: FONT, marginTop: "4px", paddingLeft: "24px" }}>
+              <div style={{ padding: "16px 20px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <CheckCircle size={16} color={T.success} strokeWidth={2} />
+                    <span style={{ fontSize: "13px", fontWeight: 500, color: T.text, fontFamily: FONT }}>
+                      Pipeline complete
+                    </span>
+                    <span style={{ fontSize: "13px", color: T.textSec, fontFamily: MONO }}>
                       {pipeElapsed.toFixed(1)}s
                       {m2Out > 0 && ` · ${m2Out} candidates`}
                       {finalSize > 0 && ` · ${finalSize} selected`}
-                    </div>
+                    </span>
                   </div>
                   <button
                     onClick={() => goTo("results", { jobId: pipeJobId, scorer })}
                     style={{
-                      padding: "8px 20px", borderRadius: "4px",
+                      padding: "8px 20px", borderRadius: "6px",
                       background: T.primary, color: "#fff", border: "none",
-                      fontSize: "12px", fontWeight: 600, fontFamily: FONT,
-                      cursor: "pointer", transition: "opacity 0.15s",
+                      fontSize: "13px", fontWeight: 500, fontFamily: FONT,
+                      cursor: "pointer",
                     }}
-                    onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
-                    onMouseLeave={e => e.currentTarget.style.opacity = "1"}
                   >
-                    View Results
+                    View Results →
                   </button>
                 </div>
 
                 {/* Logs toggle */}
                 <button onClick={() => setShowLog(!showLog)} style={{
                   background: "none", border: "none", cursor: "pointer", fontFamily: FONT,
-                  fontSize: "11px", color: T.primary + "99", display: "flex", alignItems: "center", gap: "4px", padding: 0,
+                  fontSize: "11px", color: T.textTer, display: "flex", alignItems: "center", gap: "4px", padding: 0,
                 }}>
                   <ChevronDown size={12} style={{ transform: showLog ? "rotate(180deg)" : "none", transition: "0.2s" }} />
                   {showLog ? "Hide" : "Show"} execution log
                 </button>
 
                 {showLog && (
-                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${T.primary}22` }}>
+                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${T.border}` }}>
                     {effectiveModules.map((m, idx) => {
                       const st = statMap[m.id];
                       const Icon = m.icon;
@@ -1646,16 +1652,16 @@ const HomePage = ({ goTo, connected }) => {
                       return (
                         <div key={m.id} style={{ display: "flex", gap: "0" }}>
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "20px", flexShrink: 0 }}>
-                            <Icon size={12} color={T.primary} strokeWidth={1.5} style={{ opacity: 0.7 }} />
-                            {!isLast && <div style={{ width: "1px", flex: 1, minHeight: "6px", background: T.primary + "30" }} />}
+                            <Icon size={12} color={T.textTer} strokeWidth={1.5} />
+                            {!isLast && <div style={{ width: "1px", flex: 1, minHeight: "6px", background: T.border }} />}
                           </div>
                           <div style={{ flex: 1, paddingLeft: "8px", paddingBottom: isLast ? 0 : "2px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "6px", height: "20px" }}>
-                              <span style={{ fontFamily: MONO, fontSize: "10px", color: T.primary + "88" }}>{m.id}</span>
-                              <span style={{ fontSize: "11px", fontWeight: 500, color: T.primaryDark, fontFamily: FONT }}>{m.name}</span>
-                              {st && <span style={{ fontFamily: FONT, fontSize: "10px", color: T.primary + "99", marginLeft: "auto" }}>{fmtDur(st.duration_ms)}</span>}
+                              <span style={{ fontFamily: MONO, fontSize: "10px", color: T.textTer }}>{m.id}</span>
+                              <span style={{ fontSize: "11px", fontWeight: 500, color: T.text, fontFamily: FONT }}>{m.name}</span>
+                              {st && <span style={{ fontFamily: MONO, fontSize: "10px", color: T.textTer, marginLeft: "auto" }}>{fmtDur(st.duration_ms)}</span>}
                             </div>
-                            {st && <div style={{ fontSize: "10px", color: T.primary + "88", lineHeight: 1.4, padding: "1px 0 3px", fontFamily: FONT }}>{st.detail}</div>}
+                            {st && <div style={{ fontSize: "10px", color: T.textSec, lineHeight: 1.4, padding: "1px 0 3px", fontFamily: FONT }}>{st.detail}</div>}
                           </div>
                         </div>
                       );
@@ -1683,37 +1689,30 @@ const MethodsPage = () => {
 
   /* ── Section heading with thin accent line ── */
   const sectionBlock = (label, title, sub) => (
-    <div style={{ marginTop: "72px", marginBottom: "32px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-        <div style={{ width: "28px", height: "2px", background: T.primary, borderRadius: "1px" }} />
-        <span style={{ fontSize: "11px", fontWeight: 600, color: T.primary, textTransform: "uppercase", letterSpacing: "0.04em", fontFamily: FONT }}>{label}</span>
-      </div>
-      <h2 style={{ fontSize: mobile ? "22px" : "28px", fontWeight: 600, color: T.text, fontFamily: HEADING, letterSpacing: "-0.03em", margin: 0, lineHeight: 1.2 }}>{title}</h2>
-      {sub && <p style={{ fontSize: "14px", color: T.textSec, marginTop: "8px", lineHeight: 1.6, maxWidth: "640px", margin: "8px 0 0" }}>{sub}</p>}
+    <div style={{ marginTop: "40px", marginBottom: "20px" }}>
+      <div style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>{label}</div>
+      <h2 style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: HEADING, margin: 0, lineHeight: 1.3 }}>{title}</h2>
+      {sub && <p style={{ fontSize: "13px", color: T.textSec, marginTop: "6px", lineHeight: 1.6, maxWidth: "640px", margin: "6px 0 0" }}>{sub}</p>}
     </div>
   );
 
   /* ── Spec pill for inline metrics ── */
   const specPill = (label, value) => (
     <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-      <span style={{ fontSize: "22px", fontWeight: 600, color: T.text, fontFamily: FONT, letterSpacing: "-0.02em" }}>{value}</span>
+      <span style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: FONT, letterSpacing: "-0.02em" }}>{value}</span>
       <span style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</span>
     </div>
   );
 
   return (
-    <div style={{ padding: mobile ? "24px 16px" : "56px 48px", maxWidth: "1200px" }}>
+    <div style={{ padding: mobile ? "24px 16px" : "32px 40px", maxWidth: "1100px" }}>
 
       {/* ═══ Page Header ═══ */}
-      <div style={{ marginBottom: "16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" }}>
-          <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: T.primary }} />
-          <span style={{ fontSize: "12px", fontWeight: 600, color: T.primary, textTransform: "uppercase", letterSpacing: "0.04em", fontFamily: FONT }}>Technical Documentation</span>
-        </div>
-        <h1 style={{ fontSize: mobile ? "28px" : "40px", fontWeight: 600, color: T.text, fontFamily: HEADING, letterSpacing: "-0.04em", margin: 0, lineHeight: 1.1 }}>
+      <div style={{ marginBottom: "24px" }}>
+        <h1 style={{ fontSize: "20px", fontWeight: 600, color: T.text, fontFamily: HEADING, margin: 0 }}>
           Methods
         </h1>
-        <p style={{ fontSize: "15px", color: T.textSec, marginTop: "12px", lineHeight: 1.7, maxWidth: "680px" }}>
+        <p style={{ fontSize: "13px", color: T.textSec, marginTop: "4px", lineHeight: 1.6, maxWidth: "680px" }}>
           How NARSIL designs, scores, and validates CRISPR-Cas12a diagnostic panels for drug-resistant tuberculosis.
         </p>
       </div>
@@ -1723,9 +1722,9 @@ const MethodsPage = () => {
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(4, 1fr)", gap: mobile ? "16px" : "20px" }}>
         {[
-          { step: "001", icon: Target, title: "Define targets", desc: "Resolve WHO catalogue mutations to H37Rv genomic coordinates, codon context, and drug class annotations.", color: "#4338CA" },
-          { step: "002", icon: Brain, title: "Score candidates", desc: "Scan PAM sites, generate crRNAs, and predict activity with Narsil-ML trained on 25K+ measurements.", color: "#4338CA" },
-          { step: "003", icon: Zap, title: "Optimise panel", desc: "Simulated annealing over candidate assignments with co-designed AS-RPA primers and multiplex constraints.", color: "#3730A3" },
+          { step: "001", icon: Target, title: "Define targets", desc: "Resolve WHO catalogue mutations to H37Rv genomic coordinates, codon context, and drug class annotations.", color: "#2563EB" },
+          { step: "002", icon: Brain, title: "Score candidates", desc: "Scan PAM sites, generate crRNAs, and predict activity with Narsil-ML trained on 25K+ measurements.", color: "#2563EB" },
+          { step: "003", icon: Zap, title: "Optimise panel", desc: "Simulated annealing over candidate assignments with co-designed AS-RPA primers and multiplex constraints.", color: "#1D4ED8" },
           { step: "004", icon: Shield, title: "Assess clinically", desc: "Evaluate against WHO TPP thresholds for per-drug sensitivity, specificity, and three operating modes.", color: "#059669" },
         ].map((c, idx) => (
           <div
@@ -1809,9 +1808,9 @@ const MethodsPage = () => {
       {/* Bento grid: 3 feature cards */}
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
         {[
-          { icon: Cpu, title: "Target DNA Branch", tag: "CNN", desc: "Multi-scale convolutions (k=3,5,7) scan the 34-nt target context for PAM quality, seed composition, and dinucleotide patterns.", accent: "#4338CA" },
-          { icon: Layers, title: "Guide RNA Branch", tag: "RNA-FM", desc: "Pre-trained foundation model (23M sequences) captures folding stability and accessibility governing Cas12a loading.", accent: "#4338CA" },
-          { icon: TrendingUp, title: "R-Loop Propagation", tag: "RLPA", desc: "Causal attention encodes PAM-proximal to distal directionality. +6.7% cross-dataset generalisation vs bidirectional.", accent: "#3730A3" },
+          { icon: Cpu, title: "Target DNA Branch", tag: "CNN", desc: "Multi-scale convolutions (k=3,5,7) scan the 34-nt target context for PAM quality, seed composition, and dinucleotide patterns.", accent: "#2563EB" },
+          { icon: Layers, title: "Guide RNA Branch", tag: "RNA-FM", desc: "Pre-trained foundation model (23M sequences) captures folding stability and accessibility governing Cas12a loading.", accent: "#2563EB" },
+          { icon: TrendingUp, title: "R-Loop Propagation", tag: "RLPA", desc: "Causal attention encodes PAM-proximal to distal directionality. +6.7% cross-dataset generalisation vs bidirectional.", accent: "#1D4ED8" },
         ].map(c => (
           <div key={c.title} style={{
             background: T.bg,
@@ -1860,7 +1859,7 @@ const MethodsPage = () => {
       <div style={{
         display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(5, 1fr)",
         gap: "1px", marginBottom: "24px",
-        background: T.border, borderRadius: "14px", overflow: "hidden",
+        background: T.border, borderRadius: "4px", overflow: "hidden",
         border: `1px solid ${T.border}`,
       }}>
         {[
@@ -1912,9 +1911,9 @@ const MethodsPage = () => {
         {archOpen && (
           <div style={{ display: "flex", flexDirection: "column", gap: "0px" }}>
             {[
-              { label: "Branch 1", title: "Multi-Scale CNN", accent: "#4338CA", input: "34-nt one-hot encoded target (4 PAM + 20 protospacer + 10 flanking).", process: "Three parallel conv paths (k=3,5,7), 32 channels each, BN + dropout(0.3). Projected to 64-dim via 1×1 conv.", output: "64-dim per position: dinucleotide preferences, seed complementarity, PAM patterns." },
-              { label: "Branch 2", title: "RNA-FM Projection", accent: "#4338CA", input: "Guide RNA (20–23 nt). Processed by frozen RNA-FM (23M sequences, masked LM).", process: "640-dim per-nucleotide embeddings → trainable linear → 64-dim. Zero-padded to 34 positions.", output: "64-dim structural embedding: folding, stability, 5' accessibility." },
-              { label: "Fusion", title: "R-Loop Propagation Attention", accent: "#3730A3", input: "Concatenated 128-dim (64 CNN + 64 RNA-FM) at each of 34 positions.", process: "Single-head attention, 32-dim Q/K/V, causal mask (PAM-proximal → distal), learnable 34×34 positional bias.", output: "Attention-weighted 128-dim features re-weighted by positional importance." },
+              { label: "Branch 1", title: "Multi-Scale CNN", accent: "#2563EB", input: "34-nt one-hot encoded target (4 PAM + 20 protospacer + 10 flanking).", process: "Three parallel conv paths (k=3,5,7), 32 channels each, BN + dropout(0.3). Projected to 64-dim via 1×1 conv.", output: "64-dim per position: dinucleotide preferences, seed complementarity, PAM patterns." },
+              { label: "Branch 2", title: "RNA-FM Projection", accent: "#2563EB", input: "Guide RNA (20–23 nt). Processed by frozen RNA-FM (23M sequences, masked LM).", process: "640-dim per-nucleotide embeddings → trainable linear → 64-dim. Zero-padded to 34 positions.", output: "64-dim structural embedding: folding, stability, 5' accessibility." },
+              { label: "Fusion", title: "R-Loop Propagation Attention", accent: "#1D4ED8", input: "Concatenated 128-dim (64 CNN + 64 RNA-FM) at each of 34 positions.", process: "Single-head attention, 32-dim Q/K/V, causal mask (PAM-proximal → distal), learnable 34×34 positional bias.", output: "Attention-weighted 128-dim features re-weighted by positional importance." },
               { label: "Output", title: "Multi-Task Heads", accent: "#059669", input: "RLPA-weighted representation, globally pooled.", process: "Efficiency: 128→64→32→1 (sigmoid). Discrimination: 547→64→32→1 (Softplus).", output: "Two scalars: efficiency (0–1) and discrimination ratio (fold-change MUT/WT)." },
             ].map((block, idx, arr) => (
               <div key={block.title} style={{ padding: "18px 0", borderBottom: idx < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
@@ -1945,14 +1944,14 @@ const MethodsPage = () => {
 
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
         {[
-          { icon: TrendingUp, title: "Per-drug sensitivity", desc: "WHO TPP minimums: ≥95% RIF, ≥90% INH/FQ, ≥80% EMB/PZA/AG.", accent: "#4338CA" },
-          { icon: Shield, title: "Specificity estimate", desc: "Discrimination ratio predicts false-positive rates. ≥3× diagnostic-grade, ≥10× reference-lab.", accent: "#4338CA" },
-          { icon: Settings, title: "Three operating modes", desc: "High Sensitivity (field), Balanced (WHO TPP), High Specificity (reference lab).", accent: "#3730A3" },
+          { icon: TrendingUp, title: "Per-drug sensitivity", desc: "WHO TPP minimums: ≥95% RIF, ≥90% INH/FQ, ≥80% EMB/PZA/AG.", accent: "#2563EB" },
+          { icon: Shield, title: "Specificity estimate", desc: "Discrimination ratio predicts false-positive rates. ≥3× diagnostic-grade, ≥10× reference-lab.", accent: "#2563EB" },
+          { icon: Settings, title: "Three operating modes", desc: "High Sensitivity (field), Balanced (WHO TPP), High Specificity (reference lab).", accent: "#1D4ED8" },
           { icon: Layers, title: "Ranked alternatives", desc: "3–5 backup candidates per target with documented efficiency-discrimination tradeoffs.", accent: "#059669" },
         ].map(c => (
           <div key={c.title} style={{
             display: "flex", gap: "16px", padding: "22px 24px",
-            background: T.bg, border: `1px solid ${T.border}`, borderRadius: "14px",
+            background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px",
           }}>
             <div style={{
               width: "36px", height: "36px", borderRadius: "4px", flexShrink: 0,
@@ -1979,17 +1978,17 @@ const MethodsPage = () => {
       <div style={{
         display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)",
         gap: "1px", marginBottom: "24px",
-        background: T.border, borderRadius: "14px", overflow: "hidden",
+        background: T.border, borderRadius: "4px", overflow: "hidden",
         border: `1px solid ${T.border}`,
       }}>
         {[
           { label: "Excellent", val: "≥ 10×", desc: "Single-plex clinical use. Robust across sample types.", accent: "#059669" },
-          { label: "Good", val: "≥ 3×", desc: "Multiplex panel. Electrochemical and lateral flow.", accent: "#4338CA" },
-          { label: "Acceptable", val: "≥ 2×", desc: "Requires confirmatory readout or dual-target.", accent: "#4338CA" },
+          { label: "Good", val: "≥ 3×", desc: "Multiplex panel. Electrochemical and lateral flow.", accent: "#2563EB" },
+          { label: "Acceptable", val: "≥ 2×", desc: "Requires confirmatory readout or dual-target.", accent: "#2563EB" },
           { label: "Insufficient", val: "< 2×", desc: "Synthetic mismatch enhancement needed.", accent: "#DC2626" },
         ].map(t => (
           <div key={t.label} style={{ background: T.bg, padding: "24px 20px" }}>
-            <div style={{ fontSize: "28px", fontWeight: 600, color: T.text, fontFamily: FONT, letterSpacing: "-0.03em", marginBottom: "2px" }}>{t.val}</div>
+            <div style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: FONT, letterSpacing: "-0.01em", marginBottom: "2px" }}>{t.val}</div>
             <div style={{ fontSize: "12px", fontWeight: 600, color: t.accent, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{t.label}</div>
             <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.55 }}>{t.desc}</div>
           </div>
@@ -2086,7 +2085,7 @@ const MethodsPage = () => {
       {/* ═══ References ═══ */}
       {sectionBlock("Literature", `References (${BIBLIOGRAPHY.length})`)}
 
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "14px", overflow: "hidden" }}>
+      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", overflow: "hidden" }}>
         {(() => {
           const categories = [...new Set(BIBLIOGRAPHY.map(b => b.category))];
           return categories.map((cat, catIdx) => (
@@ -2191,7 +2190,7 @@ const CHART_TEXT = "#111827";
 const CHART_TEXT_SEC = "#6B7280";
 const CHART_GRID = "#E5E7EB";
 const PASS_GREEN = "#059669";
-const AXIS_COLORS = { efficiency: "#059669", discrimination: "#4338CA", primers: "#0891B2", safety: "#D97706", gc: "#9CA3AF" };
+const AXIS_COLORS = { efficiency: "#059669", discrimination: "#2563EB", primers: "#0891B2", safety: "#D97706", gc: "#9CA3AF" };
 const AXIS_LABELS = { efficiency: "Activity", discrimination: "Discrimination", primers: "Primers", safety: "Off-target", gc: "GC" };
 
 const RiskDot = ({ level, size = 12 }) => (
@@ -2294,12 +2293,12 @@ const RiskMatrix = ({ results }) => {
         <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: "2px 2px", fontSize: "12px" }}>
           <thead>
             <tr>
-              <th style={{ padding: "8px 16px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", width: mobile ? 100 : 140 }}>Target</th>
+              <th style={{ padding: "8px 16px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", width: mobile ? 100 : 140 }}>Target</th>
               {axes.map(a => (
-                <th key={a} style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", width: 52 }}>{axisNames[a]}</th>
+                <th key={a} style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", width: 52 }}>{axisNames[a]}</th>
               ))}
-              <th style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", width: 52 }}>Overall</th>
-              <th style={{ padding: "8px 14px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", width: 50 }}>#</th>
+              <th style={{ padding: "8px 6px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", width: 52 }}>Overall</th>
+              <th style={{ padding: "8px 14px", textAlign: "center", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", width: 50 }}>#</th>
             </tr>
           </thead>
           <tbody>
@@ -2350,7 +2349,7 @@ const ReadinessChart = ({ results }) => {
   const [hovIdx, setHovIdx] = useState(null);
 
   // UMAP-style gradient colors per drug class
-  const DRUG_LINE = { RIF: "#4338CA", INH: "#4338CA", EMB: "#059669", PZA: "#059669", FQ: "#DC2626", AG: "#3730A3", OTHER: "#6B7280", CTRL: "#6B7280" };
+  const DRUG_LINE = { RIF: "#1E3A5F", INH: "#4338CA", EMB: "#059669", PZA: "#059669", FQ: "#DC2626", AG: "#3730A3", OTHER: "#6B7280", CTRL: "#6B7280" };
 
   // Full-width responsive SVG — use viewBox for scaling
   const W = 900, H = 290, padL = 100, padR = 80, padT = 20, padB = 34;
@@ -2780,42 +2779,56 @@ const OverviewTab = ({ results, scorer, jobId }) => {
 
   return (
     <div>
-      {/* Explainer box — blue */}
-      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", padding: mobile ? "16px" : "20px 24px", marginBottom: "24px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING, marginBottom: "4px" }}>How to read these results</div>
-        <p style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6, margin: "0 0 16px", opacity: 0.85 }}>
-          Each <strong>candidate</strong> is a CRISPR guide RNA (crRNA) targeting one drug-resistance mutation in <em>M.&nbsp;tuberculosis</em>.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
+      {/* ── Stat blocks (Adaptyv style — grouped containers with internal dividers) ── */}
+      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "24px" }}>
+        {/* Block 1: Panel summary */}
+        <div style={{ display: "flex", border: `1px solid ${T.border}`, borderRadius: "4px", background: T.bg }}>
           {[
-            { title: "Activity", tag: "0–1", text: "Predicted Cas12a trans-cleavage efficiency. ≥ 0.7 = strong signal in 15–30 min. Below 0.4 may not generate a detectable signal.", detail: usesNarsilMl ? "Narsil-ML (25K+ measurements). PAM-adjusted score corrects for non-canonical PAM." : "Position-weighted biophysical features." },
-            { title: "Discrimination", tag: "×", text: "Fold-difference in cleavage between resistant (MUT) and susceptible (WT) DNA. ≥ 3× is diagnostic-grade.", detail: results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Gradient-boosted model · 6,136 EasyDesign pairs · 15 thermodynamic features." : "Heuristic: position sensitivity × mismatch destabilisation." },
-            { title: "RPA Primers", tag: "37°C", text: "Isothermal amplification (no thermal cycler). Amplifies the target region in 15–20 min, then Cas12a detects the product.", detail: "Without primers, a candidate cannot be used as a complete assay." },
-            { title: "Drug Class", tag: "WHO", text: "Which antibiotic the mutation confers resistance to (e.g. RIF = rifampicin, INH = isoniazid).", detail: "14-plex panel covers all 6 WHO priority drug classes for MDR/XDR-TB." },
-            { title: "Readiness Score", tag: "0–1", text: "Multi-axis composite ranking candidates within this panel. Discrimination 40%, activity 20%, primers 15%, off-targets 15%, GC balance 10%.", detail: "Forces spread to reveal quality differences hidden by similar efficiency scores." },
-            { title: "Risk Matrix", tag: "per axis", text: "Traffic-light assessment: green = meets threshold, amber = borderline, red = below minimum.", detail: "Overall risk = worst axis. Priority number indicates experimental validation order." },
-          ].map(item => (
-            <div key={item.title} style={{ background: "rgba(255,255,255,0.45)", borderRadius: "4px", padding: "12px 14px", border: `1px solid ${T.primary}15` }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                <span style={{ fontSize: "12px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>{item.title}</span>
-                <span style={{ fontSize: "9px", fontWeight: 600, color: T.primary, padding: "1px 6px", borderRadius: "4px", background: `${T.primary}15`, letterSpacing: "0.02em" }}>{item.tag}</span>
-              </div>
-              <div style={{ fontSize: "11.5px", color: T.primaryDark, lineHeight: 1.55, opacity: 0.9 }}>{item.text}</div>
-              <div style={{ fontSize: "10.5px", color: T.primaryDark, lineHeight: 1.5, opacity: 0.6, marginTop: "4px" }}>{item.detail}</div>
+            { l: "CANDIDATES", v: totalTargets },
+            { l: "DRUGS", v: drugs.length },
+            { l: "STRATEGY", v: `${directCount}D · ${proximityCount}P` },
+          ].map((s, i) => (
+            <div key={s.l} style={{ padding: "12px 16px", borderLeft: i > 0 ? `1px solid ${T.border}` : "none" }}>
+              <div style={{ fontSize: "11px", fontWeight: 500, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "4px" }}>{s.l}</div>
+              <div style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: MONO }}>{s.v}</div>
+            </div>
+          ))}
+        </div>
+        {/* Block 2: Discrimination */}
+        <div style={{ display: "flex", border: `1px solid ${T.border}`, borderRadius: "4px", background: T.bg }}>
+          {[
+            { l: "AVG DISC", v: `${avgDisc}×` },
+            { l: "≥3× PASS", v: highDisc },
+          ].map((s, i) => (
+            <div key={s.l} style={{ padding: "12px 16px", borderLeft: i > 0 ? `1px solid ${T.border}` : "none" }}>
+              <div style={{ fontSize: "11px", fontWeight: 500, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "4px" }}>{s.l}</div>
+              <div style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: MONO }}>{s.v}</div>
+            </div>
+          ))}
+        </div>
+        {/* Block 3: Activity */}
+        <div style={{ display: "flex", border: `1px solid ${T.border}`, borderRadius: "4px", background: T.bg }}>
+          {[
+            { l: "AVG ACTIVITY", v: avgActivity },
+            { l: "PRIMERS", v: `${withPrimers}/${totalTargets}` },
+          ].map((s, i) => (
+            <div key={s.l} style={{ padding: "12px 16px", borderLeft: i > 0 ? `1px solid ${T.border}` : "none" }}>
+              <div style={{ fontSize: "11px", fontWeight: 500, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.03em", marginBottom: "4px" }}>{s.l}</div>
+              <div style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: MONO }}>{s.v}</div>
             </div>
           ))}
         </div>
       </div>
 
       {/* ── Verdict-first panel ── */}
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "20px 16px" : "28px 36px", marginBottom: "24px", boxShadow: "none" }}>
+      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "20px 16px" : "24px 28px", marginBottom: "24px" }}>
         {/* Headline verdict */}
-        <div style={{ marginBottom: "24px" }}>
-          <div style={{ fontSize: mobile ? "22px" : "28px", fontWeight: 600, color: T.text, fontFamily: HEADING, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: HEADING, lineHeight: 1.3 }}>
             {assayReady} of {totalTargets} targets are assay-ready
           </div>
-          <div style={{ fontSize: "12px", color: T.textTer, marginTop: "6px" }}>
-            {drugs.length} drug classes · {directCount} direct / {proximityCount} proximity detection · {sensitivity}% primer coverage
+          <div style={{ fontSize: "13px", color: T.textSec, marginTop: "4px" }}>
+            {drugs.length} drug classes · {directCount} direct / {proximityCount} proximity · {sensitivity}% primer coverage
           </div>
         </div>
 
@@ -3203,7 +3216,7 @@ const OverviewTab = ({ results, scorer, jobId }) => {
           <thead>
             <tr>
               {["Drug", "Candidates", "Avg Score", "Avg Disc (Direct)", "Primers"].map((h) => (
-                <th key={h} style={{ padding: "10px 24px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
+                <th key={h} style={{ padding: "10px 24px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -3536,7 +3549,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
           { l: "Strategy", v: r.strategy, c: r.strategy === "Direct" ? T.success : T.purple },
         ].map((s, i) => (
           <div key={s.l} style={{ flex: 1, textAlign: "center", borderLeft: i > 0 ? `1px dashed ${T.border}` : "none", minWidth: mobile ? "30%" : "auto" }}>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>{s.l}</div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{s.l}</div>
             <div style={{ fontSize: "16px", fontWeight: 600, color: s.c, fontFamily: FONT }}>{s.v}</div>
           </div>
         ))}
@@ -3546,7 +3559,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
       {r.strategy === "Proximity" && (
         <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "4px", padding: "14px 18px", marginBottom: "16px" }}>
           <div style={{ fontSize: "12px", fontWeight: 600, color: T.purple, fontFamily: HEADING, marginBottom: "4px" }}>Proximity Detection — PAM Desert</div>
-          <div style={{ fontSize: "11px", color: "#4338CA", lineHeight: 1.5 }}>
+          <div style={{ fontSize: "11px", color: "#2563EB", lineHeight: 1.5 }}>
             crRNA binds a conserved site {r.proximityDistance ? `${r.proximityDistance} bp` : "near"} the mutation. Discrimination via AS-RPA primers.
           </div>
         </div>
@@ -4274,10 +4287,10 @@ const DiscriminationTab = ({ results }) => {
           { label: "Insufficient", val: "< 2×", count: insufficient, color: "#dc2626", desc: "SM enhancement required" },
         ].map(t => (
           <div key={t.label} style={{ background: T.bg, borderRadius: "4px", padding: "16px 18px", border: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "8px" }}>{t.label}</div>
+            <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>{t.label}</div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
               <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec }}>{t.val}</div>
-              <div style={{ fontSize: "22px", fontWeight: 600, color: T.text, fontFamily: FONT }}>{t.count}</div>
+              <div style={{ fontSize: "18px", fontWeight: 600, color: T.text, fontFamily: FONT }}>{t.count}</div>
             </div>
             <div style={{ fontSize: "10px", color: T.textTer, marginTop: "6px" }}>{t.desc}</div>
             <div style={{ marginTop: "8px", height: "3px", borderRadius: "2px", background: T.borderLight, overflow: "hidden" }}>
@@ -4289,7 +4302,7 @@ const DiscriminationTab = ({ results }) => {
 
       {/* Discrimination chart — horizontal lollipop */}
       {(() => {
-        const DRUG_DC = { RIF: "#4338CA", INH: "#4338CA", EMB: "#059669", FQ: "#DC2626", AG: "#3730A3", PZA: "#059669", OTHER: "#9CA3AF" };
+        const DRUG_DC = { RIF: "#1E3A5F", INH: "#4338CA", EMB: "#059669", FQ: "#DC2626", AG: "#3730A3", PZA: "#059669", OTHER: "#9CA3AF" };
         const sorted = [...directCands].sort((a, b) => b.disc - a.disc);
         const discChart = sorted.map((r) => ({ name: r.label, disc: +r.disc, score: r.score, drug: r.drug }));
         const diagGrade = discChart.filter(d => d.disc >= 3).length;
@@ -4733,7 +4746,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   ];
 
   // Drug colors for pads
-  const PAD_DRUG_COLORS = { RIF: "#4338CA", INH: "#D97706", EMB: "#059669", PZA: "#0891B2", FQ: "#DC2626", AG: "#7C3AED", CTRL: "#9CA3AF" };
+  const PAD_DRUG_COLORS = { RIF: "#1E3A5F", INH: "#D97706", EMB: "#059669", PZA: "#0891B2", FQ: "#DC2626", AG: "#7C3AED", CTRL: "#9CA3AF" };
   const PAD_DRUG_BG = { RIF: "#EEF2FF", INH: "#FFFBEB", EMB: "#ecf8f4", PZA: "#f2f9ee", FQ: "#FEF2F2", AG: "#FFFBEB", CTRL: "#F3F4F6" };
 
   const targetDrug = (t) => {
@@ -4786,7 +4799,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   };
 
   const WHO_thresholds = { RIF: 0.95, INH: 0.90, FQ: 0.90, EMB: 0.80, PZA: 0.80, AG: 0.80 };
-  const DRUG_LINE_COLORS = { RIF: "#4338CA", INH: "#4338CA", EMB: "#059669", PZA: "#059669", FQ: "#DC2626", AG: "#3730A3", IS6110: "#6B7280" };
+  const DRUG_LINE_COLORS = { RIF: "#1E3A5F", INH: "#4338CA", EMB: "#059669", PZA: "#059669", FQ: "#DC2626", AG: "#3730A3", IS6110: "#6B7280" };
 
   // ═══════════ PREDICTED ELECTROCHEMICAL READOUT — Physics Engine ═══════════
   // Architecture-specific electrochemistry configurations
@@ -5169,7 +5182,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   return (
     <div>
       {/* ═══════════ SECTION 0: 3D Interactive Chip Render ═══════════ */}
-      <CollapsibleSection title="Device Architecture · 3D" defaultOpen={true} badge={{ text: "interactive", bg: "#FFFBEB", color: "#4338CA" }}>
+      <CollapsibleSection title="Device Architecture · 3D" defaultOpen={true} badge={{ text: "interactive", bg: "#FFFBEB", color: "#2563EB" }}>
         <ChipRender3D
           electrodeLayout={electrodeLayout}
           targetDrug={targetDrug}
@@ -5257,7 +5270,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
 
       {/* ═══════════ SECTION 2: Predicted Electrochemical Readout ═══════════ */}
-      <CollapsibleSection title="Predicted Electrochemical Readout" defaultOpen={true} badge={{ text: "computed", bg: "#FFFBEB", color: "#4338CA" }}>
+      <CollapsibleSection title="Predicted Electrochemical Readout" defaultOpen={true} badge={{ text: "computed", bg: "#FFFBEB", color: "#2563EB" }}>
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "16px" : "24px", marginBottom: "24px" }}>
           {/* Header description — architecture-dependent */}
           <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "20px", lineHeight: 1.6 }}>
@@ -5828,7 +5841,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
       {/* ═══════════ SECTION 8: AS-RPA Thermodynamic Discrimination ═══════════ */}
       {results.some(r => r.asrpaDiscrimination) && (
-      <CollapsibleSection title="AS-RPA Thermodynamic Discrimination" defaultOpen={false} badge={{ text: `${proximityCount} proximity`, bg: "#FFFBEB", color: "#4338CA" }}>
+      <CollapsibleSection title="AS-RPA Thermodynamic Discrimination" defaultOpen={false} badge={{ text: `${proximityCount} proximity`, bg: "#FFFBEB", color: "#2563EB" }}>
         <div style={{ padding: "0", marginBottom: "24px" }}>
           <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "12px", lineHeight: 1.6 }}>
             Proximity candidates use allele-specific RPA primers for discrimination. The 3\u2032 terminal mismatch
@@ -6202,7 +6215,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             <span>Thresholds: efficiency ≥ {presetObj.efficiency_threshold}, discrimination ≥ {presetObj.discrimination_threshold}×</span>
             <span style={{
               display: "inline-flex", alignItems: "center", gap: "5px",
-              padding: "2px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: 600,
+              padding: "2px 10px", borderRadius: "3px", fontSize: "10px", fontWeight: 600,
               background: scorerInfo.level >= 3 ? "rgba(16,185,129,0.1)" : T.bgSub,
               color: scorerInfo.level >= 3 ? T.success : T.textSec,
               border: `1px solid ${scorerInfo.level >= 3 ? T.success + "33" : T.borderLight}`,
@@ -6242,9 +6255,9 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               <div key={card.label} style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "16px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
                   <card.icon size={14} color={card.color} />
-                  <span style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em" }}>{card.label}</span>
+                  <span style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em" }}>{card.label}</span>
                 </div>
-                <div style={{ fontSize: "28px", fontWeight: 600, color: card.color, fontFamily: FONT, lineHeight: 1 }}>{card.value}</div>
+                <div style={{ fontSize: "18px", fontWeight: 600, color: card.color, fontFamily: FONT, lineHeight: 1 }}>{card.value}</div>
               </div>
             ))}
           </div>
@@ -6460,7 +6473,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   <thead>
                     <tr style={{ background: T.bgSub }}>
                       {["Drug Class", "Sensitivity", "WHO Target", "Coverage", "Avg Disc", "Specificity", "Sens. Status", "Spec. Status"].map(h => (
-                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, color: T.textSec, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
+                        <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, color: T.textSec, fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.border}` }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -6499,16 +6512,16 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                         </td>
                         <td style={{ padding: "10px 14px" }}>
                           {data.meets_sensitivity ? (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "20px", background: "rgba(16,185,129,0.1)", color: T.success, fontWeight: 600, fontSize: "11px" }}><CheckCircle size={12} /> Pass</span>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "3px", background: "rgba(16,185,129,0.1)", color: T.success, fontWeight: 600, fontSize: "11px" }}><CheckCircle size={12} /> Pass</span>
                           ) : (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "20px", background: "rgba(239,68,68,0.08)", color: T.danger, fontWeight: 600, fontSize: "11px" }}><AlertTriangle size={12} /> Fail</span>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "3px", background: "rgba(239,68,68,0.08)", color: T.danger, fontWeight: 600, fontSize: "11px" }}><AlertTriangle size={12} /> Fail</span>
                           )}
                         </td>
                         <td style={{ padding: "10px 14px" }}>
                           {data.meets_specificity ? (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "20px", background: "rgba(16,185,129,0.1)", color: T.success, fontWeight: 600, fontSize: "11px" }}><CheckCircle size={12} /> Pass</span>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "3px 10px", borderRadius: "3px", background: "rgba(16,185,129,0.1)", color: T.success, fontWeight: 600, fontSize: "11px" }}><CheckCircle size={12} /> Pass</span>
                           ) : (
-                            <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "3px 10px", borderRadius: "20px", background: "rgba(245,158,11,0.08)", color: T.warning, fontWeight: 600, fontSize: "11px" }}><AlertTriangle size={12} /> Pending</span>
+                            <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "3px 10px", borderRadius: "3px", background: "rgba(245,158,11,0.08)", color: T.warning, fontWeight: 600, fontSize: "11px" }}><AlertTriangle size={12} /> Pending</span>
                           )}
                         </td>
                       </tr>
@@ -6615,9 +6628,9 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                             <td style={{ padding: "10px 12px" }}>{t.has_primers ? <CheckCircle size={14} color={T.success} /> : <span style={{ color: T.textTer }}>—</span>}</td>
                             <td style={{ padding: "10px 12px" }}>
                               {t.is_assay_ready ? (
-                                <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, padding: "3px 10px", borderRadius: "20px", background: "rgba(16,185,129,0.1)", color: T.success }}>Ready</span>
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, padding: "3px 10px", borderRadius: "3px", background: "rgba(16,185,129,0.1)", color: T.success }}>Ready</span>
                               ) : (
-                                <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, padding: "3px 10px", borderRadius: "20px", background: T.bgSub, color: T.textTer }}>Not ready</span>
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", fontSize: "10px", fontWeight: 600, padding: "3px 10px", borderRadius: "3px", background: T.bgSub, color: T.textTer }}>Not ready</span>
                               )}
                             </td>
                             {(() => { const orig = results.find(r => r.label === t.target_label); return orig?.riskProfile ? (<>
@@ -6640,7 +6653,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                                         <thead>
                                           <tr>
                                             {["Rank", "Score", "Disc", "OT", "Spacer (20-nt)", "Tradeoff vs selected"].map(h => (
-                                              <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
+                                              <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: T.textTer, fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${T.borderLight}` }}>{h}</th>
                                             ))}
                                           </tr>
                                         </thead>
@@ -6860,15 +6873,15 @@ const ResultsPage = ({ connected, jobId, scorer: scorerProp, goTo }) => {
   const hasResults = results && results.length > 0;
 
   return (
-    <div style={{ padding: mobile ? "16px" : "36px 40px" }}>
+    <div style={{ padding: mobile ? "16px" : "32px 40px", maxWidth: "1100px" }}>
       {/* Header */}
-      <div style={{ display: "flex", flexDirection: mobile ? "column" : "row", justifyContent: "space-between", alignItems: mobile ? "stretch" : "center", gap: "12px", marginBottom: "28px" }}>
+      <div style={{ display: "flex", flexDirection: mobile ? "column" : "row", justifyContent: "space-between", alignItems: mobile ? "stretch" : "center", gap: "12px", marginBottom: "24px" }}>
         <div>
-          <h2 style={{ fontSize: mobile ? "20px" : "24px", fontWeight: 600, color: T.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>
+          <h2 style={{ fontSize: "20px", fontWeight: 600, color: T.text, margin: 0, fontFamily: HEADING }}>
             Panel Results
           </h2>
           {hasResults && (
-            <p style={{ fontSize: "13px", color: T.textTer, marginTop: "4px" }}>
+            <p style={{ fontSize: "13px", color: T.textSec, marginTop: "4px" }}>
               {results.length} candidates · {new Set(results.map((r) => r.drug)).size} drug classes · {results.filter(r => r.hasPrimers).length} with primers
             </p>
           )}
@@ -7013,11 +7026,11 @@ const PanelsPage = ({ connected }) => {
   };
 
   return (
-    <div style={{ padding: mobile ? "24px 16px" : "48px 40px" }}>
+    <div style={{ padding: mobile ? "24px 16px" : "32px 40px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <div>
           <div style={{ fontSize: "11px", fontWeight: 600, color: T.primary, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Library</div>
-          <h2 style={{ fontSize: mobile ? "22px" : "28px", fontWeight: 600, color: T.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>Mutation Panels</h2>
+          <h2 style={{ fontSize: "20px", fontWeight: 600, color: T.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>Mutation Panels</h2>
         </div>
         <Btn icon={Plus} size="sm" onClick={() => setShowNew(!showNew)}>New Panel</Btn>
       </div>
@@ -7091,10 +7104,10 @@ const MutationsPage = () => {
   }, [search, drugFilter]);
 
   return (
-    <div style={{ padding: mobile ? "24px 16px" : "48px 40px" }}>
+    <div style={{ padding: mobile ? "24px 16px" : "32px 40px" }}>
       <div style={{ marginBottom: "24px" }}>
         <div style={{ fontSize: "11px", fontWeight: 600, color: T.primary, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Library</div>
-        <h2 style={{ fontSize: mobile ? "22px" : "28px", fontWeight: 600, color: T.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>WHO Mutation Catalogue</h2>
+        <h2 style={{ fontSize: "20px", fontWeight: 600, color: T.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>WHO Mutation Catalogue</h2>
         <p style={{ fontSize: "13px", color: T.textSec, marginTop: "4px" }}>{MUTATIONS.length} target mutations from WHO 2023 v2 catalogue</p>
       </div>
 
@@ -7165,10 +7178,10 @@ const ScoringPage = ({ connected }) => {
   }, [connected]);
 
   return (
-    <div style={{ padding: mobile ? "24px 16px" : "48px 40px" }}>
+    <div style={{ padding: mobile ? "24px 16px" : "32px 40px" }}>
       <div style={{ marginBottom: "24px" }}>
         <div style={{ fontSize: "11px", fontWeight: 600, color: T.primary, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Models</div>
-        <h2 style={{ fontSize: mobile ? "22px" : "28px", fontWeight: 600, color: T.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>Scoring Models</h2>
+        <h2 style={{ fontSize: "20px", fontWeight: 600, color: T.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>Scoring Models</h2>
         <p style={{ fontSize: "13px", color: T.textSec, marginTop: "4px" }}>Heuristic and ML-based candidate scoring</p>
       </div>
 
@@ -7259,7 +7272,7 @@ const ScoringPage = ({ connected }) => {
         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px", flexWrap: "wrap" }}>
           <Brain size={20} color={T.primary} />
           <span style={{ fontSize: "16px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>B-DNA JEPA</span>
-          <span style={{ background: "#EAEBFA", color: T.primary, padding: "3px 10px", borderRadius: "3px", fontSize: "11px", fontWeight: 600 }}>In development</span>
+          <span style={{ background: T.primaryLight, color: T.primary, padding: "3px 10px", borderRadius: "3px", fontSize: "11px", fontWeight: 600 }}>In development</span>
         </div>
         <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 16px" }}>
           Self-supervised foundation model (JEPA architecture) pretrained on 6,326 bacterial genomes (301K fragments × 512bp).
@@ -7273,7 +7286,7 @@ const ScoringPage = ({ connected }) => {
             { label: "Target ρ", value: "> 0.60" },
           ].map(s => (
             <div key={s.label} style={{ background: T.bgSub, borderRadius: "4px", padding: "12px", textAlign: "center" }}>
-              <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "4px" }}>{s.label}</div>
+              <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{s.label}</div>
               <div style={{ fontSize: "16px", fontWeight: 600, color: T.text, fontFamily: FONT }}>{s.value}</div>
             </div>
           ))}
@@ -7453,11 +7466,11 @@ const ResearchPage = ({ connected }) => {
   });
 
   return (
-    <div style={{ padding: mobile ? "24px 16px" : "48px 40px", background: RS.bg, minHeight: "100%" }}>
+    <div style={{ padding: mobile ? "24px 16px" : "32px 40px", background: RS.bg, minHeight: "100%" }}>
       {/* Header */}
       <div style={{ marginBottom: "28px" }}>
         <div style={{ fontSize: "11px", fontWeight: 600, color: RS.accent, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Research</div>
-        <h2 style={{ fontSize: mobile ? "22px" : "28px", fontWeight: 600, color: RS.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>Scoring R&D Sandbox</h2>
+        <h2 style={{ fontSize: "20px", fontWeight: 600, color: RS.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>Scoring R&D Sandbox</h2>
         <p style={{ fontSize: "13px", color: RS.muted, marginTop: "8px", lineHeight: 1.7, maxWidth: "720px" }}>
           Experimental workspace for scoring model development. Results here are exploratory — they inform model selection and feature engineering but do not affect production panel design. All thermodynamic calculations use nearest-neighbor parameters (Sugimoto et al. 1995 for RNA:DNA; SantaLucia 1998 for DNA:DNA) and are approximations of the true molecular energetics.
         </p>
@@ -7504,12 +7517,12 @@ const ResearchPage = ({ connected }) => {
               <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
                 <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "14px 18px" }}>
                   <div style={{ fontSize: "11px", color: RS.muted, fontWeight: 600, marginBottom: "4px" }}>KENDALL TAU</div>
-                  <div style={{ fontSize: "22px", fontWeight: 600, color: RS.text, fontFamily: FONT }}>{summary.kendall_tau?.toFixed(3) ?? "—"}</div>
+                  <div style={{ fontSize: "18px", fontWeight: 600, color: RS.text, fontFamily: FONT }}>{summary.kendall_tau?.toFixed(3) ?? "—"}</div>
                   <div style={{ fontSize: "10px", color: RS.muted, marginTop: "2px" }}>1.0 = identical ranking, 0 = unrelated</div>
                 </div>
                 <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "14px 18px" }}>
                   <div style={{ fontSize: "11px", color: RS.muted, fontWeight: 600, marginBottom: "4px" }}>MEAN SCORE DELTA</div>
-                  <div style={{ fontSize: "22px", fontWeight: 600, color: summary.mean_score_delta > 0 ? RS.positive : summary.mean_score_delta < 0 ? RS.negative : RS.text, fontFamily: FONT }}>
+                  <div style={{ fontSize: "18px", fontWeight: 600, color: summary.mean_score_delta > 0 ? RS.positive : summary.mean_score_delta < 0 ? RS.negative : RS.text, fontFamily: FONT }}>
                     {summary.mean_score_delta > 0 ? "+" : ""}{summary.mean_score_delta?.toFixed(4) || "0"}
                   </div>
                   <div style={{ fontSize: "10px", color: RS.muted, marginTop: "2px" }}>Average score change (B - A)</div>
@@ -8497,7 +8510,7 @@ const NARSILPlatform = () => {
 
       {/* Global styles */}
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pageIn { from { opacity: 0; } to { opacity: 1; } }
