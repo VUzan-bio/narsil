@@ -1649,19 +1649,37 @@ const HomePage = ({ goTo, connected }) => {
                       const st = statMap[m.id];
                       const Icon = m.icon;
                       const isLast = idx === effectiveModules.length - 1;
+                      const subs = m.substeps || [m.execDesc];
                       return (
-                        <div key={m.id} style={{ display: "flex", gap: "0" }}>
-                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "20px", flexShrink: 0 }}>
-                            <Icon size={12} color={T.textTer} strokeWidth={1.5} />
-                            {!isLast && <div style={{ width: "1px", flex: 1, minHeight: "6px", background: T.border }} />}
-                          </div>
-                          <div style={{ flex: 1, paddingLeft: "8px", paddingBottom: isLast ? 0 : "2px" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", height: "20px" }}>
-                              <span style={{ fontFamily: MONO, fontSize: "10px", color: T.textTer }}>{m.id}</span>
-                              <span style={{ fontSize: "11px", fontWeight: 500, color: T.text, fontFamily: FONT }}>{m.name}</span>
-                              {st && <span style={{ fontFamily: MONO, fontSize: "10px", color: T.textTer, marginLeft: "auto" }}>{fmtDur(st.duration_ms)}</span>}
+                        <div key={m.id} style={{ display: "flex", gap: "0", marginBottom: isLast ? 0 : "4px" }}>
+                          {/* Timeline rail */}
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "28px", flexShrink: 0 }}>
+                            <div style={{ width: "24px", height: "24px", borderRadius: "6px", background: st ? T.text : T.bgSub, border: st ? "none" : `1px solid ${T.border}`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              <Icon size={12} color={st ? "#fff" : T.textTer} strokeWidth={1.8} />
                             </div>
-                            {st && <div style={{ fontSize: "10px", color: T.textSec, lineHeight: 1.4, padding: "1px 0 3px", fontFamily: FONT }}>{st.detail}</div>}
+                            {!isLast && <div style={{ width: "1px", flex: 1, minHeight: "8px", background: T.border }} />}
+                          </div>
+                          {/* Content */}
+                          <div style={{ flex: 1, paddingLeft: "12px", paddingBottom: isLast ? 0 : "8px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
+                              <span style={{ fontFamily: MONO, fontSize: "10px", color: T.textTer, minWidth: "28px" }}>{m.id}</span>
+                              <span style={{ fontSize: "13px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>{m.name}</span>
+                              {st && <span style={{ fontFamily: MONO, fontSize: "10px", color: T.success, marginLeft: "auto", display: "flex", alignItems: "center", gap: "4px" }}>
+                                <Check size={10} color={T.success} strokeWidth={2.5} />
+                                {fmtDur(st.duration_ms)}
+                              </span>}
+                            </div>
+                            <div style={{ fontSize: "11px", color: T.textSec, marginBottom: "6px", lineHeight: 1.4 }}>{m.desc}</div>
+                            {/* Substeps */}
+                            <div style={{ display: "flex", flexDirection: "column", gap: "2px", paddingLeft: "2px" }}>
+                              {subs.map((sub, si) => (
+                                <div key={si} style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "11px", color: T.textTer, lineHeight: 1.4 }}>
+                                  <span style={{ color: T.border, flexShrink: 0, marginTop: "1px" }}>{"\u2192"}</span>
+                                  <span>{sub}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {st?.detail && <div style={{ fontSize: "11px", color: T.primary, marginTop: "4px", fontWeight: 500 }}>{st.detail}</div>}
                           </div>
                         </div>
                       );
