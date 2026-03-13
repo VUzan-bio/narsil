@@ -1010,7 +1010,7 @@ const HomePage = ({ goTo, connected }) => {
   const [mode, setMode] = useState("standard");
   const [selectedModules, setSelectedModules] = useState(new Set(MODULES.map(m => m.id)));
   const [configOpen, setConfigOpen] = useState(false);
-  const [scorer, setScorer] = useState("guard_net"); // "heuristic" | "guard_net"
+  const [scorer, setScorer] = useState(null); // "heuristic" | "guard_net" | null
   const [enzymeId, setEnzymeId] = useState("enAsCas12a"); // "AsCas12a" | "enAsCas12a"
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState(null);
@@ -1023,6 +1023,7 @@ const HomePage = ({ goTo, connected }) => {
   const [pipeElapsed, setPipeElapsed] = useState(0);
   const [showLog, setShowLog] = useState(false);
   const [archOpen, setArchOpen] = useState(false);
+  const [configCollapsed, setConfigCollapsed] = useState(false);
   const pipeStartRef = useRef(Date.now());
   const pipeStepStartRef = useRef(Date.now());
   const pipeTimerRef = useRef(null);
@@ -1038,8 +1039,8 @@ const HomePage = ({ goTo, connected }) => {
   const CORE5_LABELS = ["rpoB_S531L", "katG_S315T", "fabG1_C-15T", "gyrA_D94G", "rrs_A1401G"];
   const CORE5_INDICES = MUTATIONS.map((m, i) => CORE5_LABELS.includes(`${m.gene}_${m.ref}${m.pos}${m.alt}`) ? i : -1).filter(i => i >= 0);
 
-  const [panel, setPanel] = useState("mdr14");        // "mdr14" | "core5" | "custom"
-  const [selected, setSelected] = useState(new Set(ALL_INDICES));
+  const [panel, setPanel] = useState(null);        // "mdr14" | "mdr14_rnasep" | "core5" | "custom" | null
+  const [selected, setSelected] = useState(new Set());
   const [targetsOpen, setTargetsOpen] = useState(false);
 
   const selectPanel = (p) => {
@@ -1084,6 +1085,7 @@ const HomePage = ({ goTo, connected }) => {
     pipeStartRef.current = Date.now();
     pipeStepStartRef.current = Date.now();
     setLaunching(false);
+    setConfigCollapsed(true);
 
     // Elapsed timer
     pipeTimerRef.current = setInterval(() => {
@@ -1203,7 +1205,37 @@ const HomePage = ({ goTo, connected }) => {
       </p>
 
       {/* ── Run Workflow ── */}
-      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "20px" : "32px", marginBottom: "24px" }}>
+      <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", marginBottom: "24px", overflow: "hidden" }}>
+
+        {/* Collapsed header when pipeline is running */}
+        {configCollapsed && pipeJobId && (
+          <button onClick={() => setConfigCollapsed(!configCollapsed)} style={{
+            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "14px 24px", background: T.bgSub, border: "none", cursor: "pointer", fontFamily: FONT,
+          }}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", fontSize: "13px" }}>
+              <span style={{ fontWeight: 600, color: T.text }}>Pipeline Configuration</span>
+              <span style={{ color: T.textSec, fontSize: "11px" }}>
+                {panel === "mdr14" ? "MDR-TB 14-plex" : panel === "mdr14_rnasep" ? "MDR-TB 14-plex + RNaseP" : panel === "core5" ? "Core 5-plex" : "Custom"} · {scorer === "guard_net" ? "GUARD-Net" : scorer === "heuristic" ? "Heuristic" : ""} · {selected.size} targets
+              </span>
+            </div>
+            <ChevronDown size={14} color={T.textSec} style={{ transform: "rotate(0deg)", transition: "0.2s" }} />
+          </button>
+        )}
+
+        <div style={{ padding: mobile ? "20px" : "32px", display: configCollapsed && pipeJobId ? "none" : "block" }}>
+
+        {/* Expand/collapse toggle when pipeline running */}
+        {pipeJobId && !configCollapsed && (
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "12px" }}>
+            <button onClick={() => setConfigCollapsed(true)} style={{
+              fontSize: "11px", color: T.textSec, background: "none", border: "none", cursor: "pointer", fontFamily: FONT,
+              display: "flex", alignItems: "center", gap: "4px",
+            }}>
+              Collapse <ChevronDown size={12} color={T.textSec} style={{ transform: "rotate(180deg)" }} />
+            </button>
+          </div>
+        )}
 
         {/* 1. Run Name — compact inline */}
         <div style={{ marginBottom: "24px" }}>
@@ -1493,14 +1525,17 @@ const HomePage = ({ goTo, connected }) => {
             <span style={{ color: T.textSec }}><strong style={{ color: T.text }}>{selected.size}</strong> targets</span>
             <span style={{ color: T.textSec }}><strong style={{ color: T.text }}>{[...new Set([...selected].map(i => MUTATIONS[i]?.drug))].length}</strong> drug classes</span>
             <span style={{ color: T.textSec }}><strong style={{ color: T.text }}>{mode === "custom" ? selectedModules.size : MODULES.length}</strong> modules</span>
-            <span style={{ padding: "2px 8px", borderRadius: "4px", background: scorer === "guard_net" ? T.primaryLight : T.bgSub, color: scorer === "guard_net" ? T.primaryDark : T.textSec, fontSize: "11px", fontWeight: 600 }}>
-              {scorer === "guard_net" ? "GUARD-Net" : "Heuristic"}
-            </span>
+            {scorer && (
+              <span style={{ padding: "2px 8px", borderRadius: "4px", background: scorer === "guard_net" ? T.primaryLight : T.bgSub, color: scorer === "guard_net" ? T.primaryDark : T.textSec, fontSize: "11px", fontWeight: 600 }}>
+                {scorer === "guard_net" ? "GUARD-Net" : "Heuristic"}
+              </span>
+            )}
           </div>
-          <Btn icon={launching ? Loader2 : Play} onClick={launch} disabled={launching || selected.size === 0 || !!pipeJobId}>
+          <Btn icon={launching ? Loader2 : Play} onClick={launch} disabled={launching || selected.size === 0 || !scorer || !!pipeJobId}>
             {launching ? "Launching…" : pipeJobId ? (pipeDone ? "Complete" : "Running…") : "Launch Pipeline"}
           </Btn>
         </div>
+        </div>{/* close inner padding div */}
       </div>
 
       {/* ═══ INLINE PIPELINE EXECUTION ═══ */}
