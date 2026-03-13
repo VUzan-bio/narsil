@@ -4,7 +4,7 @@
 
 Computational pipeline for designing multiplexed CRISPR-Cas12a diagnostic panels targeting drug-resistant *Mycobacterium tuberculosis*.
 
-Live platform: [narsil-design.app](https://narsil-design.app)
+Live platform: [narsil-guide.com](https://narsil-guide.com/)
 
 ---
 
