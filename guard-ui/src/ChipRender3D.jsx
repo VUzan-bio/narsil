@@ -124,6 +124,8 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
   const [showWaxBarriers, setShowWaxBarriers] = useState(true);
   const [showLabels, setShowLabels] = useState(true);
   const [showCapillaryFlow, setShowCapillaryFlow] = useState(false);
+  const [expandedCurve, setExpandedCurve] = useState(false);
+  const [expandedETransfer, setExpandedETransfer] = useState(false);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -335,24 +337,54 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     // Channel: plasma → RPA zone
     addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 2), channelMat), 0, chipH / 2 + 0.08, -chipD / 2 + 6.5);
 
-    // RPA amplification zone (lyophilized, 3 sub-pools)
-    const rpaLabels = ["RPA-A", "RPA-B", "RPA-C"];
+    // ── RPA amplification zone (prominent, labeled) ──
+    const rpaZoneZ = -chipD / 2 + 8;
+    const rpaMat = new THREE.MeshStandardMaterial({ color: 0xCC8844, transparent: true, opacity: 0.55, roughness: 0.7 });
+    const rpaBorderMat = new THREE.MeshStandardMaterial({ color: 0x996633, roughness: 0.6 });
+
+    // Shared RPA zone background (large visible zone)
+    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(18, 0.08, 3.5),
+      new THREE.MeshStandardMaterial({ color: 0xE8D5B8, transparent: true, opacity: 0.3 })), 0, chipH / 2 + 0.06, rpaZoneZ);
+    // Zone label
+    addAt(fluidicsGroup, makeSprite("RPA Amplification Zone", "#7A5530", 9, true), 0, chipH / 2 + 2.2, rpaZoneZ);
+
+    // 3 sub-multiplex chambers
+    const rpaLabels = ["RPA-A (5-plex)", "RPA-B (5-plex)", "RPA-C (4-plex)"];
     for (let i = 0; i < 3; i++) {
-      const rx = -5 + i * 5;
-      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.12, 2),
-        new THREE.MeshStandardMaterial({ color: 0xCC8844, transparent: true, opacity: 0.35 })), rx, chipH / 2 + 0.1, -chipD / 2 + 8);
-      addAt(fluidicsGroup, makeSprite(rpaLabels[i], "#996633", 7), rx, chipH / 2 + 1.5, -chipD / 2 + 8);
+      const rx = -6 + i * 6;
+      // Chamber body
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.18, 2.5), rpaMat), rx, chipH / 2 + 0.12, rpaZoneZ);
+      // Chamber border
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(4.7, 0.04, 0.12), rpaBorderMat), rx, chipH / 2 + 0.2, rpaZoneZ - 1.3);
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(4.7, 0.04, 0.12), rpaBorderMat), rx, chipH / 2 + 0.2, rpaZoneZ + 1.3);
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 2.7), rpaBorderMat), rx - 2.35, chipH / 2 + 0.2, rpaZoneZ);
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 2.7), rpaBorderMat), rx + 2.35, chipH / 2 + 0.2, rpaZoneZ);
+      // Lyophilized pellet dots (show dried reagents)
+      for (let d = 0; d < 4; d++) {
+        const dx = rx - 1.2 + d * 0.8;
+        addAt(fluidicsGroup, new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.06, 8),
+          new THREE.MeshStandardMaterial({ color: 0xAA7733, roughness: 0.9 })), dx, chipH / 2 + 0.22, rpaZoneZ);
+      }
+      addAt(fluidicsGroup, makeSprite(rpaLabels[i], "#7A5530", 7), rx, chipH / 2 + 1.6, rpaZoneZ);
     }
 
-    // Distribution channels from RPA → detection grid
+    // Distribution channels from RPA → detection grid (wider, more visible)
     const trunkZ = gridOriginZ - 1.5;
-    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(6 * colSpacing + 3, 0.05, 0.25), channelMat),
+    const distChannelMat = new THREE.MeshStandardMaterial({ color: 0x88BBDD, transparent: true, opacity: 0.35, roughness: 0.4 });
+    addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(6 * colSpacing + 3, 0.06, 0.4), distChannelMat),
       gridOriginX + 3 * colSpacing, chipH / 2 + 0.08, trunkZ);
+    // Feeder channels from RPA to trunk
+    for (let i = 0; i < 3; i++) {
+      const rx = -6 + i * 6;
+      const feedLen = Math.abs(rpaZoneZ + 1.3 - trunkZ);
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, feedLen), distChannelMat),
+        rx, chipH / 2 + 0.08, (rpaZoneZ + 1.3 + trunkZ) / 2);
+    }
     for (let c = 0; c < 7; c++) {
       const cx = gridOriginX + c * colSpacing;
-      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, Math.abs(gridOriginZ - trunkZ)), channelMat),
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.06, Math.abs(gridOriginZ - trunkZ)), distChannelMat),
         cx, chipH / 2 + 0.08, (gridOriginZ + trunkZ) / 2);
-      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.05, rowSpacing), channelMat),
+      addAt(fluidicsGroup, new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.06, rowSpacing), distChannelMat),
         cx, chipH / 2 + 0.08, gridOriginZ + rowSpacing / 2);
     }
 
@@ -545,6 +577,39 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
       const pz = (Math.random() - 0.5) * (secR * 1.4);
       addAt(archAGroup, new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), papMat),
         px, baseY + 2.8 + Math.random() * 2, pz);
+    }
+
+    // ── Vertical flow pore channels (Arch A key feature) ──
+    const poreChannelMat = new THREE.MeshStandardMaterial({ color: 0x88BBDD, transparent: true, opacity: 0.15, roughness: 0.4 });
+    const poreChannelDarkMat = new THREE.MeshStandardMaterial({ color: 0x556677, transparent: true, opacity: 0.2, roughness: 0.5 });
+    // Vertical channels through cellulose (y=0 to y=4.0)
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + Math.random() * 0.3;
+      const rr = 0.5 + Math.random() * (secR - 1.2);
+      const cx = Math.cos(a) * rr, cz = Math.sin(a) * rr;
+      const chRadius = 0.06 + Math.random() * 0.04;
+      // Channel through cellulose
+      addAt(archAGroup, new THREE.Mesh(new THREE.CylinderGeometry(chRadius, chRadius, 4.0, 6), poreChannelMat), cx, 2.0, cz);
+      // Channel through LIG-E
+      addAt(archAGroup, new THREE.Mesh(new THREE.CylinderGeometry(chRadius * 0.8, chRadius * 0.8, 0.8, 6), poreChannelDarkMat), cx, 4.4, cz);
+      // Channel through nitrocellulose
+      addAt(archAGroup, new THREE.Mesh(new THREE.CylinderGeometry(chRadius * 0.7, chRadius * 0.7, 0.6, 6), poreChannelMat), cx, baseY + 1.5, cz);
+      // Small pore openings at top surface of LIG-E
+      addAt(archAGroup, new THREE.Mesh(new THREE.CylinderGeometry(chRadius * 1.2, chRadius * 0.5, 0.1, 6),
+        new THREE.MeshStandardMaterial({ color: 0x3388AA, transparent: true, opacity: 0.3 })), cx, baseY + 0.05, cz);
+    }
+
+    // ── Animated fluid wicking particles (Arch A) ──
+    const wickParticleMat = new THREE.MeshStandardMaterial({ color: 0x3B82F6, emissive: 0x1a4480, emissiveIntensity: 0.4, transparent: true, opacity: 0.8 });
+    const wickParticles = [];
+    for (let i = 0; i < 24; i++) {
+      const a = (i % 12) / 12 * Math.PI * 2 + Math.random() * 0.3;
+      const rr = 0.5 + Math.random() * (secR - 1.2);
+      const wp = new THREE.Mesh(new THREE.SphereGeometry(0.05, 6, 6), wickParticleMat);
+      wp.position.set(Math.cos(a) * rr, -0.5 + Math.random() * 7, Math.sin(a) * rr);
+      wp.visible = false;
+      archAGroup.add(wp);
+      wickParticles.push({ mesh: wp, speed: 0.015 + Math.random() * 0.025, baseA: a, baseR: rr });
     }
 
     // ────────────────────────────────────────
@@ -794,6 +859,23 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
         }
       });
 
+      // Vertical wicking particles (Arch A)
+      wickParticles.forEach((wp, i) => {
+        if (wp.mesh.visible) {
+          wp.mesh.position.y += wp.speed;
+          wp.mesh.position.x += Math.sin(time * 1.5 + i * 2.1) * 0.002;
+          wp.mesh.position.z += Math.cos(time * 1.2 + i * 1.7) * 0.002;
+          // Reset to bottom when reaching top
+          if (wp.mesh.position.y > baseY + 2.2) {
+            wp.mesh.position.y = -0.2 + Math.random() * 0.5;
+            const a = wp.baseA + (Math.random() - 0.5) * 0.4;
+            const rr = wp.baseR + (Math.random() - 0.5) * 0.3;
+            wp.mesh.position.x = Math.cos(a) * rr;
+            wp.mesh.position.z = Math.sin(a) * rr;
+          }
+        }
+      });
+
       // Capillary flow particles
       capillaryParticles.forEach((cp, i) => {
         if (cp.mesh.visible) {
@@ -820,7 +902,7 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     stateRef.current = {
       chipGroup, crossGroup, sideGroup, fluidicsGroup, waxGroup, labelSprites,
       reporters, reportersC, padMeshes, rnps, ampliconGroup, orbit, tgtOrbit,
-      archAGroup, archBGroup, archCGroup, capillaryParticles,
+      archAGroup, archBGroup, archCGroup, capillaryParticles, wickParticles,
       _hovIdx: -1,
       _selectPad: (idx, target) => { setSelectedPad({ idx, target }); setMode(2); },
       _toMode1: () => { setMode(1); setSelectedPad(null); setCas12aActive(false); },
@@ -850,6 +932,7 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
     if (mode === 1) {
       s.tgtOrbit.dist = 60; s.tgtOrbit.theta = 0.3; s.tgtOrbit.phi = -0.45;
       s.tgtOrbit.target = new THREE.Vector3(0, 0, 0);
+      setExpandedCurve(false); setExpandedETransfer(false);
     } else if (mode === 2) {
       s.tgtOrbit.dist = 18; s.tgtOrbit.theta = 0.4; s.tgtOrbit.phi = -0.3;
       s.tgtOrbit.target = new THREE.Vector3(0, 4.5, 0);
@@ -920,6 +1003,11 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
 
     s.rnps.forEach(rnp => { rnp.visible = cas12aActive; });
     s.ampliconGroup.visible = cas12aActive;
+
+    // Vertical wicking particles (Arch A) — flow on activation
+    if (s.wickParticles) {
+      s.wickParticles.forEach(wp => { wp.mesh.visible = cas12aActive && arch === "A"; });
+    }
   }, [cas12aActive, incubationMin, arch]);
 
   // ── Computed data for selected pad ──
@@ -1123,6 +1211,13 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
       {/* ═══ MODE 2: CROSS-SECTION ═══ */}
       {mode === 2 && selectedPad && (
         <>
+          {/* Backdrop for expanded panels */}
+          {(expandedCurve || expandedETransfer) && (
+            <div onClick={() => { setExpandedCurve(false); setExpandedETransfer(false); }} style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)",
+              zIndex: 50, backdropFilter: "blur(2px)",
+            }} />
+          )}
           {/* Info panel */}
           <div style={{ position: "absolute", top: 12, left: 16, background: "rgba(255,255,255,0.95)", padding: "10px 14px", borderRadius: 8, border: "1px solid #E3E8EF", maxWidth: 280, backdropFilter: "blur(8px)" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", fontFamily: HEADING }}>
@@ -1139,7 +1234,17 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
                 {selR.pam && <div>PAM: <span style={{ color: "#374151" }}>{selR.pam}</span>{selR.pamVariant && <span> ({selR.pamVariant})</span>}</div>}
                 {selR.pamDisrupted != null && <div>PAM-overlap: <span style={{ color: selR.pamDisrupted ? "#7c3aed" : "#374151" }}>{selR.pamDisrupted ? "yes — binary disc" : "no"}</span></div>}
                 {selR.amplicon && <div>Amplicon: <span style={{ color: selR.amplicon <= 120 ? "#16A34A" : "#ef4444" }}>{selR.amplicon} bp</span>{selR.amplicon <= 120 ? " (cfDNA ✓)" : " (⚠ >120)"}</div>}
-                {deltaI != null && <div>Expected ΔI%: <span style={{ color: "#16A34A", fontWeight: 700 }}>{deltaI}%</span> @ {incubationMin} min</div>}
+                {deltaI != null && (
+                  <div>
+                    Expected ΔI%: <span style={{ color: "#16A34A", fontWeight: 700 }}>{deltaI}%</span> @ {incubationMin} min
+                    {selDisc != null && selDisc <= 2.0 && (
+                      <div style={{ marginTop: 2, padding: "2px 4px", background: "#FEF3C7", borderRadius: 2, fontSize: 7, color: "#92400E", lineHeight: 1.4 }}>
+                        ⚠ D = {selDisc.toFixed(1)}× — WT allele ΔI% ≈ MUT ΔI% (S_eff_WT = {(selEff / selDisc).toFixed(3)}).
+                        Discrimination relies on AS-RPA primer selectivity, not crRNA alone.
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1174,37 +1279,55 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
             </div>
           </div>
 
-          {/* ── Electrochemistry curves panel ── */}
+          {/* ── Electrochemistry curves panel (expandable) ── */}
           {curveData && (
-            <div style={{ position: "absolute", bottom: 55, right: 16, background: "rgba(255,255,255,0.96)", padding: "8px 12px", borderRadius: 8, border: "1px solid #E3E8EF", backdropFilter: "blur(8px)", minWidth: 190 }}>
-              <div style={{ display: "flex", gap: 2, marginBottom: 4 }}>
+            <div onClick={() => setExpandedCurve(!expandedCurve)} style={{ position: expandedCurve ? "fixed" : "absolute", bottom: expandedCurve ? "50%" : 55, right: expandedCurve ? "50%" : 16, transform: expandedCurve ? "translate(50%, 50%)" : "none", background: "rgba(255,255,255,0.98)", padding: expandedCurve ? "16px 20px" : "8px 12px", borderRadius: 8, border: "1px solid #E3E8EF", backdropFilter: "blur(8px)", minWidth: expandedCurve ? 420 : 190, zIndex: expandedCurve ? 100 : 10, cursor: "pointer", boxShadow: expandedCurve ? "0 8px 40px rgba(0,0,0,0.2)" : "none", transition: "all 0.2s ease" }}>
+              <div style={{ display: "flex", gap: 2, marginBottom: 4, alignItems: "center" }}>
                 {["SWV", "EIS"].map(m => (
-                  <button key={m} onClick={() => setCurveMode(m)} style={{
-                    fontSize: 7, fontWeight: curveMode === m ? 700 : 500, fontFamily: MONO,
-                    padding: "2px 8px", borderRadius: 3, border: "none", cursor: "pointer",
+                  <button key={m} onClick={(e) => { e.stopPropagation(); setCurveMode(m); }} style={{
+                    fontSize: expandedCurve ? 10 : 7, fontWeight: curveMode === m ? 700 : 500, fontFamily: MONO,
+                    padding: expandedCurve ? "4px 12px" : "2px 8px", borderRadius: 3, border: "none", cursor: "pointer",
                     background: curveMode === m ? "#374151" : "#F3F4F6",
                     color: curveMode === m ? "#fff" : "#6B7280",
                   }}>{m}</button>
                 ))}
-                <span style={{ fontSize: 6, color: "#B0B0B0", marginLeft: 4, fontFamily: MONO }}>Signal-{am.sig}</span>
+                <span style={{ fontSize: expandedCurve ? 9 : 6, color: "#B0B0B0", marginLeft: 4, fontFamily: MONO }}>Signal-{am.sig}</span>
+                <span style={{ fontSize: expandedCurve ? 8 : 5.5, color: "#C0C0C0", marginLeft: "auto", fontFamily: MONO }}>{expandedCurve ? "click to collapse" : "click to expand"}</span>
               </div>
 
-              <svg width={190} height={90} viewBox="0 0 190 90">
+              <svg width={expandedCurve ? 400 : 190} height={expandedCurve ? 200 : 90} viewBox="0 0 190 90" style={{ display: "block" }}>
                 {curveMode === "SWV" ? (
                   <>
-                    <path d={svgPathVolt(curveData.before, 190, 90)} fill="none" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3,2" />
-                    <path d={svgPathVolt(curveData.after, 190, 90)} fill="none" stroke="#ef4444" strokeWidth="1.5" />
+                    <path d={svgPathVolt(curveData.before, 190, 90)} fill="none" stroke="#93C5FD" strokeWidth={arch === "A" ? "2.5" : "1.5"} strokeDasharray="4,3" />
+                    <path d={svgPathVolt(curveData.after, 190, 90)} fill="none" stroke="#ef4444" strokeWidth="2" />
                     <line x1="0" y1="86" x2="190" y2="86" stroke="#D1D5DB" strokeWidth="0.5" />
                     <text x="2" y="85" fontSize="5" fill="#9CA3AF">{am.eRange.split(" to ")[0]}</text>
                     <text x="140" y="85" fontSize="5" fill="#9CA3AF">{am.eRange.split(" to ")[1]} V</text>
                     <line x1="95" y1="0" x2="95" y2="90" stroke="#E5E7EB" strokeWidth="0.5" strokeDasharray="2,2" />
                     <text x="97" y="8" fontSize="5" fill="#9CA3AF">{am.peak} ({am.label})</text>
                     {deltaI && <text x="130" y="20" fontSize="6.5" fill="#ef4444" fontWeight="bold">ΔI = {deltaI}%</text>}
+                    {arch === "A" && cas12aActive && (
+                      <>
+                        {/* Signal-ON annotation arrow */}
+                        <line x1="105" y1="55" x2="105" y2="30" stroke="#16A34A" strokeWidth="1.2" markerEnd="url(#arrowUp)" />
+                        <defs><marker id="arrowUp" markerWidth="6" markerHeight="6" refX="3" refY="6" orient="auto"><path d="M1,6 L3,0 L5,6" fill="#16A34A" /></marker></defs>
+                        <text x="110" y="46" fontSize="5.5" fill="#16A34A" fontWeight="bold">peak GROWS</text>
+                        <text x="110" y="53" fontSize="4.5" fill="#16A34A">+target → +pAP</text>
+                      </>
+                    )}
+                    {arch !== "A" && cas12aActive && (
+                      <>
+                        <line x1="105" y1="30" x2="105" y2="55" stroke="#ef4444" strokeWidth="1.2" markerEnd="url(#arrowDown)" />
+                        <defs><marker id="arrowDown" markerWidth="6" markerHeight="6" refX="3" refY="0" orient="auto"><path d="M1,0 L3,6 L5,0" fill="#ef4444" /></marker></defs>
+                        <text x="110" y="40" fontSize="5.5" fill="#ef4444" fontWeight="bold">peak SHRINKS</text>
+                        <text x="110" y="47" fontSize="4.5" fill="#ef4444">signal-OFF</text>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
-                    <path d={svgPathEIS(curveData.before, 190, 90)} fill="none" stroke="#93C5FD" strokeWidth="1.5" strokeDasharray="3,2" />
-                    <path d={svgPathEIS(curveData.after, 190, 90)} fill="none" stroke="#ef4444" strokeWidth="1.5" />
+                    <path d={svgPathEIS(curveData.before, 190, 90)} fill="none" stroke="#93C5FD" strokeWidth="2" strokeDasharray="4,3" />
+                    <path d={svgPathEIS(curveData.after, 190, 90)} fill="none" stroke="#ef4444" strokeWidth="2" />
                     <line x1="0" y1="86" x2="190" y2="86" stroke="#D1D5DB" strokeWidth="0.5" />
                     <text x="2" y="85" fontSize="5" fill="#9CA3AF">Z' (Ω)</text>
                     <line x1="2" y1="0" x2="2" y2="86" stroke="#D1D5DB" strokeWidth="0.5" />
@@ -1213,9 +1336,10 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
                 )}
               </svg>
 
-              <div style={{ fontSize: 6, color: "#9CA3AF", fontFamily: MONO, display: "flex", gap: 8, marginTop: 2 }}>
-                <span><span style={{ color: "#93C5FD" }}>---</span> baseline</span>
-                <span><span style={{ color: "#ef4444" }}>—</span> t={incubationMin}m</span>
+              <div style={{ fontSize: 6, color: "#9CA3AF", fontFamily: MONO, display: "flex", gap: 8, marginTop: 2, alignItems: "center" }}>
+                <span><span style={{ color: "#93C5FD", fontWeight: 700 }}>- - -</span> baseline (t=0)</span>
+                <span><span style={{ color: "#ef4444", fontWeight: 700 }}>——</span> t={incubationMin}m</span>
+                <span style={{ color: am.sig === "ON" ? "#16A34A" : "#ef4444", fontWeight: 700, fontSize: 7 }}>Signal-{am.sig}</span>
               </div>
               <div style={{ fontSize: 5.5, color: "#C0C0C0", fontFamily: MONO, marginTop: 1 }}>
                 Freq: {am.freq} | Amp: {am.amp} | Step: {am.step}
@@ -1223,10 +1347,32 @@ export default function ChipRender3D({ electrodeLayout, targetDrug, targetStrate
             </div>
           )}
 
-          {/* ── Electron transfer inset ── */}
-          <div style={{ position: "absolute", bottom: 55, left: 16, background: "rgba(255,255,255,0.94)", padding: "5px 8px", borderRadius: 6, border: "1px solid #E3E8EF", backdropFilter: "blur(8px)" }}>
-            <div style={{ fontSize: 6.5, fontWeight: 700, color: "#374151", fontFamily: MONO, marginBottom: 2 }}>e⁻ Transfer — Arch {arch}</div>
-            {eTransferSVG[arch]}
+          {/* ── Electron transfer inset (expandable) ── */}
+          <div onClick={() => setExpandedETransfer(!expandedETransfer)} style={{
+            position: expandedETransfer ? "fixed" : "absolute",
+            bottom: expandedETransfer ? "50%" : 55,
+            left: expandedETransfer ? "50%" : 16,
+            transform: expandedETransfer ? "translate(-50%, 50%)" : "none",
+            background: "rgba(255,255,255,0.96)", padding: expandedETransfer ? "16px 20px" : "5px 8px",
+            borderRadius: expandedETransfer ? 10 : 6, border: "1px solid #E3E8EF", backdropFilter: "blur(8px)",
+            zIndex: expandedETransfer ? 100 : 10, cursor: "pointer",
+            boxShadow: expandedETransfer ? "0 8px 40px rgba(0,0,0,0.2)" : "none",
+            transition: "all 0.2s ease",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: expandedETransfer ? 8 : 2 }}>
+              <div style={{ fontSize: expandedETransfer ? 11 : 6.5, fontWeight: 700, color: "#374151", fontFamily: MONO }}>e⁻ Transfer — Arch {arch}: {ARCH_META[arch].name}</div>
+              <span style={{ fontSize: expandedETransfer ? 8 : 5, color: "#C0C0C0", fontFamily: MONO, marginLeft: 8 }}>{expandedETransfer ? "click to collapse" : "click to expand"}</span>
+            </div>
+            <div style={{ transform: expandedETransfer ? "scale(2.8)" : "scale(1)", transformOrigin: "top left", width: expandedETransfer ? 280 : "auto", height: expandedETransfer ? 112 : "auto" }}>
+              {eTransferSVG[arch]}
+            </div>
+            {expandedETransfer && (
+              <div style={{ marginTop: 120, fontSize: 10, color: "#6B7280", fontFamily: MONO, lineHeight: 1.7, maxWidth: 380 }}>
+                {arch === "A" && "ALP converts p-APP → pAP in solution. pAP diffuses to LIG-E surface and is oxidized (pAP → quinoneimine + 2H⁺ + 2e⁻). Electrons flow through LIG-E to potentiostat. Signal-ON: more target → more cleavage → more captured ALP → more pAP → higher peak."}
+                {arch === "B" && "Ag⁰ nanoparticles deposited along ssDNA scaffold. Cas12a trans-cleavage releases Ag-ssDNA fragments into solution. Remaining surface-bound Ag⁰ is oxidized via ASV (Ag⁰ → Ag⁺ + e⁻). Signal-OFF: more cleavage → less surface Ag → smaller stripping peak."}
+                {arch === "C" && "MB redox reporter tethered to ssDNA probe via pyrene π-π stacking on LIG-E. Intact probe: MB within electron-tunneling distance (<2 nm) → strong signal. Cas12a cleaves probe → MB diffuses away → signal loss. Signal-OFF."}
+              </div>
+            )}
           </div>
 
           {/* ── Cas12a controls ── */}

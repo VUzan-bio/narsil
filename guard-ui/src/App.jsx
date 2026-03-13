@@ -5385,6 +5385,11 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
               <div style={{ fontSize: "10px", color: T.textSec, marginBottom: "8px", fontFamily: FONT }}>
                 {echemCandidateData.label} {"\u00b7"} {"\u0394"}I% = <span style={{ fontWeight: 600, color: EC.purple }}>{echemMeta.deltaI}%</span>
                 {" \u00b7 "}|I{"\u2080"}| = {echemArch === "C" ? (Math.abs(echemMeta.peakBase) * 1000).toFixed(1) : Math.abs(echemMeta.peakBase).toFixed(3)} {echemArch === "C" ? "nA" : "\u03bcA"} {"\u2192"} |I_after| = {echemArch === "C" ? (Math.abs(echemMeta.peakAfter) * 1000).toFixed(1) : Math.abs(echemMeta.peakAfter).toFixed(3)} {echemArch === "C" ? "nA" : "\u03bcA"}
+                {echemCandidateData.discrimination <= 2.0 && echemCandidateData.discrimination < 900 && (
+                  <div style={{ marginTop: "4px", padding: "3px 8px", background: "#FEF3C7", borderRadius: "3px", fontSize: "9px", color: "#92400E", lineHeight: 1.5, fontFamily: MONO }}>
+                    {"\u26A0"} D = {echemCandidateData.discrimination.toFixed(1)}{"\u00d7"} {"\u2014"} WT allele {"\u0394"}I% {"\u2248"} MUT {"\u0394"}I% (S_eff_WT = {(echemCandidateData.efficiency / echemCandidateData.discrimination).toFixed(3)}). Clinical discrimination relies entirely on AS-RPA primer selectivity, not crRNA alone.
+                  </div>
+                )}
               </div>
               <div style={{ width: "100%", height: 280 }}>
                 {(() => {
