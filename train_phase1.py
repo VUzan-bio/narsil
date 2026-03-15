@@ -103,8 +103,11 @@ def to_onehot(seq: str) -> np.ndarray:
 
 
 def normalise(raw: np.ndarray) -> np.ndarray:
-    ranked = raw.argsort().argsort()
-    return ranked.astype(np.float32) / max(len(raw) - 1, 1)
+    """Min-max normalise raw indel frequencies to [0, 1]."""
+    mn, mx = raw.min(), raw.max()
+    if mx - mn < 1e-8:
+        return np.full_like(raw, 0.5, dtype=np.float32)
+    return ((raw - mn) / (mx - mn)).astype(np.float32)
 
 
 # ── Dataset ──
@@ -121,8 +124,9 @@ class GuideDataset(Dataset):
     def __getitem__(self, i):
         oh = self.onehots[i]
         if self.augment:
-            if np.random.random() < 0.5:
-                oh = augment_rc(oh)
+            # NOTE: RC augmentation is biologically INVALID for Cas12a —
+            # PAM must be 5' upstream, RC flips it to wrong end. Disabled.
+            # Only flanking shuffle is strand-safe.
             if np.random.random() < 0.3:
                 oh = augment_shuffle_flank(oh)
         return (
