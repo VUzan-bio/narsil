@@ -4203,10 +4203,10 @@ const DiscriminationTab = ({ results }) => {
       {/* Threshold cards — glass style */}
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "10px", marginBottom: "24px" }}>
         {[
-          { label: "Excellent", val: "≥ 10×", count: excellent, color: "#16a34a", desc: "Clinical deployment ready" },
-          { label: "Good", val: "≥ 3×", count: good, color: T.primary, desc: "Diagnostic-grade" },
-          { label: "Acceptable", val: "≥ 2×", count: acceptable, color: "#d97706", desc: "Needs confirmation" },
-          { label: "Insufficient", val: "< 2×", count: insufficient, color: "#dc2626", desc: "SM enhancement required" },
+          { label: "Excellent", val: "≥ 10×", count: excellent, color: "#16a34a", desc: "Single-plex clinical use. Robust across sample types." },
+          { label: "Good", val: "≥ 3×", count: good, color: T.primary, desc: "Multiplex panel. Electrochemical and lateral flow." },
+          { label: "Acceptable", val: "≥ 2×", count: acceptable, color: "#d97706", desc: "Requires confirmatory readout or dual-target." },
+          { label: "Insufficient", val: "< 2×", count: insufficient, color: "#dc2626", desc: "Synthetic mismatch enhancement needed." },
         ].map(t => (
           <div key={t.label} style={{ background: T.bg, borderRadius: "4px", padding: "16px 18px", border: `1px solid ${T.border}` }}>
             <div style={{ fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>{t.label}</div>
@@ -4539,7 +4539,7 @@ const PrimersTab = ({ results }) => {
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", minWidth: 700 }}>
           <thead>
             <tr style={{ background: T.bgSub }}>
-              {["Target", "Type", "Disc", "Forward Primer", "Reverse Primer", "Amplicon", "SM"].map((h) => (
+              {["Target", "Type", "Disc", "Forward Primer", "Reverse Primer", "Amplicon", "GC%", "SM"].map((h) => (
                 <th key={h} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 600, color: T.textSec, borderBottom: `1px solid ${T.border}` }}>{h}</th>
               ))}
             </tr>
@@ -4570,6 +4570,7 @@ const PrimersTab = ({ results }) => {
                   {isHov ? <Seq s={r.rev} /> : <span style={{ fontFamily: MONO, fontSize: "11.5px", letterSpacing: "1.2px", color: T.textTer }}>{r.rev}</span>}
                 </td>
                 <td style={{ padding: "10px 14px", fontFamily: FONT, fontWeight: 600, color: r.amplicon <= 100 ? T.success : r.amplicon <= 120 ? T.warning : T.danger }}>{r.amplicon} bp</td>
+                <td style={{ padding: "10px 14px", fontFamily: FONT, fontSize: "11px", color: (r.ampliconGc || r.gc || 0.656) >= 0.70 ? T.warning : T.textSec }}>{((r.ampliconGc || r.gc || 0.656) * 100).toFixed(0)}%{(r.ampliconGc || r.gc || 0.656) >= 0.70 ? <span style={{ fontSize: "9px", color: T.warning, marginLeft: "3px" }} title="High GC may cause hairpins blocking RPA recombinase invasion">{"\u26a0"}</span> : ""}</td>
                 <td style={{ padding: "10px 14px" }}><Badge variant={r.hasSM ? "primary" : "default"}>{r.hasSM ? "Yes" : "No"}</Badge></td>
               </tr>
               );
@@ -4608,7 +4609,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   const [echemTechnique, setEchemTechnique] = useState("SWV");
   const [echemTime, setEchemTime] = useState(30);       // minutes
   const [echemBloodTiter, setEchemBloodTiter] = useState(100); // cp/mL
-  const [echemKtrans, setEchemKtrans] = useState(0.002); // s⁻¹ (realistic for LIG-AuNP surface trans-cleavage)
+  const [echemKtrans, setEchemKtrans] = useState(0.02); // s⁻¹ (mid-range estimate for LIG-AuNP surface trans-cleavage, 0.01–0.1 s⁻¹)
   const [echemAdvanced, setEchemAdvanced] = useState(false);
   const [echemGamma0, setEchemGamma0] = useState(1.5e11); // molecules/cm²
   const [echemPorosity, setEchemPorosity] = useState(3);
@@ -4636,12 +4637,13 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       { param: "k_trans (surface, estimated)", value: "0.01\u20130.1 s\u207b\u00b9", source: "Estimated", note: "Key experimental unknown." },
       { param: "[Cas12a]", value: "50 nM", source: "Design parameter", note: null },
       { param: "[crRNA] on pad", value: "~200 nM equivalent", source: "Design parameter", note: "Effective concentration after rehydration unknown." },
-      { param: "MB-ssDNA probe density", value: "~10\u00b9\u2070\u201310\u00b9\u00b9 molecules/cm\u00b2", source: "Estimated for LIG", note: "Probe density directly affects signal magnitude and time-to-detection." },
+      { param: "MB-ssDNA probe density", value: "~10\u00b9\u2070\u201310\u00b9\u00b9 molecules/cm\u00b2", source: "Estimated for LIG", note: "Geometric density \u2014 effective density is higher due to LIG porosity (3\u201310\u00d7 surface area). Directly affects signal magnitude and time-to-detection." },
     ],
     insights: [
       { title: "Rate-limiting step", text: "Surface trans-cleavage of tethered MB-ssDNA reporters dominates detection time \u2014 not RNP formation or target recognition." },
       { title: "In situ complexation", text: "Lesinski et al. 2024: reduces effective [RNP] during the first ~5 minutes by ~10-fold vs pre-complexed format. This prevents Cas12a from destroying target amplicons before detection begins." },
       { title: "Experimental unknowns", text: "k_trans on LIG-tethered MB-ssDNA and crRNA rehydration kinetics have not been measured. These are key characterisation priorities." },
+      { title: "Capacitive background", text: "SWV simulation models Faradaic current only. Real LIG electrodes have capacitive (non-Faradaic) baseline from double-layer charging on high-surface-area graphene foam. Signal-to-noise ratio in practice depends on the Faradaic-to-capacitive current ratio." },
     ],
     target_ranking: [
       { target: "IS6110", efficiency: 0.95, is_weak: false },
@@ -6169,7 +6171,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
           <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Sensitivity-Specificity Optimization</span>
         </div>
         <div style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6 }}>
-          Evaluate panel performance against WHO Target Product Profile thresholds across three operating modes. Per-drug sensitivity and specificity are computed from discrimination ratios and primer coverage. Adjust the optimization profile to balance field deployment (high sensitivity) versus reference laboratory (high specificity) requirements.
+          Evaluate panel performance against WHO Target Product Profile thresholds across three operating modes. Per-drug sensitivity is computed from primer coverage and readiness; specificity is estimated from discrimination ratios using 1{"\u2212"}1/D (theoretical upper bound assuming separated signal distributions). Real specificity on LIG electrodes depends on intra-device CV ({"\u2248"}5% RSD) and electrode-to-electrode variability across the 14-plex array. Adjust the optimization profile to balance field deployment (high sensitivity) versus reference laboratory (high specificity) requirements.
         </div>
       </div>
 
