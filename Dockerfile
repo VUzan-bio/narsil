@@ -52,6 +52,9 @@ COPY compass-net/ ./compass-net/
 # Editable install (egg-link only, no downloads)
 RUN pip install --no-cache-dir --no-deps -e .
 
+# XGBoost for discrimination model
+RUN pip install --no-cache-dir xgboost>=2.0
+
 # Build Bowtie2 index
 RUN bowtie2-build data/references/H37Rv.fasta data/references/H37Rv
 
