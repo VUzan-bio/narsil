@@ -231,10 +231,13 @@ class LearnedDiscriminationScorer(Scorer):
                     cas_variant=self.cas_variant,
                 )
 
-                # Predict
-                from thermo_discrimination_features import FEATURE_NAMES
+                # Predict — use V1 features (15) for backward compatibility
+                # with existing trained checkpoints. New models trained on
+                # FEATURE_NAMES (18) should set self._feature_version = "v2".
+                from thermo_discrimination_features import FEATURE_NAMES_V1
+                feature_names = FEATURE_NAMES_V1
                 X = np.array(
-                    [[features[n] for n in FEATURE_NAMES]],
+                    [[features[n] for n in feature_names]],
                     dtype=np.float32,
                 )
                 delta_logk = float(self._model.predict(X)[0])

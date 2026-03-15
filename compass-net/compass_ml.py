@@ -43,6 +43,9 @@ class CompassML(nn.Module):
         # CNN branch config
         cnn_branches: int = 32,
         cnn_out_dim: int = 64,
+        # Gap 7: explicit PAM encoding
+        n_pam_classes: int = 0,
+        pam_embed_dim: int = 8,
         # RNA-FM branch config
         use_rnafm: bool = True,
         use_rnafm_lora: bool = False,
@@ -61,6 +64,10 @@ class CompassML(nn.Module):
         # Discrimination head enhancements
         n_thermo: int = 0,
         pos_embed_dim: int = 0,
+        # Gap 3: R-loop positional prior for discrimination
+        rloop_pos_dim: int = 0,
+        # Gap 4: cross-attention between MUT/WT
+        use_cross_attention: bool = False,
         # Head params
         hidden_dim: int = 64,
         dropout: float = 0.3,
@@ -70,6 +77,7 @@ class CompassML(nn.Module):
         # -- Branch 1: CNN on target DNA (trainable) --
         self.cnn = CNNBranch(
             in_channels=4, branches=cnn_branches, out_dim=cnn_out_dim,
+            n_pam_classes=n_pam_classes, pam_embed_dim=pam_embed_dim,
         )
 
         # -- Branch 2: RNA-FM on crRNA --
@@ -125,6 +133,9 @@ class CompassML(nn.Module):
                 dense_input_dim, hidden_dim,
                 n_thermo=n_thermo,
                 pos_embed_dim=pos_embed_dim,
+                rloop_pos_dim=rloop_pos_dim,
+                use_cross_attention=use_cross_attention,
+                cross_attn_d_model=fused_dim,
             )
 
         # -- Domain-adversarial head (optional, for multi-dataset training) --

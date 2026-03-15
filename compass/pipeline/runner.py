@@ -159,8 +159,8 @@ class COMPASSPipeline:
             ))
         self.screener = OffTargetScreener(databases=ot_databases)
 
-        # Module 5: Heuristic scorer
-        self.heuristic_scorer = HeuristicScorer()
+        # Module 5: Heuristic scorer (organism-aware weights for TB)
+        self.heuristic_scorer = HeuristicScorer(organism=config.organism)
 
         # Module 5 ML: scorer selection (Compass-ML or SeqCNN)
         if (

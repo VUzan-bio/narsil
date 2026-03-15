@@ -273,13 +273,19 @@ def compute_features_for_pair(
     }
 
 
-FEATURE_NAMES = [
+# Original 15 features — used by existing trained XGBoost/LightGBM checkpoints.
+# Do NOT remove or reorder these; existing models depend on this exact layout.
+FEATURE_NAMES_V1 = [
     "spacer_position", "in_seed", "position_sensitivity", "region_code",
     "mismatch_destab", "is_wobble", "is_purine_purine", "is_transition",
     "mismatch_ddg", "cumulative_dg_at_mm", "seed_dg", "total_hybrid_dg",
     "energy_ratio",
     "gc_content", "local_gc",
-    # Gap 8: cooperative context features (Strohkendl 2018, Kim 2020)
+]
+
+# Extended 18 features — includes cooperative context (Strohkendl 2018, Kim 2020).
+# New models should be trained on this feature set for improved discrimination.
+FEATURE_NAMES = FEATURE_NAMES_V1 + [
     "flank_at_rich", "pam_to_mm_distance", "upstream_gc",
 ]
 
