@@ -1845,7 +1845,7 @@ const MethodsPage = () => {
           {[
             { tag: "CNN", title: "Target DNA Branch", desc: "Multi-scale convolutions (k=3,5,7) scan the 34-nt target context for PAM quality, seed composition, and dinucleotide patterns." },
             { tag: "RNA-FM", title: "Guide RNA Branch", desc: "Pre-trained foundation model (23M sequences) captures folding stability and accessibility governing Cas12a loading." },
-            { tag: "RLPA", title: "R-Loop Propagation", desc: "Causal attention encodes PAM-proximal to distal directionality. +6.7% cross-dataset generalisation vs bidirectional." },
+            { tag: "RLPA", title: "R-Loop Propagation", desc: "Directional attention encodes PAM-proximal to distal R-loop propagation. +6.7% cross-dataset generalisation vs bidirectional." },
           ].map(c => (
             <div key={c.tag} style={{ padding: "16px", border: `1px solid ${T.border}`, borderRadius: "4px" }}>
               <span style={{ fontSize: "10px", fontWeight: 600, color: T.primary, padding: "2px 6px", borderRadius: "3px", background: T.primaryLight, fontFamily: MONO, display: "inline-block", marginBottom: "10px" }}>{c.tag}</span>
@@ -1869,7 +1869,7 @@ const MethodsPage = () => {
             ["RLPA improvement", "+6.7% on Kim 2018 cross-library"],
             ["Training protocol", "3-phase: pretrain, RLPA, multi-task"],
             ["Multi-task heads", "Efficiency (sigmoid) + Discrimination (Softplus)"],
-            ["Attention", "R-Loop Propagation Attention (RLPA), causal mask"],
+            ["Attention", "R-Loop Propagation Attention (RLPA), directional propagation bias"],
           ].map(([k, v]) => <KV key={k} label={k} value={v} />)}
         </div>
 
@@ -1882,9 +1882,9 @@ const MethodsPage = () => {
       {/* ═══════════ 3. ARCHITECTURE DETAIL ═══════════ */}
       <Section id="architecture" title="Architecture Detail" subtitle="Full layer-by-layer breakdown of the Compass-ML network">
         {[
-          { label: "Branch 1", title: "Multi-Scale CNN", input: "34-nt one-hot encoded target (4 PAM + 20 protospacer + 10 flanking).", process: "Three parallel conv paths (k=3,5,7), 32 channels each, BN + dropout(0.3). Projected to 64-dim via 1\u00d71 conv.", output: "64-dim per position: dinucleotide preferences, seed complementarity, PAM patterns." },
+          { label: "Branch 1", title: "Multi-Scale CNN", input: "34-nt one-hot encoded target (4 PAM + 20 protospacer + 10 flanking).", process: "Three parallel conv paths (k=3,5,7), 40 channels each, BN + dropout(0.3). Projected to 64-dim via 1\u00d71 conv.", output: "64-dim per position: dinucleotide preferences, seed complementarity, PAM patterns." },
           { label: "Branch 2", title: "RNA-FM Projection", input: "Guide RNA (20\u201323 nt). Processed by frozen RNA-FM (23M sequences, masked LM).", process: "640-dim per-nucleotide embeddings \u2192 trainable linear \u2192 64-dim. Zero-padded to 34 positions.", output: "64-dim structural embedding: folding, stability, 5\u2032 accessibility." },
-          { label: "Fusion", title: "R-Loop Propagation Attention", input: "Concatenated 128-dim (64 CNN + 64 RNA-FM) at each of 34 positions.", process: "Single-head attention, 32-dim Q/K/V, causal mask (PAM-proximal \u2192 distal), learnable 34\u00d734 positional bias.", output: "Attention-weighted 128-dim features re-weighted by positional importance." },
+          { label: "Fusion", title: "R-Loop Propagation Attention", input: "Concatenated 128-dim (64 CNN + 64 RNA-FM) at each of 34 positions.", process: "Single-head attention, 32-dim Q/K/V, directional propagation bias (PAM-proximal \u2192 distal), learnable 34\u00d734 positional bias.", output: "Attention-weighted 128-dim features re-weighted by positional importance." },
           { label: "Output", title: "Multi-Task Heads", input: "RLPA-weighted representation, globally pooled.", process: "Efficiency: 128\u219264\u219232\u21921 (sigmoid). Discrimination: 547\u219264\u219232\u21921 (Softplus).", output: "Two scalars: efficiency (0\u20131) and discrimination ratio (fold-change MUT/WT)." },
         ].map((block, idx, arr) => (
           <div key={block.title} style={{ padding: "16px 0", borderBottom: idx < arr.length - 1 ? `1px solid ${T.borderLight}` : "none" }}>
@@ -1951,7 +1951,7 @@ const MethodsPage = () => {
         <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "12px 16px" }}>
           <div style={{ fontSize: "12px", fontWeight: 600, color: T.text, marginBottom: "4px" }}>Synthetic Mismatch Enhancement</div>
           <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6 }}>
-            For candidates with insufficient discrimination, deliberate mismatches within the seed region (positions 1{"\u2013"}8) destabilize wildtype binding while preserving mutant recognition. Published improvements range from 2{"\u00d7"} to {">"}50{"\u00d7"} (Kohabir et al. 2024).
+            For candidates with insufficient discrimination, deliberate mismatches within the seed region (positions 1{"\u2013"}8) destabilize wildtype binding while preserving mutant recognition. Published improvements of 6{"\u2013"}7.5{"\u00d7"} at PAM+4 (Kohabir et al. 2024), with up to {">"}10{"\u00d7"} in favourable seed contexts (Chen et al. 2018; Teng et al. 2019).
           </div>
         </div>
       </Section>
