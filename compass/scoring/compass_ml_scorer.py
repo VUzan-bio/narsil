@@ -806,7 +806,7 @@ class CompassMlScorer(Scorer):
                 chunk_seqs = unique_seqs[start:start + CHUNK]
                 batch_data = [(f"s{i}", seq) for i, seq in enumerate(chunk_seqs)]
                 _, _, tokens = bc(batch_data)
-                with torch.no_grad():
+                with torch.inference_mode():
                     out = self._rnafm_model(
                         tokens.to(self._device), repr_layers=[12],
                     )
@@ -824,10 +824,45 @@ class CompassMlScorer(Scorer):
                 results[i] = unique_embs.get(seq)
 
             logger.info("RNA-FM batch complete: %d embeddings computed", len(unique_embs))
+
+            # Persist to disk cache for instant subsequent runs
+            self._persist_live_cache_to_disk(unique_embs)
+
         except Exception as e:
             logger.warning("RNA-FM batch inference failed: %s — falling back to zeros", e)
 
         return results
+
+    def _persist_live_cache_to_disk(self, embeddings: dict) -> None:
+        """Save newly computed embeddings to disk cache for future runs."""
+        try:
+            import importlib.util
+            cache_module_path = _COMPASS_NET_DIR / "data" / "embedding_cache.py"
+            if not cache_module_path.exists():
+                return
+            spec = importlib.util.spec_from_file_location(
+                "compass_ml_embedding_cache_persist", str(cache_module_path),
+            )
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            EmbeddingCache = mod.EmbeddingCache
+
+            cache_dir = Path("compass/data/embeddings/rnafm")
+            cache_dir.mkdir(parents=True, exist_ok=True)
+            cache = EmbeddingCache(str(cache_dir))
+
+            import torch as _torch
+            seqs = list(embeddings.keys())
+            tensors = [_torch.from_numpy(embeddings[s]) if not isinstance(embeddings[s], _torch.Tensor) else embeddings[s] for s in seqs]
+            new_seqs = [s for s, t in zip(seqs, tensors) if not cache.has(s)]
+            new_tensors = [t for s, t in zip(seqs, tensors) if not cache.has(s)]
+
+            if new_seqs:
+                cache.put_batch(new_seqs, new_tensors)
+                logger.info("Persisted %d new RNA-FM embeddings to disk cache (%d total)",
+                           len(new_seqs), len(cache))
+        except Exception as e:
+            logger.debug("Could not persist RNA-FM cache: %s", e)
 
     # ------------------------------------------------------------------
     # Private — prediction

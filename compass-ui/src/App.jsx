@@ -25,7 +25,7 @@ import {
 } from "./api";
 
 /* ═══════════════════════════════════════════════════════════════════
-   DESIGN TOKENS — Institutional Biotech (Benchling-style)
+   DESIGN TOKENS; Institutional Biotech (Benchling-style)
    ═══════════════════════════════════════════════════════════════════ */
 const T = {
   bg: "#FFFFFF", bgSub: "#F9FAFB", bgHover: "#F3F4F6",
@@ -204,7 +204,7 @@ const MOCK_CROSS_REACTIVITY = (() => {
     same_gene_pairs: sameGenePairs,
     panel_safe: highRisk.length === 0,
     none_count: noneCount,
-    interpretation: "All cross-reactive pairs occur between same-gene targets sharing overlapping amplicons. In the spatially multiplexed paper electrode array, each detection zone is physically isolated by wax-printed hydrophobic barriers \u2014 cross-reactivity between zones is impossible. These scores are relevant only for hypothetical solution-phase multiplex formats.",
+    interpretation: "All cross-reactive pairs occur between same-gene targets sharing overlapping amplicons. In the spatially multiplexed paper electrode array, each detection zone is physically isolated by wax-printed hydrophobic barriers, so cross-reactivity between zones is impossible. These scores are relevant only for hypothetical solution-phase multiplex formats.",
   };
 })();
 
@@ -326,7 +326,7 @@ function resolveStep(data) {
   return 0;
 }
 
-/* Scoring feature weights — matches compass/core/constants.py HEURISTIC_WEIGHTS exactly */
+/* Scoring feature weights; matches compass/core/constants.py HEURISTIC_WEIGHTS exactly */
 const SCORING_FEATURES = [
   { name: "Seed Position", key: "seed_position", weight: 0.35, desc: "Positions 1–8 (PAM-proximal) perfect match penalty. Mismatches in seed dramatically reduce cleavage.", source: "Kim et al. 2017" },
   { name: "GC Content", key: "gc", weight: 0.20, desc: "Optimal 40–60%. Extreme GC causes self-complementarity (high) or weak binding (low).", source: "Empirical" },
@@ -490,7 +490,7 @@ const ToastProvider = ({ children }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   API DATA TRANSFORMER — maps API CandidateResponse → flat v8 format
+   API DATA TRANSFORMER; maps API CandidateResponse → flat v8 format
    ═══════════════════════════════════════════════════════════════════ */
 function transformApiCandidate(c) {
   /* Handle both the detailed per-candidate shape and the TargetResult shape from /api/results */
@@ -528,7 +528,7 @@ function transformApiCandidate(c) {
       experimentalPriority: c.experimental_priority ?? null,
       riskProfile: c.risk_profile ?? null,
       priorityReason: c.priority_reason ?? null,
-      // Phase 1 — newly exposed backend fields
+      // Phase 1; newly exposed backend fields
       seedPositionScore: sc.seed_position_score ?? null,
       gcPenalty: sc.gc_penalty ?? null,
       structurePenalty: sc.structure_penalty ?? null,
@@ -585,7 +585,7 @@ function transformApiCandidate(c) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   CANDIDATE VIEWER — Detail panel with amplicon map + mismatch
+   CANDIDATE VIEWER; Detail panel with amplicon map + mismatch
    ═══════════════════════════════════════════════════════════════════ */
 const AmpliconMap = ({ r }) => {
   const W = 640, H = 100, pad = 40;
@@ -624,13 +624,13 @@ const MismatchProfile = ({ spacer, wtSpacer, strategy }) => {
     if (strategy === "Proximity") {
       return (
         <div style={{ fontSize: "12px", color: T.purple, lineHeight: 1.6, padding: "8px 0" }}>
-          <strong>Proximity detection</strong> — discrimination is provided by the AS-RPA primers, not by crRNA mismatch. The crRNA binds a conserved region near the mutation site.
+          <strong>Proximity detection:</strong> discrimination is provided by the AS-RPA primers, not by crRNA mismatch. The crRNA binds a conserved region near the mutation site.
         </div>
       );
     }
     return (
       <div style={{ fontSize: "12px", color: T.textTer, lineHeight: 1.6, padding: "8px 0" }}>
-        WT spacer not available — mismatch profile cannot be displayed.
+        WT spacer not available. Mismatch profile cannot be displayed.
       </div>
     );
   }
@@ -675,7 +675,7 @@ const CandidateViewer = ({ r, onClose }) => {
   /* Compute per-feature scores deterministically from candidate data */
   const computeFeatures = () => {
     if (r.scoringBreakdown) {
-      /* Real API data — use actual per-feature scores from pipeline HeuristicScore */
+      /* Real API data; use actual per-feature scores from pipeline HeuristicScore */
       const sb = r.scoringBreakdown;
       return [
         { ...SCORING_FEATURES[0], raw: +(1 - (sb.seed_position_score || 0)).toFixed(3), weighted: +((1 - (sb.seed_position_score || 0)) * 0.35).toFixed(4) },
@@ -685,7 +685,7 @@ const CandidateViewer = ({ r, onClose }) => {
         { ...SCORING_FEATURES[4], raw: +(1 - (sb.offtarget_penalty || 0)).toFixed(3), weighted: +((1 - (sb.offtarget_penalty || 0)) * 0.15).toFixed(4) },
       ];
     }
-    /* Mock data — simulate deterministically from spacer */
+    /* Mock data; simulate deterministically from spacer */
     const seed = r.spacer.charCodeAt(0) + r.spacer.charCodeAt(1);
     return SCORING_FEATURES.map((f, i) => {
       let raw;
@@ -739,7 +739,7 @@ const CandidateViewer = ({ r, onClose }) => {
         {/* PROXIMITY explanation block */}
         {r.strategy === "Proximity" && (
           <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "4px", padding: "16px 20px", marginBottom: "24px" }}>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: T.purple, fontFamily: HEADING, marginBottom: "6px" }}>Proximity Detection — PAM Desert Region</div>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: T.purple, fontFamily: HEADING, marginBottom: "6px" }}>Proximity Detection: PAM Desert Region</div>
             <div style={{ fontSize: "12px", color: "#2563EB", lineHeight: 1.6 }}>
               <p style={{ margin: "0 0 6px" }}>
                 The <strong>{r.gene} {r.ref}{r.pos}{r.alt}</strong> mutation sits in a high-GC region with no Cas12a PAM placing the SNP within any spacer.
@@ -794,7 +794,7 @@ const CandidateViewer = ({ r, onClose }) => {
                 ["WHO Classification", ref.who, ref.who === "Associated" ? "success" : "warning"],
                 ["WHO Catalogue", ref.catalogue, null],
                 ["Clinical Frequency", ref.freq, null],
-                ["CRyPTIC Dataset", ref.cryptic || "—", null],
+                ["CRyPTIC Dataset", ref.cryptic || "N/A", null],
               ].map(([k, v, type], i, arr) => (
                 <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 16px", borderBottom: i < arr.length - 1 ? `1px solid ${T.borderLight}` : "none", fontSize: "12px" }}>
                   <span style={{ color: T.textSec }}>{k}</span>
@@ -827,7 +827,7 @@ const CandidateViewer = ({ r, onClose }) => {
           </div>
         </div>
 
-        {/* Scoring Breakdown — 5 real pipeline features */}
+        {/* Scoring Breakdown; 5 real pipeline features */}
         <div style={{ marginBottom: "24px" }}>
           <div style={{ fontSize: "13px", fontWeight: 600, color: T.text, marginBottom: "4px" }}>Scoring Breakdown</div>
           <div style={{ fontSize: "11px", color: T.textSec, marginBottom: "10px" }}>Per-feature contribution to composite score (heuristic model)</div>
@@ -1024,7 +1024,7 @@ const CollapsibleSection = ({ title, children, defaultOpen = false, badge }) => 
   );
 };
 
-/* Collapsible figure wrapper for Overview tab — open by default, click to toggle */
+/* Collapsible figure wrapper for Overview tab; open by default, click to toggle */
 const FigureSection = ({ title, subtitle, children, defaultOpen = true }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
@@ -1045,7 +1045,7 @@ const FigureSection = ({ title, subtitle, children, defaultOpen = true }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   HOME PAGE — Run workflow + methodology blog
+   HOME PAGE; Run workflow + methodology blog
    ═══════════════════════════════════════════════════════════════════ */
 const DEFAULT_MUTS = [
   "rpoB_S531L", "rpoB_H526Y", "rpoB_D516V",
@@ -1158,7 +1158,7 @@ const HomePage = ({ goTo, connected }) => {
     }, 100);
 
     if (connected) {
-      // WS for fast updates (best-effort — proxies often break this)
+      // WS for fast updates (best-effort; proxies often break this)
       try {
         const ws = connectJobWS(jobId,
           (msg) => {
@@ -1175,7 +1175,7 @@ const HomePage = ({ goTo, connected }) => {
         );
         pipeWsRef.current = ws;
       } catch { /* ignore */ }
-      // Polling is the reliable path — always run it
+      // Polling is the reliable path; always run it
       pipePollRef.current = setInterval(async () => {
         const { data } = await getJob(jobId);
         if (!data) return;
@@ -1212,8 +1212,8 @@ const HomePage = ({ goTo, connected }) => {
       });
     } else {
       const m5Detail = scorer === "compass_ml"
-        ? "241 candidates scored — Compass-ML activity (0.125–0.608) · Compass-ML discrimination (0.288–0.959) · PAM-adjusted (0.045–0.608)"
-        : "241 candidates scored — Heuristic QC (0.125–0.608) · SeqCNN calibrated T=1.1 (0.288–0.959) · PAM-adjusted (0.045–0.608)";
+        ? "241 candidates scored: Compass-ML activity (0.125–0.608) · Compass-ML discrimination (0.288–0.959) · PAM-adjusted (0.045–0.608)"
+        : "241 candidates scored: Heuristic QC (0.125–0.608) · SeqCNN calibrated T=1.1 (0.288–0.959) · PAM-adjusted (0.045–0.608)";
       setPipeStats([
         { module_id: "M1",   detail: "14 WHO catalogue mutations → genomic coordinates on H37Rv (NC_000962.3)", candidates_out: 14,  duration_ms: 1 },
         { module_id: "M2",   detail: "34,364 positions scanned → 1,797 PAM sites → 334 candidates",             candidates_out: 334, duration_ms: 98 },
@@ -1237,7 +1237,7 @@ const HomePage = ({ goTo, connected }) => {
     return () => cleanupPipeline();
   }, []);
 
-  /* Scorer-aware modules — M5 adapts to selected scoring model */
+  /* Scorer-aware modules; M5 adapts to selected scoring model */
   const effectiveModules = useMemo(() => MODULES.map(m =>
     m.id === "M5" && scorer === "compass_ml"
       ? {
@@ -1297,7 +1297,7 @@ const HomePage = ({ goTo, connected }) => {
           </div>
         )}
 
-        {/* 1. Run Name — compact inline */}
+        {/* 1. Run Name; compact inline */}
         <div style={{ marginBottom: "24px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <label style={{ fontSize: "13px", fontWeight: 600, color: T.text, fontFamily: HEADING, flexShrink: 0 }}>Run Name</label>
@@ -1324,7 +1324,7 @@ const HomePage = ({ goTo, connected }) => {
           </button>
           {panelSectionOpen && (
             <div style={{ padding: "16px 20px", borderTop: `1px solid ${T.borderLight}` }}>
-              {/* Preset cards — 2×2 */}
+              {/* Preset cards; 2×2 */}
               <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
                 {[
                   { id: "mdr14", name: "MDR-TB 14-plex", targets: ALL_INDICES.length + " targets",
@@ -1419,7 +1419,7 @@ const HomePage = ({ goTo, connected }) => {
             {/* Expanded table */}
             {targetsOpen && (
               <div style={{ borderTop: `1px solid ${T.borderLight}` }}>
-                {/* Drug filter chips — only for Custom panel */}
+                {/* Drug filter chips; only for Custom panel */}
                 {panel === "custom" && (
                   <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", padding: "12px 16px", borderBottom: `1px solid ${T.borderLight}` }}>
                     <button onClick={() => setSelected(new Set(ALL_INDICES))} style={{ padding: "5px 12px", borderRadius: "4px", border: `1px solid ${T.border}`, background: selected.size === MUTATIONS.length ? T.primary : T.bg, color: selected.size === MUTATIONS.length ? "#fff" : T.textSec, fontSize: "11px", fontWeight: 600, cursor: "pointer", fontFamily: FONT }}>All ({MUTATIONS.length})</button>
@@ -1481,7 +1481,7 @@ const HomePage = ({ goTo, connected }) => {
           </div>
         </div>
 
-        {/* Advanced Configuration (collapsible card — matching mutations card design) */}
+        {/* Advanced Configuration (collapsible card; matching mutations card design) */}
         <div style={{ marginBottom: "28px" }}>
           <div style={{ background: T.bgSub, border: `1px solid ${T.borderLight}`, borderRadius: "4px", overflow: "hidden" }}>
           <button onClick={() => setConfigOpen(!configOpen)} style={{
@@ -1590,7 +1590,7 @@ const HomePage = ({ goTo, connected }) => {
                     {k === "RPA Amplicon" && (
                       <div style={{ display: "flex", alignItems: "flex-start", gap: "6px", padding: "6px 0 8px", fontSize: "10px", color: T.textTer, lineHeight: 1.5 }}>
                         <Droplet size={10} color={T.textTer} strokeWidth={2} style={{ flexShrink: 0, marginTop: 2 }} />
-                        <span>Capped at 120 bp — cfDNA fragments in blood are ~100–160 bp. Shorter amplicons maximise template capture from fragmented circulating DNA.</span>
+                        <span>Capped at 120 bp. cfDNA fragments in blood are ~100-160 bp. Shorter amplicons maximise template capture from fragmented circulating DNA.</span>
                       </div>
                     )}
                   </div>
@@ -1643,18 +1643,18 @@ const HomePage = ({ goTo, connected }) => {
             borderRadius: "4px",
             marginBottom: "24px", overflow: "hidden",
           }}>
-            {/* Queued state — waiting for previous run */}
+            {/* Queued state; waiting for previous run */}
             {!pipeDone && pipeQueued && (
               <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", gap: "10px" }}>
                 <svg width="14" height="14" viewBox="0 0 16 16" style={{ animation: "spin 1s linear infinite", flexShrink: 0 }}>
                   <circle cx="8" cy="8" r="6" fill="none" stroke={T.border} strokeWidth="2" />
                   <path d="M8 2a6 6 0 0 1 6 6" fill="none" stroke={T.textTer} strokeWidth="2" strokeLinecap="round" />
                 </svg>
-                <span style={{ fontSize: "13px", color: T.textSec }}>Queued — waiting for previous run to complete</span>
+                <span style={{ fontSize: "13px", color: T.textSec }}>Queued, waiting for previous run to complete</span>
                 <span style={{ fontFamily: MONO, fontSize: "12px", color: T.textTer, marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>{fmtElapsed(pipeElapsed)}</span>
               </div>
             )}
-            {/* Running state — continuous progress bar + current module + collapsible timeline */}
+            {/* Running state; continuous progress bar + current module + collapsible timeline */}
             {!pipeDone && !pipeQueued && (() => {
               const stepEstSec = activeModule.estSec || 10;
               const stepElapsed = (Date.now() - pipeStepStartRef.current) / 1000;
@@ -1771,7 +1771,7 @@ const HomePage = ({ goTo, connected }) => {
               );
             })()}
 
-            {/* Complete state — summary + logs toggle + CTA */}
+            {/* Complete state; summary + logs toggle + CTA */}
             {pipeDone && (
               <div style={{ padding: "16px 20px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
@@ -1879,7 +1879,7 @@ const MethodsPage = () => {
     return { ...prev, [k]: willOpen };
   });
 
-  /* ── Reusable section card — grey header bar, collapsible body ── */
+  /* ── Reusable section card; grey header bar, collapsible body ── */
   const Section = ({ id, title, subtitle, badge, children }) => {
     const isOpen = openSections[id];
     return (
@@ -1984,7 +1984,7 @@ const MethodsPage = () => {
 
         {/* Multi-task callout */}
         <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: "12px 16px", fontSize: "13px", color: T.primaryDark, lineHeight: 1.6, marginBottom: "20px" }}>
-          <strong>Multi-task learning</strong> — Efficiency and discrimination are predicted jointly. Discrimination (the MUT/WT cleavage ratio) determines whether a guide can distinguish resistant from susceptible bacteria at single-nucleotide resolution.
+          <strong>Multi-task learning:</strong> Efficiency and discrimination are predicted jointly. Discrimination (the MUT/WT cleavage ratio) determines whether a guide can distinguish resistant from susceptible bacteria at single-nucleotide resolution.
         </div>
 
         {/* Technical details table */}
@@ -2181,7 +2181,7 @@ const MethodsPage = () => {
 /* ═══════════════════════════════════════════════════════════════════
    EXECUTION THEME TOKENS (light, integrated with sidebar)
    ═══════════════════════════════════════════════════════════════════ */
-/* Monotone execution palette — black, grey, white only */
+/* Monotone execution palette; black, grey, white only */
 const EX = {
   bg: T.bgSub,
   text: "#111111",
@@ -2195,7 +2195,7 @@ const EX = {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   PIPELINE PAGE — Redirects to Home (execution is now inline)
+   PIPELINE PAGE; Redirects to Home (execution is now inline)
    ═══════════════════════════════════════════════════════════════════ */
 const PipelinePage = ({ jobId, connected, goTo }) => {
   const mobile = useIsMobile();
@@ -2215,16 +2215,16 @@ const PipelinePage = ({ jobId, connected, goTo }) => {
    ═══════════════════════════════════════════════════════════════════ */
 const RISK_COLORS = { green: T.riskGreen, amber: T.riskAmber, red: T.riskRed };
 const RISK_BG = { green: T.riskGreenBg, amber: T.riskAmberBg, red: T.riskRedBg };
-/* GreenBlue colormap — single-cell omics UMAP aesthetic.
+/* GreenBlue colormap; single-cell omics UMAP aesthetic.
    Stops: light gray → pale green → teal → blue → deep blue. */
 const gradientColor = (t) => {
   t = Math.max(0, Math.min(1, t));
   const stops = [
-    { t: 0.00, r: 180, g: 185, b: 195 },  // #b4b9c3 — soft gray (low)
-    { t: 0.25, r: 171, g: 221, b: 164 },  // #abdda4 — pale green
-    { t: 0.50, r: 102, g: 194, b: 165 },  // #66c2a5 — teal
-    { t: 0.75, r: 50,  g: 136, b: 189 },  // #3288bd — blue
-    { t: 1.00, r: 30,  g: 58,  b: 95 },   // #1E3A5F — deep navy (high)
+    { t: 0.00, r: 180, g: 185, b: 195 },  // #b4b9c3; soft gray (low)
+    { t: 0.25, r: 171, g: 221, b: 164 },  // #abdda4; pale green
+    { t: 0.50, r: 102, g: 194, b: 165 },  // #66c2a5; teal
+    { t: 0.75, r: 50,  g: 136, b: 189 },  // #3288bd; blue
+    { t: 1.00, r: 30,  g: 58,  b: 95 },   // #1E3A5F; deep navy (high)
   ];
   let lower = stops[0], upper = stops[stops.length - 1];
   for (let i = 0; i < stops.length - 1; i++) {
@@ -2252,7 +2252,7 @@ const RiskDot = ({ level, size = 12 }) => (
   }} />
 );
 
-/* Heatmap cell for Risk Assessment Matrix — 3 discrete pastel colors */
+/* Heatmap cell for Risk Assessment Matrix; 3 discrete pastel colors */
 const RISK_CELL_COLORS = { green: "#B8E6C8", amber: "#FDDCB0", red: "#F5A3A3" };
 const RISK_CELL_PASS = "#a7d8b8";
 const RiskHeatCell = ({ level, type = "quantitative" }) => {
@@ -2320,7 +2320,7 @@ const ExperimentalPriorityCard = ({ results }) => {
       </div>
       {gaps.length > 0 && (
         <div style={{ marginTop: "14px", padding: "10px 14px", background: T.riskRedBg, border: `1px solid ${T.riskRed}33`, borderRadius: "4px", fontSize: "11px", color: T.danger, lineHeight: 1.6 }}>
-          <strong>Panel gap:</strong> {gaps.map(r => r.label).join(", ")} — no viable discrimination pathway. Requires alternative strategy or SM enhancement.
+          <strong>Panel gap:</strong> {gaps.map(r => r.label).join(", ")}. No viable discrimination pathway. Requires alternative strategy or SM enhancement.
         </div>
       )}
     </div>
@@ -2400,10 +2400,10 @@ const ReadinessChart = ({ results }) => {
   });
   const [hovIdx, setHovIdx] = useState(null);
 
-  // Pastel palette — matches UMAP embedding aesthetic
+  // Pastel palette; matches UMAP embedding aesthetic
   const DRUG_LINE = { RIF: "#5B8BD4", INH: "#9B8EC4", EMB: "#66C2A5", PZA: "#8DA0CB", FQ: "#E78AC3", AG: "#A6D854", OTHER: "#B3B3B3", CTRL: "#B3B3B3" };
 
-  // Full-width responsive SVG — use viewBox for scaling
+  // Full-width responsive SVG; use viewBox for scaling
   const W = 900, H = 290, padL = 100, padR = 80, padT = 20, padB = 34;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
@@ -2426,7 +2426,7 @@ const ReadinessChart = ({ results }) => {
         </div>
       </div>
 
-      {/* Full-width SVG — viewBox scales to container */}
+      {/* Full-width SVG; viewBox scales to container */}
       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }} preserveAspectRatio="xMidYMid meet">
         {/* Soft background bands for readability */}
         {[0, 1, 2, 3].map(i => (
@@ -2456,7 +2456,7 @@ const ReadinessChart = ({ results }) => {
         {/* 50% reference line */}
         <line x1={axisX[0]} y1={padT + plotH / 2} x2={axisX[axes.length - 1]} y2={padT + plotH / 2} stroke="#E5E7EB" strokeWidth={0.7} strokeDasharray="6,4" />
 
-        {/* Candidate polylines — non-hovered first (dimmed), then hovered on top */}
+        {/* Candidate polylines; non-hovered first (dimmed), then hovered on top */}
         {chartData.map((row, ri) => {
           if (hovIdx != null && hovIdx === ri) return null; // draw hovered last
           const lineColor = DRUG_LINE[row.drug] || "#6B7280";
@@ -2546,7 +2546,7 @@ const ReadinessChart = ({ results }) => {
         const weakest = axisAvgs.reduce((min, cur) => cur.avg < min.avg ? cur : min);
         if (weakest.avg < 0.4) return (
           <div style={{ marginTop: "8px", padding: "8px 14px", background: `${T.warning}10`, border: `1px solid ${T.warning}30`, borderRadius: "4px", fontSize: "11px", color: T.textSec, lineHeight: 1.5 }}>
-            Panel-wide gap: <strong style={{ color: T.text }}>{AXIS_LABELS[weakest.axis]}</strong> axis averages {(weakest.avg * 100).toFixed(0)}% — consider strengthening candidates on this dimension.
+            Panel-wide gap: <strong style={{ color: T.text }}>{AXIS_LABELS[weakest.axis]}</strong> axis averages {(weakest.avg * 100).toFixed(0)}%. Consider strengthening candidates on this dimension.
           </div>
         );
         return null;
@@ -2591,7 +2591,7 @@ const UMAPPanel = ({ jobId }) => {
     ctx.scale(dpr, dpr);
     const pad = 36;
 
-    // Clear — light background for UMAP
+    // Clear; light background for UMAP
     ctx.fillStyle = "#FFFFFF";
     ctx.fillRect(0, 0, displayW, displayH);
 
@@ -2782,26 +2782,27 @@ const UMAPPanel = ({ jobId }) => {
 const InSilicoCaveat = () => {
   const [open, setOpen] = useState(false);
   return (
-    <div style={{ background: "#FFFBEB", border: "1px solid #F59E0B33", borderRadius: "4px", marginBottom: "20px", overflow: "hidden" }}>
-      <button onClick={() => setOpen(!open)} style={{ width: "100%", background: "none", border: "none", cursor: "pointer", padding: "10px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <AlertTriangle size={14} color="#D97706" strokeWidth={2} />
-          <span style={{ fontSize: "12px", fontWeight: 600, color: "#92400E" }}>In silico prediction — experimental validation required</span>
-        </div>
-        <ChevronDown size={14} color="#D97706" style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+    <div style={{ marginBottom: "20px" }}>
+      <button onClick={() => setOpen(!open)} style={{
+        display: "flex", alignItems: "center", gap: "6px", background: "none", border: "none",
+        cursor: "pointer", padding: "4px 0", marginBottom: open ? "2px" : 0, fontFamily: FONT,
+        fontSize: "11px", fontWeight: 600, color: "#92400E", textTransform: "uppercase",
+        letterSpacing: "0.04em",
+      }}>
+        <ChevronDown size={12} style={{ transform: open ? "rotate(0deg)" : "rotate(-90deg)", transition: "transform 0.15s", color: "#D97706" }} />
+        <AlertTriangle size={12} color="#D97706" strokeWidth={2} />
+        In silico prediction: experimental validation required
       </button>
       {open && (
-        <div style={{ padding: "0 16px 14px", fontSize: "11px", color: "#92400E", lineHeight: 1.7 }}>
+        <div style={{ background: "#FFFBEB", border: "1px solid #F59E0B33", borderRadius: "4px", padding: "12px 16px", fontSize: "11px", color: "#92400E", lineHeight: 1.7 }}>
           <p style={{ margin: "0 0 6px" }}>
-            <strong>Activity scores</strong> are predicted by Compass-ML (CNN + RNA-FM + RLPA) trained on human cell cis-cleavage data (Kim et al. 2018).
-            The ranking between candidates is informative for synthesis prioritisation, but absolute values are not proportional to electrochemical signal on LIG electrodes.
+            Activity scores are predicted by Compass-ML (CNN + RNA-FM + RLPA) trained on human cell cis-cleavage data (Kim et al. 2018). The ranking between candidates is informative for synthesis prioritisation, but absolute values are not proportional to electrochemical signal on LIG electrodes.
           </p>
           <p style={{ margin: "0 0 6px" }}>
-            <strong>Discrimination ratios</strong> (XGBoost, 18 thermodynamic features) are trained on 6,136 paired trans-cleavage measurements (Huang et al. 2024, LbCas12a).
-            These are the most reliable in silico metric. Actual enAsCas12a discrimination on the electrochemical platform requires experimental confirmation.
+            Discrimination ratios (XGBoost, 18 thermodynamic features) are trained on 6,136 paired trans-cleavage measurements (Huang et al. 2024, LbCas12a). These are the most reliable in silico metric. Actual enAsCas12a discrimination on the electrochemical platform requires experimental confirmation.
           </p>
           <p style={{ margin: 0 }}>
-            All predictions serve as a starting point for the wet-lab validation workflow on the deMello group{"\u2019"}s LIG electrode platform.
+            All predictions serve as a starting point for the wet-lab validation workflow on the deMello group's LIG electrode platform.
           </p>
         </div>
       )}
@@ -2844,7 +2845,7 @@ const OverviewTab = ({ results, scorer, jobId, panelData }) => {
     FQ: "~40%", AG: "~90%", OTHER: "N/A"
   };
 
-  // Model agreement — Spearman ρ between heuristic and Compass-ML (PAM-adjusted)
+  // Model agreement; Spearman ρ between heuristic and Compass-ML (PAM-adjusted)
   const modelAgreement = (() => {
     const pairs = results.filter(r => r.cnnCalibrated != null).map(r => ({ h: r.score, g: r.cnnCalibrated * (r.pamPenalty ?? 1.0) }));
     if (pairs.length < 3) return null;
@@ -2871,31 +2872,31 @@ const OverviewTab = ({ results, scorer, jobId, panelData }) => {
 
   return (
     <div>
-      {/* Panel Interpretation — blue card with collapsible glossary */}
+      <InSilicoCaveat />
+
+      {/* Panel Interpretation; blue card with collapsible glossary */}
       <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "6px", padding: "16px 20px", marginBottom: "20px" }}>
         <div style={{ fontSize: "13px", fontWeight: 600, color: "#1D4ED8", marginBottom: "6px" }}>Panel Interpretation</div>
         <div style={{ fontSize: "12px", color: "#1E40AF", lineHeight: 1.6 }}>
-          {assayReady}/{totalTargets} targets are assay-ready across {drugs.filter(d => d !== "OTHER").length} drug classes ({drugs.filter(d => d !== "OTHER").join(", ")}). {belowThreshold.length > 0 ? `${belowThreshold.length} below threshold \u2014 prioritised for first experimental round.` : "All targets meet readiness threshold."}
+          {assayReady}/{totalTargets} targets are assay-ready across {drugs.filter(d => d !== "OTHER").length} drug classes ({drugs.filter(d => d !== "OTHER").join(", ")}). {belowThreshold.length > 0 ? `${belowThreshold.length} below threshold - prioritised for first experimental round.` : "All targets meet readiness threshold."}
         </div>
         {/* Collapsible glossary */}
         <div style={{ marginTop: "10px" }}>
-          <button onClick={() => setGlossaryOpen(!glossaryOpen)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: "11px", fontWeight: 600, color: "#2563EB", display: "flex", alignItems: "center", gap: "4px" }}>
-            {glossaryOpen ? "\u25BC" : "\u25B6"} Metric definitions
+          <button onClick={() => setGlossaryOpen(!glossaryOpen)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: "11px", fontWeight: 500, color: "#2563EB", display: "flex", alignItems: "center", gap: "4px" }}>
+            {glossaryOpen ? <ChevronDown size={12} color="#2563EB" /> : <ChevronRight size={12} color="#2563EB" />} Metric definitions
           </button>
           {glossaryOpen && (
             <div style={{ marginTop: "8px", fontSize: "11px", color: "#1E3A5F", lineHeight: 1.7, paddingLeft: "12px", borderLeft: "2px solid #BFDBFE" }}>
-              <div style={{ marginBottom: "4px" }}><strong>Direct avg ({avgDiscDirect}×)</strong> — Mean Cas12a mismatch discrimination for direct-detection candidates (MUT/WT cleavage fold-difference).</div>
-              <div style={{ marginBottom: "4px" }}><strong>Proximity (AS-RPA)</strong> — Allele-specific RPA primer discrimination for candidates where the mutation falls outside the crRNA footprint. Estimated 11–100× selectivity.</div>
-              <div style={{ marginBottom: "4px" }}><strong>Diagnostic-grade (≥3×)</strong> — Number of direct candidates exceeding the 3× threshold for reliable clinical use on electrochemical or lateral-flow readout.</div>
-              <div style={{ marginBottom: "4px" }}><strong>Avg. activity ({avgActivity})</strong> — Compass-ML predicted Cas12a on-target cis-cleavage efficiency (0–1). Higher = stronger trans-cleavage signal.</div>
-              <div style={{ marginBottom: "4px" }}><strong>Avg. PAM-adjusted ({avgPamAdj || "—"})</strong> — Activity × PAM penalty. Predicts actual signal strength on the electrode after non-canonical PAM penalties (enAsCas12a expanded PAMs in GC-rich MTB).</div>
-              <div><strong>Disc model</strong> — XGBoost on 18 thermodynamic features (trained on 6,136 EasyDesign crRNA–target pairs). Predicts MUT/WT discrimination from mismatch position, type, and flanking sequence context.</div>
+              <div style={{ marginBottom: "4px" }}><strong>Direct avg ({avgDiscDirect}×):</strong> Mean Cas12a mismatch discrimination for direct-detection candidates (MUT/WT cleavage fold-difference).</div>
+              <div style={{ marginBottom: "4px" }}><strong>Proximity (AS-RPA):</strong> Allele-specific RPA primer discrimination for candidates where the mutation falls outside the crRNA footprint. Estimated 11–100× selectivity.</div>
+              <div style={{ marginBottom: "4px" }}><strong>Diagnostic-grade (≥3×):</strong> Number of direct candidates exceeding the 3× threshold for reliable clinical use on electrochemical or lateral-flow readout.</div>
+              <div style={{ marginBottom: "4px" }}><strong>Avg. activity ({avgActivity}):</strong> Compass-ML predicted Cas12a on-target cis-cleavage efficiency (0–1). Higher = stronger trans-cleavage signal.</div>
+              <div style={{ marginBottom: "4px" }}><strong>Avg. PAM-adjusted ({avgPamAdj || "N/A"}):</strong> Activity x PAM penalty. Predicts actual signal strength on the electrode after non-canonical PAM penalties (enAsCas12a expanded PAMs in GC-rich MTB).</div>
+              <div><strong>Disc model:</strong> XGBoost on 18 thermodynamic features (trained on 6,136 EasyDesign crRNA-target pairs). Predicts MUT/WT discrimination from mismatch position, type, and flanking sequence context.</div>
             </div>
           )}
         </div>
       </div>
-
-      <InSilicoCaveat />
 
       {/* ── Verdict-first panel ── */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "20px 16px" : "24px 28px", marginBottom: "24px" }}>
@@ -2909,9 +2910,9 @@ const OverviewTab = ({ results, scorer, jobId, panelData }) => {
           </div>
         </div>
 
-        {/* Three evidence columns — reordered: confidence → discrimination → readiness */}
+        {/* Three evidence columns; reordered: confidence → discrimination → readiness */}
         <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr 1fr", gap: mobile ? "16px" : "12px" }}>
-          {/* Column 1: How confident are we? (discrimination — most important metric) */}
+          {/* Column 1: How confident are we? (discrimination; most important metric) */}
           <div style={{ background: T.bgSub, borderRadius: "6px", padding: "16px 20px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "14px" }}>
               <TrendingUp size={11} color={T.textTer} strokeWidth={2} />
@@ -2994,7 +2995,7 @@ const OverviewTab = ({ results, scorer, jobId, panelData }) => {
             </div>
           </div>
 
-          {/* Old Column 2 removed — content moved to Column 1 */}
+          {/* Old Column 2 removed; content moved to Column 1 */}
 
           {/* Column 3: What's missing? */}
           <div style={{ background: T.bgSub, borderRadius: "6px", padding: "16px 20px" }}>
@@ -3102,7 +3103,7 @@ const OverviewTab = ({ results, scorer, jobId, panelData }) => {
 
       {/* Risk Assessment Matrix */}
       {results.some(r => r.riskProfile != null) && (
-        <FigureSection title="Risk Assessment Matrix" subtitle={`${results.length} targets scored across 5 biophysical axes — green = safe, amber = moderate risk, red = requires attention.`}>
+        <FigureSection title="Risk Assessment Matrix" subtitle={`${results.length} targets scored across 5 biophysical axes; green = safe, amber = moderate risk, red = requires attention.`}>
           <RiskMatrix results={results} />
         </FigureSection>
       )}
@@ -3120,14 +3121,15 @@ const OverviewTab = ({ results, scorer, jobId, panelData }) => {
                 {readinessData.map((r, i) => {
                   const pct = Math.round(r.score * 100);
                   const rs = r.score;
-                  const barColor = rs >= 0.7 ? "#16a34a" : rs >= 0.55 ? "#65a30d" : rs >= 0.4 ? "#d97706" : "#dc2626";
+                  const barColor = rs >= 0.55 ? "#BBF7D0" : rs >= 0.4 ? "#FDE68A" : "#FECACA";
+                  const scoreTextColor = rs >= 0.55 ? "#059669" : rs >= 0.4 ? "#D97706" : "#DC2626";
                   return (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <div style={{ width: mobile ? "80px" : "120px", fontSize: "11px", fontFamily: MONO, color: T.text, textAlign: "right", flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</div>
                       <div style={{ flex: 1, height: "18px", background: T.bgSub, borderRadius: "3px", overflow: "hidden", position: "relative" }}>
-                        <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: "3px", transition: "width 300ms ease-out", opacity: 0.85 }} />
+                        <div style={{ width: `${pct}%`, height: "100%", background: barColor, borderRadius: "3px", transition: "width 300ms ease-out" }} />
                       </div>
-                      <div style={{ width: "36px", fontSize: "11px", fontFamily: FONT, fontWeight: 600, color: r.score >= 0.4 ? T.success : T.warning, textAlign: "right", flexShrink: 0 }}>{pct}%</div>
+                      <div style={{ width: "36px", fontSize: "11px", fontFamily: FONT, fontWeight: 600, color: scoreTextColor, textAlign: "right", flexShrink: 0 }}>{pct}%</div>
                     </div>
                   );
                 })}
@@ -3146,7 +3148,7 @@ const OverviewTab = ({ results, scorer, jobId, panelData }) => {
         );
       })()}
 
-      {/* Score vs Discrimination Scatter — readiness-sized dots */}
+      {/* Score vs Discrimination Scatter; readiness-sized dots */}
       {!mobile && (() => {
         const getScore = (r) => usesCompassMl ? (r.cnnCalibrated ?? r.score) : r.score;
         const hasReadiness = results.some(r => r.readinessScore != null);
@@ -3243,9 +3245,9 @@ const OverviewTab = ({ results, scorer, jobId, panelData }) => {
                 <div style={{ marginTop: "14px", padding: "12px 16px", background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
                   <strong style={{ color: T.primary }}>Interpretation:</strong> {topRight.length}/{scatterData.length} Direct candidates are diagnostic-ready (score ≥ 0.4, disc ≥ 3×).
                   {bestCandidate ? ` Best overall: ${bestCandidate.label} (${bestCandidate.score.toFixed(3)}, ${bestCandidate.disc.toFixed(1)}×).` : ""}
-                  {bottomRight.length > 0 ? ` ${bottomRight.length} Direct candidate${bottomRight.length > 1 ? "s have" : " has"} good scores but low Cas12a discrimination (${bottomRight.slice(0, 2).map(d => d.label).join(", ")}${bottomRight.length > 2 ? "…" : ""}) — synthetic mismatch enhancement may improve these.` : ""}
-                  {topLeft.length > 0 ? ` ${topLeft.length} candidate${topLeft.length > 1 ? "s" : ""} ${topLeft.length > 1 ? "have" : "has"} strong discrimination but weak scores — alternative spacers may help.` : ""}
-                  {proximityCands.length > 0 ? ` ${proximityCands.length} Proximity candidate${proximityCands.length > 1 ? "s are" : " is"} not plotted — their discrimination comes from AS-RPA primers, not crRNA mismatch. Of these, ${viableProx.length} show viable AS-RPA discrimination${nonViableProx > 0 ? ` and ${nonViableProx} ha${nonViableProx > 1 ? "ve" : "s"} no viable discrimination pathway (WC pair)` : ""}.` : ""}
+                  {bottomRight.length > 0 ? ` ${bottomRight.length} Direct candidate${bottomRight.length > 1 ? "s have" : " has"} good scores but low Cas12a discrimination (${bottomRight.slice(0, 2).map(d => d.label).join(", ")}${bottomRight.length > 2 ? "…" : ""}); synthetic mismatch enhancement may improve these.` : ""}
+                  {topLeft.length > 0 ? ` ${topLeft.length} candidate${topLeft.length > 1 ? "s" : ""} ${topLeft.length > 1 ? "have" : "has"} strong discrimination but weak scores; alternative spacers may help.` : ""}
+                  {proximityCands.length > 0 ? ` ${proximityCands.length} Proximity candidate${proximityCands.length > 1 ? "s are" : " is"} not plotted. Their discrimination comes from AS-RPA primers, not crRNA mismatch. Of these, ${viableProx.length} show viable AS-RPA discrimination${nonViableProx > 0 ? ` and ${nonViableProx} ha${nonViableProx > 1 ? "ve" : "s"} no viable discrimination pathway (WC pair)` : ""}.` : ""}
                   {worstCandidate && worstCandidate !== bestCandidate ? ` Weakest Direct: ${worstCandidate.label} (${worstCandidate.score.toFixed(3)}, ${worstCandidate.disc.toFixed(1)}×).` : ""}
                 </div>
               );
@@ -3373,7 +3375,7 @@ const OverviewTab = ({ results, scorer, jobId, panelData }) => {
                     <strong style={{ color: T.primary }}>Interpretation:</strong> {agreePct}% of candidates are classified the same way by both models (above/below 0.5 threshold). {onLine}/{scatterData.length} score within \u00b10.05 of each other.
                     {aboveLine.length > 0 ? ` Compass-ML scores ${aboveLine.length} candidate${aboveLine.length > 1 ? "s" : ""} higher (${aboveLine.slice(0, 2).map(d => d.label).join(", ")}${aboveLine.length > 2 ? "\u2026" : ""}).` : ""}
                     {belowLine.length > 0 ? ` Heuristic scores ${belowLine.length} candidate${belowLine.length > 1 ? "s" : ""} higher (${belowLine.slice(0, 2).map(d => d.label).join(", ")}${belowLine.length > 2 ? "\u2026" : ""}).` : ""}
-                    {modelAgreement != null ? ` Rank correlation \u03c1 = ${modelAgreement} \u2014 ${modelAgreement >= 0.7 ? "strong agreement, QC corroborates activity predictions" : modelAgreement >= 0.4 ? "moderate agreement, QC catches biophysical edge cases activity model misses" : "weak agreement, models measure different things \u2014 QC serves as independent sanity check"}.` : ""}
+                    {modelAgreement != null ? ` Rank correlation \u03c1 = ${modelAgreement} (${modelAgreement >= 0.7 ? "strong agreement, QC corroborates activity predictions" : modelAgreement >= 0.4 ? "moderate agreement, QC catches biophysical edge cases activity model misses" : "weak agreement, models measure different things; QC serves as independent sanity check"}).` : ""}
                   </div>
                 );
               })()}
@@ -3439,7 +3441,7 @@ const SpacerArchitecture = ({ r }) => {
 
   const snpNt = nts.find(n => n.isSnp);
   const smNt = nts.find(n => n.isSynthMM);
-  const snpChange = snpNt ? `${wt[snpNt.pos - 1]}→${snpNt.base}` : "—";
+  const snpChange = snpNt ? `${wt[snpNt.pos - 1]}→${snpNt.base}` : "–";
   const smChange = smNt ? `${wt[smNt.pos - 1]}→${smNt.base}` : null;
 
   const handleCopy = (e) => {
@@ -3460,7 +3462,7 @@ const SpacerArchitecture = ({ r }) => {
         </button>
       </div>
 
-      {/* SVG card — centered with generous padding */}
+      {/* SVG card; centered with generous padding */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "28px 24px 20px", overflowX: "auto" }}>
         <div style={{ display: "flex", justifyContent: "center" }}>
           <svg width={svgW} height={svgH} style={{ fontFamily: MONO, display: "block", minWidth: svgW }}>
@@ -3504,7 +3506,7 @@ const SpacerArchitecture = ({ r }) => {
           </svg>
         </div>
 
-        {/* Legend + metadata row — below the SVG, centered */}
+        {/* Legend + metadata row; below the SVG, centered */}
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", alignItems: "center", gap: "20px", marginTop: "16px", paddingTop: "14px", borderTop: `1px solid ${T.borderLight}` }}>
           {/* Legend items */}
           {[
@@ -3565,24 +3567,24 @@ const generateInterpretation = (r) => {
   }
 
   // Overall assessment
-  if (eff >= 0.7) lines.push(`Strong candidate (activity score ${eff.toFixed(3)}). High predicted Cas12a trans-cleavage rate — expected to produce a clear SWV signal decrease within 15–30 min on the electrochemical platform, well above the limit of detection.`);
-  else if (eff >= 0.5) lines.push(`Moderate candidate (activity score ${eff.toFixed(3)}). Predicted trans-cleavage is sufficient for detection but not optimal — the SWV signal decrease may require 30–45 min to reach a confident positive call on the electrochemical platform.`);
-  else lines.push(`Weak candidate (activity score ${eff.toFixed(3)}). Low predicted trans-cleavage rate — the electrochemical signal decrease may be near the detection limit, risking false negatives. Consider alternatives from the top-K list or synthetic mismatch optimisation.`);
+  if (eff >= 0.7) lines.push(`Strong candidate (activity score ${eff.toFixed(3)}). High predicted Cas12a trans-cleavage rate, expected to produce a clear SWV signal decrease within 15-30 min on the electrochemical platform, well above the limit of detection.`);
+  else if (eff >= 0.5) lines.push(`Moderate candidate (activity score ${eff.toFixed(3)}). Predicted trans-cleavage is sufficient for detection but not optimal. The SWV signal decrease may require 30-45 min to reach a confident positive call on the electrochemical platform.`);
+  else lines.push(`Weak candidate (activity score ${eff.toFixed(3)}). Low predicted trans-cleavage rate. The electrochemical signal decrease may be near the detection limit, risking false negatives. Consider alternatives from the top-K list or synthetic mismatch optimisation.`);
 
   // PAM quality
   const pam = (r.pam || "").toUpperCase();
   if (r.isCanonicalPam || pam.match(/^TTT[ACG]/)) {
-    lines.push(`Canonical PAM (${r.pam}) \u2014 optimal Cas12a recognition, no activity penalty applied.`);
+    lines.push(`Canonical PAM (${r.pam}). Optimal Cas12a recognition, no activity penalty applied.`);
   } else {
     const penaltyStr = r.pamPenalty != null ? ` Activity penalty: ${r.pamPenalty}\u00d7 (Kleinstiver et al. 2019).` : "";
-    lines.push(`Expanded PAM (${r.pam}${r.pamVariant ? `, ${r.pamVariant}` : ""}) \u2014 recognized by enAsCas12a with reduced activity vs canonical TTTV.${penaltyStr} This is the best available PAM site in the GC-rich M. tuberculosis genomic context around this mutation.`);
+    lines.push(`Expanded PAM (${r.pam}${r.pamVariant ? `, ${r.pamVariant}` : ""}), recognized by enAsCas12a with reduced activity vs canonical TTTV.${penaltyStr} This is the best available PAM site in the GC-rich M. tuberculosis genomic context around this mutation.`);
   }
 
-  // PAM disruption — binary discrimination override
+  // PAM disruption: binary discrimination override
   if (r.pamDisrupted) {
     const disruptionDetail = r.pamDisruptionType === "wt_pam_broken"
-      ? "Binary discrimination \u2014 the resistance SNP disrupts the PAM consensus in the wildtype sequence. Cas12a cannot bind WT DNA at this locus, providing effectively infinite discrimination. This is the strongest possible discrimination mechanism: all-or-nothing PAM recognition gating."
-      : "Binary discrimination \u2014 the resistance SNP disrupts the PAM consensus in the mutant sequence. Cas12a cannot bind MUT DNA at this locus. This inverts the expected detection logic \u2014 signal absence indicates resistance.";
+      ? "Binary discrimination: the resistance SNP disrupts the PAM consensus in the wildtype sequence. Cas12a cannot bind WT DNA at this locus, providing effectively infinite discrimination. This is the strongest possible discrimination mechanism: all-or-nothing PAM recognition gating."
+      : "Binary discrimination: the resistance SNP disrupts the PAM consensus in the mutant sequence. Cas12a cannot bind MUT DNA at this locus. This inverts the expected detection logic, so signal absence indicates resistance.";
     lines.push(disruptionDetail);
   }
 
@@ -3592,9 +3594,9 @@ const generateInterpretation = (r) => {
   const isLearnedDisc = discModelName.includes("learned") || r.discMethod === "feature";
   const discSource = isNeuralDisc ? "neural discrimination head (Compass-ML multi-task, trained on 6,136 EasyDesign pairs)" : isLearnedDisc ? "learned model (XGBoost, 18 thermodynamic features)" : "heuristic model (position \u00D7 destabilisation)";
   if (r.pamDisrupted) {
-    // Skip normal discrimination analysis — already covered above
+    // Skip normal discrimination analysis; already covered above
   } else if (r.strategy === "Proximity") {
-    lines.push(`Proximity detection \u2014 the resistance SNP falls outside the crRNA spacer${r.proximityDistance ? ` (${r.proximityDistance} bp away)` : ""}. Allele discrimination relies on AS-RPA primers (10\u2013100\u00D7 selectivity), not Cas12a mismatch intolerance. The Cas12a disc ratio (~${disc.toFixed(1)}\u00D7) is not relevant for this strategy.`);
+    lines.push(`Proximity detection: the resistance SNP falls outside the crRNA spacer${r.proximityDistance ? ` (${r.proximityDistance} bp away)` : ""}. Allele discrimination relies on AS-RPA primers (10\u2013100\u00D7 selectivity), not Cas12a mismatch intolerance. The Cas12a disc ratio (~${disc.toFixed(1)}\u00D7) is not relevant for this strategy.`);
   } else if (snpPos) {
     // Mismatch chemistry context
     let mmChem = "";
@@ -3613,10 +3615,10 @@ const generateInterpretation = (r) => {
       const rloopEffect = disc >= 10 ? "near-complete R-loop collapse" : disc >= 5 ? "substantial R-loop disruption" : disc >= 3 ? "moderate R-loop destabilization" : disc >= 2 ? "partial R-loop disruption" : "minimal R-loop disruption";
       if (disc >= 5) lines.push(`SNP at seed position ${snpPos} (${snpChange}${mmChem}) provides strong discrimination (${disc.toFixed(1)}\u00D7, ${discSource}). The mismatch in the PAM-proximal seed region (pos 1\u20138) causes ${rloopEffect} on the wildtype template, ensuring high specificity.`);
       else if (disc >= 3) lines.push(`SNP at seed position ${snpPos} (${snpChange}${mmChem}) provides diagnostic-grade discrimination (${disc.toFixed(1)}\u00D7, ${discSource}). Seed region mismatches cause ${rloopEffect}, reducing Cas12a binding on the wildtype template.`);
-      else lines.push(`SNP at seed position ${snpPos} (${snpChange}${mmChem}) gives limited discrimination (${disc.toFixed(1)}\u00D7, ${discSource}) despite being in the seed region \u2014 ${rloopEffect}. The surrounding sequence context or mismatch chemistry may stabilise partial R-loop formation. Synthetic mismatch enhancement may improve this.`);
+      else lines.push(`SNP at seed position ${snpPos} (${snpChange}${mmChem}) gives limited discrimination (${disc.toFixed(1)}\u00D7, ${discSource}) despite being in the seed region (${rloopEffect}). The surrounding sequence context or mismatch chemistry may stabilise partial R-loop formation. Synthetic mismatch enhancement may improve this.`);
     } else {
       if (disc >= 3) lines.push(`SNP at PAM-distal position ${snpPos} (${snpChange}${mmChem}) provides ${disc.toFixed(1)}\u00D7 discrimination (${discSource}) with ${disc >= 10 ? "near-complete R-loop collapse" : disc >= 5 ? "substantial R-loop disruption" : "moderate R-loop destabilization"}. Although outside the seed, the mismatch is sufficient for diagnostic-grade allele differentiation.`);
-      else lines.push(`SNP at PAM-distal position ${snpPos} (${snpChange}${mmChem}) gives limited discrimination (${disc.toFixed(1)}\u00D7, ${discSource}) \u2014 ${disc >= 2 ? "partial R-loop disruption" : "minimal R-loop disruption"}. PAM-distal mismatches are better tolerated by Cas12a \u2014 synthetic mismatch in the seed region could boost specificity.`);
+      else lines.push(`SNP at PAM-distal position ${snpPos} (${snpChange}${mmChem}) gives limited discrimination (${disc.toFixed(1)}\u00D7, ${discSource}), ${disc >= 2 ? "partial R-loop disruption" : "minimal R-loop disruption"}. PAM-distal mismatches are better tolerated by Cas12a. Synthetic mismatch in the seed region could boost specificity.`);
     }
   } else if (r.strategy === "Direct" && !wt) {
     lines.push(`Direct detection strategy. Discrimination ratio: ${disc.toFixed(1)}\u00D7 (${discSource}). WT spacer data unavailable for positional analysis.`);
@@ -3629,15 +3631,15 @@ const generateInterpretation = (r) => {
     if (smPos && wt && spacer[smPos - 1] !== wt[smPos - 1]) smChange = `${wt[smPos - 1]}\u2192${spacer[smPos - 1]}`;
     const smImprovement = r.smImprovementFactor ? ` (${r.smImprovementFactor.toFixed(1)}\u00D7 improvement)` : "";
     if (smPos && smChange) lines.push(`Synthetic mismatch at position ${smPos} (${smChange}) creates a double-mismatch penalty on the wildtype template${smImprovement}. Activity cost depends on position and mismatch type (seed-proximal SM: 10\u201340% reduction; PAM-distal SM: 5\u201315% reduction; Liang et al. 2023).`);
-    else lines.push(`Synthetic mismatch applied \u2014 an engineered base substitution creates a double-mismatch penalty on the wildtype template, boosting specificity${smImprovement}. Activity cost is position-dependent (Liang et al. 2023).`);
+    else lines.push(`Synthetic mismatch applied. An engineered base substitution creates a double-mismatch penalty on the wildtype template, boosting specificity${smImprovement}. Activity cost is position-dependent (Liang et al. 2023).`);
   }
 
   // GC content
   if (gc > 65) lines.push(`High GC content (${gc.toFixed(0)}%) increases R-loop thermodynamic stability but also raises the energetic cost of target strand unwinding. This is typical for M. tuberculosis (genome-wide GC ~65.6%).`);
-  else if (gc < 40) lines.push(`Low GC content (${gc.toFixed(0)}%) \u2014 unusual for M. tuberculosis. R-loop stability may be reduced, potentially lowering cleavage efficiency.`);
+  else if (gc < 40) lines.push(`Low GC content (${gc.toFixed(0)}%), unusual for M. tuberculosis. R-loop stability may be reduced, potentially lowering cleavage efficiency.`);
 
   // Off-targets
-  if (r.ot > 0) lines.push(`${r.ot} potential off-target site${r.ot > 1 ? "s" : ""} detected in the H37Rv genome. Review cross-reactivity before synthesis \u2014 off-targets within the same amplicon region could generate false positives.`);
+  if (r.ot > 0) lines.push(`${r.ot} potential off-target site${r.ot > 1 ? "s" : ""} detected in the H37Rv genome. Review cross-reactivity before synthesis. Off-targets within the same amplicon region could generate false positives.`);
 
   return lines;
 };
@@ -3689,14 +3691,14 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
       {/* PROXIMITY explanation block */}
       {r.strategy === "Proximity" && (
         <div style={{ background: T.purpleLight, border: `1px solid ${T.purple}33`, borderRadius: "4px", padding: "12px 16px", marginBottom: "16px" }}>
-          <div style={{ fontSize: "12px", fontWeight: 600, color: T.purple, fontFamily: HEADING, marginBottom: "4px" }}>Proximity Detection — PAM Desert</div>
+          <div style={{ fontSize: "12px", fontWeight: 600, color: T.purple, fontFamily: HEADING, marginBottom: "4px" }}>Proximity Detection; PAM Desert</div>
           <div style={{ fontSize: "11px", color: "#2563EB", lineHeight: 1.5 }}>
             crRNA binds a conserved site {r.proximityDistance ? `${r.proximityDistance} bp` : "near"} the mutation. Discrimination via AS-RPA primers.
           </div>
         </div>
       )}
 
-      {/* crRNA Spacer Architecture — full width, with Show Alternatives top-right */}
+      {/* crRNA Spacer Architecture; full width, with Show Alternatives top-right */}
       <div style={{ position: "relative" }}>
         {onShowAlternatives && (
           <button onClick={(e) => { e.stopPropagation(); onShowAlternatives(); }} style={{
@@ -3799,7 +3801,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
                   <div style={{ background: T.bg, borderRadius: "4px", padding: "8px 10px", border: `1px solid ${T.borderLight}`, marginBottom: "4px" }}>
                     <Seq s={o.seq} />
                   </div>
-                  <div style={{ fontSize: "9px", color: T.textTer }}>{o.note} — {o.seq.length} nt</div>
+                  <div style={{ fontSize: "9px", color: T.textTer }}>{o.note}; {o.seq.length} nt</div>
                 </div>
               ))}
             </div>
@@ -3816,7 +3818,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
                       ["WHO Classification", ref.who],
                       ["Catalogue", ref.catalogue],
                       ["Clinical Frequency", ref.freq],
-                      ["CRyPTIC", ref.cryptic || "—"],
+                      ["CRyPTIC", ref.cryptic || "N/A"],
                     ].map(([k, v], i) => (
                       <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "9px 14px", borderBottom: i < 3 ? `1px solid ${T.borderLight}` : "none", fontSize: "11px" }}>
                         <span style={{ color: T.textSec }}>{k}</span>
@@ -3833,7 +3835,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
                     ["Drug Class", r.drug],
                     ["Gene", r.gene],
                     ["Strategy", r.strategy],
-                    ["PAM Sequence", `${r.pam}${r.pamVariant ? ` (${r.pamVariant})` : ""}${r.pamPenalty != null && r.pamPenalty < 1.0 ? ` — ${r.pamPenalty}× activity` : ""}`],
+                    ["PAM Sequence", `${r.pam}${r.pamVariant ? ` (${r.pamVariant})` : ""}${r.pamPenalty != null && r.pamPenalty < 1.0 ? `; ${r.pamPenalty}× activity` : ""}`],
                     ["Spacer Length", `${(r.spacer || "").length} nt`],
                     ["GC Content", `${(r.gc * 100).toFixed(1)}%`],
                     ...(r.amplicon ? [["Amplicon Size", `${r.amplicon} bp`]] : []),
@@ -3848,7 +3850,7 @@ const CandidateAccordion = ({ r, onShowAlternatives }) => {
                 </div>
               </div>
 
-              {/* Score Breakdown — heuristic sub-scores */}
+              {/* Score Breakdown; heuristic sub-scores */}
               {r.seedPositionScore != null && (
                 <div style={{ gridColumn: mobile ? "1" : "1 / -1" }}>
                   <div style={{ fontSize: "11px", fontWeight: 600, color: T.textSec, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Score Breakdown</div>
@@ -4017,18 +4019,20 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
 
   return (
     <div>
-      {/* Explainer box — blue */}
+      <InSilicoCaveat />
+
+      {/* Explainer box; blue */}
       <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", padding: mobile ? "14px" : "16px 20px", marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
           <List size={16} color={T.primary} strokeWidth={1.8} />
           <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Candidate Scoring</span>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", color: T.primaryDark, lineHeight: 1.6 }}>
-          <div><span style={{ color: T.primary }}>Signal</span> — PAM-adjusted efficiency (Activity × PAM penalty). Predicts actual signal strength on the electrode. Below 0.3 = risk of weak SWV peak.</div>
-          <div><span style={{ color: T.primary }}>Disc</span> — MUT/WT fold-difference. Direct: crRNA mismatch (XGBoost, 18 features). Proximity: AS-RPA primer selectivity. ≥3× diagnostic-grade, {"<"}2× insufficient.</div>
-          <div><span style={{ color: T.primary }}>Prevalence</span> — % of drug-resistant isolates with this mutation (WHO catalogue 2023).</div>
-          <div><span style={{ color: T.primary }}>Risk flags</span> — ↓ signal below 0.3 · GC primer GC {">"}70% · D discrimination below 5×</div>
-          <div><span style={{ color: T.primary }}>Readiness</span> — Composite 0–100 across signal, discrimination, primers, off-target, GC. ≥40 = assay-ready. Ranks by technical feasibility, not clinical importance — sort by Prevalence to prioritize by patient impact.</div>
+          <div><span style={{ color: T.primary }}>Signal:</span> PAM-adjusted efficiency (Activity x PAM penalty). Predicts actual signal strength on the electrode. Below 0.3 = risk of weak SWV peak.</div>
+          <div><span style={{ color: T.primary }}>Disc:</span> MUT/WT fold-difference. Direct: crRNA mismatch (XGBoost, 18 features). Proximity: AS-RPA primer selectivity. ≥3x diagnostic-grade, {"<"}2x insufficient.</div>
+          <div><span style={{ color: T.primary }}>Prevalence:</span> % of drug-resistant isolates with this mutation (WHO catalogue 2023).</div>
+          <div><span style={{ color: T.primary }}>Risk flags:</span> signal below 0.3 · GC primer GC {">"}70% · D discrimination below 5x</div>
+          <div><span style={{ color: T.primary }}>Readiness:</span> Composite 0-100 across signal, discrimination, primers, off-target, GC. ≥40 = assay-ready. Ranks by technical feasibility, not clinical importance. Sort by Prevalence to prioritize by patient impact.</div>
           <div style={{ color: T.textSec }}>Expand any row for scored sequence, primers, Top-K alternatives, and predicted SWV curves.</div>
         </div>
       </div>
@@ -4050,10 +4054,10 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
         </div>
       </div>
 
-      {/* Candidates — cards on mobile, table on desktop */}
+      {/* Candidates; cards on mobile, table on desktop */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", overflow: "hidden" }}>
        {mobile ? (
-        /* ── Mobile card layout — monochrome ── */
+        /* ── Mobile card layout; monochrome ── */
         <div>
           {filtered.map((r) => {
             const isExpanded = expanded === r.label;
@@ -4107,7 +4111,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                             <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                               <span style={{ fontFamily: FONT }}>{alt.score}</span>
                               <span style={{ fontFamily: FONT }}>{r.strategy === "Proximity" ? <span style={{ fontSize: "10px", color: T.purple }}>AS-RPA</span> : `${alt.discrimination}×`}</span>
-                              {alt.has_primers ? <Badge variant="success">P</Badge> : <Badge variant="danger">—</Badge>}
+                              {alt.has_primers ? <Badge variant="success">P</Badge> : <Badge variant="danger">–</Badge>}
                             </div>
                           </div>
                         ))}
@@ -4120,7 +4124,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
           })}
         </div>
        ) : (
-        /* ── Desktop table layout — monochrome by default, color encodes meaning ── */
+        /* ── Desktop table layout; monochrome by default, color encodes meaning ── */
         <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
           <thead>
@@ -4161,13 +4165,13 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                     </td>
                     {/* # (priority) */}
                     {hasReadiness && <td style={{ padding: "10px 6px", textAlign: "center" }}>{r.experimentalPriority != null && <PriorityBadge rank={r.experimentalPriority} />}</td>}
-                    {/* Target — clean, no strategy subscript */}
+                    {/* Target; clean, no strategy subscript */}
                     <td style={{ padding: "10px 12px" }}>
                       <span style={{ fontWeight: 600, fontFamily: MONO, fontSize: "11px", color: T.text }}>{r.label}</span>
                     </td>
                     {/* Drug */}
                     <td style={{ padding: "10px 8px" }}><DrugBadge drug={r.drug} /></td>
-                    {/* Strategy — prominent pill */}
+                    {/* Strategy; prominent pill */}
                     <td style={{ padding: "10px 8px" }}>
                       <span style={{ display: "inline-block", padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 600,
                         background: r.strategy === "Direct" ? "rgba(37,99,235,0.08)" : "rgba(124,58,237,0.08)",
@@ -4175,7 +4179,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                         border: `1px solid ${r.strategy === "Direct" ? "rgba(37,99,235,0.2)" : "rgba(124,58,237,0.2)"}`,
                       }}>{r.strategy === "Direct" ? "Direct" : "Proximity"}</span>
                     </td>
-                    {/* Signal — PAM-adjusted as primary, raw activity as secondary */}
+                    {/* Signal; PAM-adjusted as primary, raw activity as secondary */}
                     <td style={{ padding: "10px 8px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span style={{ fontFamily: FONT, fontWeight: 700, fontSize: "12px", color: pamAdjVal > 0.5 ? T.text : pamAdjVal > 0.3 ? T.warning : T.danger }}>{pamAdjVal.toFixed(3)}</span>
@@ -4189,7 +4193,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                         }} />
                       </div>
                     </td>
-                    {/* Disc — with AS-RPA range for proximity */}
+                    {/* Disc; with AS-RPA range for proximity */}
                     <td style={{ padding: "10px 8px", fontFamily: FONT, fontWeight: 600, fontSize: "11px", color: r.gene === "IS6110" ? T.textTer : r.strategy === "Proximity" ? "#7c3aed" : discColor }}>
                       {r.gene === "IS6110" ? <span style={{ fontSize: "10px", fontWeight: 400 }}>N/A</span>
                         : r.strategy === "Proximity" ? (() => {
@@ -4199,7 +4203,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                         })()
                         : `${typeof r.disc === "number" ? r.disc.toFixed(1) : r.disc}\u00d7`}
                     </td>
-                    {/* Prevalence — clinical importance */}
+                    {/* Prevalence; clinical importance */}
                     <td style={{ padding: "10px 8px" }}>
                       {(() => {
                         const prev = PREVALENCE[r.label];
@@ -4207,7 +4211,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                         return <span style={{ fontSize: "11px", fontWeight: 600, color: T.text, fontFamily: FONT }} title={prev.tip}>{prev.pct}</span>;
                       })()}
                     </td>
-                    {/* Risk — compact flag icons */}
+                    {/* Risk; compact flag icons */}
                     <td style={{ padding: "10px 6px" }}>
                       {(() => {
                         const flags = getRiskFlags(r);
@@ -4221,7 +4225,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                         );
                       })()}
                     </td>
-                    {/* Readiness — gradient fill (keep strongest visual element) */}
+                    {/* Readiness; gradient fill (keep strongest visual element) */}
                     {hasReadiness && (
                       <td style={{ padding: "10px 8px" }}>
                         {r.readinessScore != null ? (
@@ -4235,7 +4239,7 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                               {(r.readinessScore * 100).toFixed(0)}
                             </span>
                           </div>
-                        ) : "—"}
+                        ) : "N/A"}
                       </td>
                     )}
                   </tr>
@@ -4265,8 +4269,8 @@ const CandidatesTab = ({ results, jobId, connected, scorer }) => {
                                     <td style={{ padding: "7px 12px", fontFamily: MONO, fontSize: "11px", color: T.textTer }}>{alt.spacer_seq?.slice(0, 20)}</td>
                                     <td style={{ padding: "7px 12px", fontFamily: FONT, fontWeight: 600, color: T.text }}>{alt.score}</td>
                                     <td style={{ padding: "7px 12px", fontFamily: FONT, fontWeight: 600, color: r.strategy === "Proximity" ? T.textSec : alt.discrimination >= 3 ? T.success : alt.discrimination >= 2 ? T.warning : T.danger }}>{r.strategy === "Proximity" ? <span style={{ fontSize: "10px" }}>AS-RPA</span> : `${alt.discrimination}×`}</td>
-                                    <td style={{ padding: "7px 12px", fontFamily: FONT, fontSize: "10px", color: alt.has_primers ? T.success : T.textTer }}>{alt.has_primers ? "Yes" : "—"}</td>
-                                    <td style={{ padding: "7px 12px", fontSize: "10px", color: T.textSec }}>{alt.tradeoff || "—"}</td>
+                                    <td style={{ padding: "7px 12px", fontFamily: FONT, fontSize: "10px", color: alt.has_primers ? T.success : T.textTer }}>{alt.has_primers ? "Yes" : "–"}</td>
+                                    <td style={{ padding: "7px 12px", fontSize: "10px", color: T.textSec }}>{alt.tradeoff || "N/A"}</td>
                                   </tr>
                                 ))}
                               </tbody>
@@ -4321,7 +4325,7 @@ const CrossReactivityMatrix = () => {
   const getOnTargetScore = (idx) => {
     const label = labels[idx];
     const r = RESULTS.find(x => x.label === label);
-    return r ? ((r.cnnCalibrated ?? r.score) || 0).toFixed(2) : "—";
+    return r ? ((r.cnnCalibrated ?? r.score) || 0).toFixed(2) : "N/A";
   };
 
   const pairMap = {};
@@ -4415,7 +4419,7 @@ const CrossReactivityMatrix = () => {
           }}>
             {hovCell.diag ? (
               <div style={{ fontSize: 10, fontFamily: MONO, color: T.text }}>
-                <strong>{labels[hovCell.idx]}</strong> — on-target (S_eff = {getOnTargetScore(hovCell.idx)})
+                <strong>{labels[hovCell.idx]}</strong>; on-target (S_eff = {getOnTargetScore(hovCell.idx)})
               </div>
             ) : (
               <>
@@ -4452,7 +4456,7 @@ const CrossReactivityMatrix = () => {
 
       {/* Summary panel */}
       <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: 4, padding: "16px 20px", marginBottom: 16 }}>
-        <div style={{ fontSize: 11, color: T.text, fontFamily: MONO, lineHeight: 2.0 }}>
+        <div style={{ fontSize: 12, color: T.text, fontFamily: FONT, lineHeight: 1.8 }}>
           <strong>{data.n_pairs} / {data.n_pairs}</strong> pairs tested<br />
           <strong>{data.none_count}</strong> pairs: no cross-reactivity (&lt; 1%)<br />
           <strong>{data.same_gene_pairs.length}</strong> pairs: low{"\u2013"}medium cross-reactivity (same-gene overlapping amplicons)
@@ -4463,15 +4467,16 @@ const CrossReactivityMatrix = () => {
             color: data.panel_safe ? "#059669" : "#DC2626",
             fontFamily: MONO,
           }}>
-            {data.panel_safe ? "\u2705 SAFE" : "\u26A0 REVIEW"} for spatially multiplexed electrode array
+            {data.panel_safe ? <><CheckCircle size={14} color="#059669" strokeWidth={2} style={{ display: "inline", verticalAlign: "middle" }} /> SAFE</> : "\u26A0 REVIEW"} for spatially multiplexed electrode array
           </span>
         </div>
         {data.same_gene_pairs.length > 0 && (
-          <div style={{ marginTop: 16, fontSize: 10, color: T.textSec, lineHeight: 1.7 }}>
+          <div style={{ marginTop: 16, fontSize: 11, color: T.textSec, lineHeight: 1.8 }}>
             <strong style={{ display: "block", marginBottom: "8px" }}>Same-gene pairs with residual cross-reactivity:</strong>
             {data.same_gene_pairs.filter(p => p.sourceIdx < p.targetIdx || !data.same_gene_pairs.find(q => q.sourceIdx === p.targetIdx && q.targetIdx === p.sourceIdx && q.sourceIdx < q.targetIdx)).map(p => (
-              <div key={`${p.source}-${p.target}`} style={{ fontFamily: MONO, marginLeft: 8, fontSize: 9, marginBottom: "6px", lineHeight: 1.7 }}>
-                {"\u2022"} {p.source} {"\u2194"} {p.target}: {(p.activity * 100).toFixed(1)}% ({p.risk.toUpperCase()}) {"\u2014"} {p.note}
+              <div key={`${p.source}-${p.target}`} style={{ marginLeft: 8, fontSize: 11, marginBottom: "6px", lineHeight: 1.7, display: "flex", gap: "6px" }}>
+                <span style={{ color: T.textTer }}>{"·"}</span>
+                <span><span style={{ fontFamily: MONO }}>{p.source} {"\u2194"} {p.target}</span><span style={{ fontFamily: FONT }}>: {(p.activity * 100).toFixed(1)}% ({p.risk.toUpperCase()}) - {p.note}</span></span>
               </div>
             ))}
             <div style={{ marginTop: 6, fontSize: 9, color: T.textTer }}>
@@ -4481,7 +4486,7 @@ const CrossReactivityMatrix = () => {
         )}
       </div>
 
-      {/* Top Risk Pairs — sorted by off-target activity */}
+      {/* Top Risk Pairs; sorted by off-target activity */}
       {(() => {
         const riskPairs = [...data.matrix]
           .filter(m => m.activity > 0.01)
@@ -4524,7 +4529,7 @@ const CrossReactivityMatrix = () => {
             </table>
             {riskPairs.every(p => p.note != null) && (
               <div style={{ marginTop: 6, fontSize: 9, color: T.textTer }}>
-                All high-activity pairs are same-gene overlapping amplicons {"\u2014"} managed by spatial isolation on the electrode array.
+                All high-activity pairs are same-gene overlapping amplicons, managed by spatial isolation on the electrode array.
               </div>
             )}
           </div>
@@ -4535,12 +4540,12 @@ const CrossReactivityMatrix = () => {
       <div style={{ background: T.bg, border: `1px solid ${T.borderLight}`, borderRadius: 4, padding: "12px 16px", fontSize: 10, color: T.textSec, lineHeight: 1.7 }}>
         <div style={{ fontWeight: 600, color: T.text, marginBottom: 4 }}>Interpretation</div>
         Cross-reactivity is assessed by scoring each crRNA against all non-self amplicons in the 14-target panel.
-        For the paper-based spatially multiplexed electrode array (Bezinge et al., <em>Adv. Mater.</em> 2023),
-        each detection zone is isolated by wax-printed hydrophobic barriers \u2014 each crRNA physically contacts only its own zone's amplicon, making inter-zone cross-reactivity impossible.
+        For the paper-based spatially multiplexed electrode array (Bezinge et al., Adv. Mater. 2023),
+        each detection zone is isolated by wax-printed hydrophobic barriers, so each crRNA physically contacts only its own zone's amplicon, making inter-zone cross-reactivity impossible.
         <br /><br />
         This analysis validates that same-gene targets with overlapping amplicons (e.g., rpoB_S531L and rpoB_H526Y, which share the rpoB RRDR amplicon) do not produce false positives even in a hypothetical shared-solution format, and identifies any targets where crRNA redesign would improve panel orthogonality.
         <br /><br />
-        <strong>PAM-level filtering:</strong> Cas12a requires a 5\u2032-TTTV PAM for activation. Off-target sites without a valid PAM are scored as zero regardless of spacer complementarity, as PAM recognition is an absolute prerequisite for R-loop initiation (Suea-Ngam et al., <em>Chem. Sci.</em> 2021, Fig. 4).
+        <strong>PAM-level filtering:</strong> Cas12a requires a 5\u2032-TTTV PAM for activation. Off-target sites without a valid PAM are scored as zero regardless of spacer complementarity, as PAM recognition is an absolute prerequisite for R-loop initiation (Suea-Ngam et al., Chem. Sci. 2021, Fig. 4).
       </div>
     </div>
   );
@@ -4595,9 +4600,29 @@ const DiscriminationTab = ({ results }) => {
     <div>
       <InSilicoCaveat />
 
-      {/* Unified discrimination summary — all 13 targets */}
+      {/* Blue explainer */}
+      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", padding: mobile ? "16px" : "20px 24px", marginBottom: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+          <TrendingUp size={16} color={T.primary} strokeWidth={1.8} />
+          <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Can this guide tell apart resistant from normal?</span>
+        </div>
+        <div style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.7 }}>
+          <p style={{ margin: "0 0 8px" }}>
+            Each crRNA is designed to perfectly match the resistance mutation (MUT). When it encounters normal/wildtype DNA (WT),
+            mismatches at the mutation site reduce Cas12a cleavage. The discrimination ratio is how many times stronger the signal
+            is on resistant DNA versus normal DNA; for example, "5×" means the guide produces 5 times more signal on a resistant sample.
+          </p>
+          <p style={{ margin: 0 }}>
+            A ratio ≥ 3× is considered diagnostic-grade; reliable enough for clinical use with electrochemical (SWV) or lateral-flow readout.
+            ≥ 2× is the minimum for any detection method. Below 2× the guide cannot reliably distinguish resistant from susceptible bacteria
+            and requires synthetic mismatch enhancement.
+          </p>
+        </div>
+      </div>
+
+      {/* Unified discrimination summary; all 13 targets */}
       <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "14px 18px", marginBottom: "16px" }}>
-        <div style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>Discrimination Summary — All Targets</div>
+        <div style={{ fontSize: "11px", fontWeight: 600, color: T.textTer, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>Discrimination Summary, All Targets</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
           {[...results].filter(r => r.gene !== "IS6110").sort((a, b) => {
             const aDisc = a.strategy === "Proximity" ? (a.asrpaDiscrimination?.disc_ratio || 100) : (a.disc || 0);
@@ -4626,27 +4651,7 @@ const DiscriminationTab = ({ results }) => {
         </div>
       </div>
 
-      {/* Blue explainer */}
-      <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", padding: mobile ? "16px" : "20px 24px", marginBottom: "24px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-          <TrendingUp size={16} color={T.primary} strokeWidth={1.8} />
-          <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Can this guide tell apart resistant from normal?</span>
-        </div>
-        <div style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.7 }}>
-          <p style={{ margin: "0 0 8px" }}>
-            Each crRNA is designed to perfectly match the resistance mutation (MUT). When it encounters normal/wildtype DNA (WT),
-            mismatches at the mutation site reduce Cas12a cleavage. The discrimination ratio is how many times stronger the signal
-            is on resistant DNA versus normal DNA — for example, "5×" means the guide produces 5 times more signal on a resistant sample.
-          </p>
-          <p style={{ margin: 0 }}>
-            A ratio ≥ 3× is considered diagnostic-grade — reliable enough for clinical use with electrochemical (SWV) or lateral-flow readout.
-            ≥ 2× is the minimum for any detection method. Below 2× the guide cannot reliably distinguish resistant from susceptible bacteria
-            and requires synthetic mismatch enhancement.
-          </p>
-        </div>
-      </div>
-
-      {/* Threshold cards — glass style */}
+      {/* Threshold cards; glass style */}
       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "10px", marginBottom: "24px" }}>
         {[
           { label: "Excellent", val: "≥ 10×", count: excellent, color: "#16a34a", desc: "Single-plex clinical use. Robust across sample types." },
@@ -4671,11 +4676,11 @@ const DiscriminationTab = ({ results }) => {
       {proximityCands.length > 0 && (
         <div style={{ background: "#F5F3FF", border: "1px solid #DDD6FE", borderRadius: "4px", padding: "12px 16px", marginBottom: "24px", display: "flex", alignItems: "center", gap: "10px" }}>
           <span style={{ fontSize: "13px", fontWeight: 600, color: "#7c3aed" }}>{proximityCands.length} proximity targets</span>
-          <span style={{ fontSize: "12px", color: "#6D28D9" }}>Discrimination via AS-RPA primers (11{"\u2013"}100{"\u00d7"} estimated selectivity) {"\u2014"} see table below</span>
+          <span style={{ fontSize: "12px", color: "#6D28D9" }}>Discrimination via AS-RPA primers (11{"\u2013"}100{"\u00d7"} estimated selectivity), see table below</span>
         </div>
       )}
 
-      {/* Discrimination chart — horizontal lollipop */}
+      {/* Discrimination chart; horizontal lollipop */}
       {(() => {
         const DRUG_DC = { RIF: "#1E3A5F", INH: "#4338CA", EMB: "#059669", FQ: "#DC2626", AG: "#3730A3", PZA: "#059669", OTHER: "#9CA3AF" };
         const sorted = [...directCands].sort((a, b) => b.disc - a.disc);
@@ -4690,7 +4695,7 @@ const DiscriminationTab = ({ results }) => {
         return (
           <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "20px" : "28px 32px", marginBottom: "24px" }}>
             <div style={{ marginBottom: "20px" }}>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Discrimination Ratio — Direct Detection</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>Discrimination Ratio; Direct Detection</div>
               <div style={{ fontSize: "11px", color: T.textSec, marginTop: "3px" }}>
                 {directCands.length} candidates using crRNA mismatch discrimination. Sorted highest to lowest.
               </div>
@@ -4779,9 +4784,9 @@ const DiscriminationTab = ({ results }) => {
               return (
                 <div style={{ marginTop: "14px", padding: "12px 16px", background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
                   <strong style={{ color: T.primary }}>Interpretation:</strong> {diagGrade}/{directCands.length} candidates reach diagnostic-grade (≥ 3×), panel avg {avgDisc}×{directCands.some(r => r.discMethod === "neural") ? " (neural disc head)" : directCands.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? " (learned model)" : " (heuristic)"}.
-                  {bestDisc ? ` Highest: ${bestDisc.name} at ${bestDisc.disc.toFixed(1)}× — likely a seed-region mismatch (positions 1–8).` : ""}
-                  {worstDisc ? ` Lowest: ${worstDisc.name} at ${worstDisc.disc.toFixed(1)}×${worstDisc.disc < 2 ? " — insufficient for any detection method, SM enhancement required." : worstDisc.disc < 3 ? " — acceptable but not diagnostic-grade." : "."}` : ""}
-                  {below2.length > 0 ? ` ${below2.length} candidate${below2.length > 1 ? "s" : ""} (${below2.map(d => d.name).slice(0, 3).join(", ")}${below2.length > 3 ? "…" : ""}) fall below the 2× minimum — these have PAM-distal mismatches and require synthetic mismatch engineering.` : " All candidates meet the 2× minimum detection threshold."}
+                  {bestDisc ? ` Highest: ${bestDisc.name} at ${bestDisc.disc.toFixed(1)}x, likely a seed-region mismatch (positions 1-8).` : ""}
+                  {worstDisc ? ` Lowest: ${worstDisc.name} at ${worstDisc.disc.toFixed(1)}x${worstDisc.disc < 2 ? ", insufficient for any detection method, SM enhancement required." : worstDisc.disc < 3 ? ", acceptable but not diagnostic-grade." : "."}` : ""}
+                  {below2.length > 0 ? ` ${below2.length} candidate${below2.length > 1 ? "s" : ""} (${below2.map(d => d.name).slice(0, 3).join(", ")}${below2.length > 3 ? "…" : ""}) fall below the 2x minimum. These have PAM-distal mismatches and require synthetic mismatch engineering.` : " All candidates meet the 2x minimum detection threshold."}
                   {excellent > 0 ? ` ${excellent} candidate${excellent > 1 ? "s" : ""} ${excellent > 1 ? "achieve" : "achieves"} excellent (≥ 10×) discrimination, suitable for lateral-flow deployment.` : ""}
                 </div>
               );
@@ -4790,9 +4795,9 @@ const DiscriminationTab = ({ results }) => {
         );
       })()}
 
-      {/* Ranking table — Direct only */}
+      {/* Ranking table; Direct only */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", overflow: "hidden", marginBottom: "24px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>Discrimination Ranking — Direct Detection</div>
+        <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, padding: "16px 20px", borderBottom: `1px solid ${T.border}` }}>Discrimination Ranking; Direct Detection</div>
         <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px", minWidth: 820 }}>
           <thead>
@@ -4856,7 +4861,7 @@ const DiscriminationTab = ({ results }) => {
                   <td colSpan={9} style={{ padding: "6px 14px 6px 42px", background: "#7c3aed08" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <Shield size={12} color="#7c3aed" strokeWidth={2} />
-                      <span style={{ fontSize: "10px", fontWeight: 600, color: "#7c3aed" }}>Binary discrimination — SNP disrupts PAM</span>
+                      <span style={{ fontSize: "10px", fontWeight: 600, color: "#7c3aed" }}>Binary discrimination: SNP disrupts PAM</span>
                       <span style={{ fontSize: "10px", color: T.textTer }}>
                         {r.pamDisruptionType ? `(${r.pamDisruptionType}) ` : ""}The SNP converts a valid TTTV PAM to a non-functional sequence. Cas12a cannot initiate R-loop formation on WT, providing the strongest possible selectivity mechanism.
                       </span>
@@ -4903,11 +4908,11 @@ const DiscriminationTab = ({ results }) => {
       {proximityCands.length > 0 && (
         <div style={{ background: T.bg, border: `1px solid ${T.purple}33`, borderRadius: "4px", overflow: "hidden" }}>
           <div style={{ fontSize: "14px", fontWeight: 600, color: T.purple, fontFamily: HEADING, padding: "16px 20px", borderBottom: `1px solid ${T.purple}33` }}>
-            AS-RPA Discrimination — Proximity Detection
+            AS-RPA Discrimination: Proximity Detection
             <span style={{ fontSize: "11px", fontWeight: 400, color: T.textTer, marginLeft: "10px" }}>{proximityCands.length} candidates (primer-based discrimination)</span>
           </div>
           <div style={{ padding: "16px 20px 8px", fontSize: "12px", color: T.textSec, lineHeight: 1.6 }}>
-            These candidates use <strong>allele-specific RPA primers</strong> for discrimination — the crRNA binds outside the mutation site.
+            These candidates use <strong>allele-specific RPA primers</strong> for discrimination. The crRNA binds outside the mutation site.
             Discrimination is provided by preferential primer extension on the mutant template.
             {proximityCands.some(r => r.asrpaDiscrimination) && (
               <span> Thermodynamic estimates below are based on 3′ terminal mismatch identity and penultimate mismatch design.</span>
@@ -4996,13 +5001,13 @@ const DiscriminationTab = ({ results }) => {
           </table>
           {proximityCands.some(r => r.asrpaDiscrimination?.block_class === "none") && (
             <div style={{ padding: "12px 20px", fontSize: "11px", color: T.danger, background: "#FEF2F2", borderTop: `1px solid #FECACA` }}>
-              <strong>Panel gap:</strong> {proximityCands.filter(r => r.asrpaDiscrimination?.block_class === "none").map(r => r.label).join(", ")} — primer 3′ base forms a Watson-Crick pair with the WT template (no mismatch = no discrimination).
+              <strong>Panel gap:</strong> {proximityCands.filter(r => r.asrpaDiscrimination?.block_class === "none").map(r => r.label).join(", ")}. Primer 3' base forms a Watson-Crick pair with the WT template (no mismatch = no discrimination).
               These targets require primer strand reversal, alternative SNP base selection, or a different discrimination strategy.
             </div>
           )}
           {proximityCands.some(r => r.asrpaDiscrimination) && (
-            <div style={{ padding: "12px 20px", fontSize: "10px", color: T.textTer, fontStyle: "italic", borderTop: `1px solid ${T.purple}15` }}>
-              Thermodynamic estimates — not experimentally validated. Ratios from Boltzmann conversion exp(ΔΔG/RT) at 37 °C, capped at 100× (empirical AS-RPA discrimination typically 10–100×; Ye et al. 2019).
+            <div style={{ padding: "12px 20px", fontSize: "10px", color: T.textTer, borderTop: `1px solid ${T.purple}15` }}>
+              Thermodynamic estimates, not experimentally validated. Ratios from Boltzmann conversion exp(ΔΔG/RT) at 37 °C, capped at 100× (empirical AS-RPA discrimination typically 10–100×; Ye et al. 2019).
             </div>
           )}
         </div>
@@ -5030,12 +5035,12 @@ const PrimersTab = ({ results }) => {
           <p style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6, margin: 0, opacity: 0.85 }}>
             RPA is an isothermal amplification method (37°C) that replaces PCR thermocycling. Each crRNA target needs a pair of
             30–35 nt primers flanking an 80–120 bp amplicon containing the crRNA binding site. The amplified product is then
-            detected by Cas12a <em>trans</em>-cleavage of MB-ssDNA reporters on the electrochemical platform (SWV signal decrease on LIG electrodes).
+            detected by Cas12a trans-cleavage of MB-ssDNA reporters on the electrochemical platform (SWV signal decrease on LIG electrodes).
           </p>
           <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginTop: "10px", padding: "8px 12px", background: "rgba(255,255,255,0.5)", borderRadius: "4px", border: `1px solid ${T.primary}22` }}>
             <Droplet size={14} color={T.primaryDark} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
             <span style={{ fontSize: "11px", color: T.primaryDark, lineHeight: 1.5, opacity: 0.85 }}>
-              Capped at 120 bp — cfDNA fragments in blood are ~100–160 bp (median ~140 bp). Shorter amplicons maximise template capture from fragmented circulating DNA.
+              Capped at 120 bp; cfDNA fragments in blood are ~100–160 bp (median ~140 bp). Shorter amplicons maximise template capture from fragmented circulating DNA.
             </span>
           </div>
         </div>
@@ -5051,7 +5056,7 @@ const PrimersTab = ({ results }) => {
           </div>
           <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: 0 }}>
             Symmetric flanking primers for <strong>DIRECT detection</strong> candidates. The crRNA spacer overlaps the mutation site,
-            so allele discrimination comes from Cas12a mismatch intolerance — not from primers. Primers simply amplify the region
+            so allele discrimination comes from Cas12a mismatch intolerance; not from primers. Primers simply amplify the region
             containing the crRNA binding site. Discrimination ratios are {results.some(r => r.discMethod === "neural") ? "predicted by Compass-ML neural discrimination head (multi-task, trained on 6,136 EasyDesign pairs)" : results.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature") ? "predicted by a learned model (XGBoost, 18 thermodynamic features)" : "estimated by position × destabilisation heuristic"}.
           </p>
         </div>
@@ -5069,7 +5074,7 @@ const PrimersTab = ({ results }) => {
           <div style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginTop: "10px", padding: "8px 12px", background: `${T.purple}0A`, borderRadius: "4px", border: `1px solid ${T.purple}22` }}>
             <Info size={14} color={T.purple} strokeWidth={2} style={{ flexShrink: 0, marginTop: 1 }} />
             <span style={{ fontSize: "11px", color: T.textSec, lineHeight: 1.5 }}>
-              <strong style={{ color: T.purple }}>PAM desert.</strong> These targets lack a TTTV PAM within the spacer window overlapping the SNP — common in M. tuberculosis (65.6% GC).
+              <strong style={{ color: T.purple }}>PAM desert.</strong> These targets lack a TTTV PAM within the spacer window overlapping the SNP; common in M. tuberculosis (65.6% GC).
               Discrimination is shifted entirely to primer-level allele specificity (estimated ≥100× selectivity), not Cas12a mismatch intolerance.
             </span>
           </div>
@@ -5119,7 +5124,7 @@ const PrimersTab = ({ results }) => {
               const discVal = r.strategy === "Proximity"
                 ? (() => { const sp = r.asrpaDiscrimination?.estimated_specificity; return sp != null ? `≥${(1 / Math.max(1 - sp, 0.001)).toFixed(0)}×` : "≥100×"; })()
                 : r.gene === "IS6110" ? "N/A"
-                : r.disc > 0 ? `${r.disc.toFixed(1)}×${r.hasSM ? " (post-SM)" : ""}` : "—";
+                : r.disc > 0 ? `${r.disc.toFixed(1)}×${r.hasSM ? " (post-SM)" : ""}` : "–";
               return (
               <tr key={r.label} style={{ borderBottom: `1px solid ${T.borderLight}`, transition: "background 0.15s", background: isHov ? `${T.primary}08` : "transparent" }}
                 onMouseEnter={() => setHoveredRow(r.label)} onMouseLeave={() => setHoveredRow(null)}>
@@ -5173,7 +5178,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     }
   }, [connected, jobId]);
 
-  // ═══════════ PREDICTED ELECTROCHEMICAL READOUT — State ═══════════
+  // ═══════════ PREDICTED ELECTROCHEMICAL READOUT; State ═══════════
   const [echemCandidate, setEchemCandidate] = useState("rpoB_S531L");
   const [echemTechnique, setEchemTechnique] = useState("SWV");
   const [echemTime, setEchemTime] = useState(30);       // minutes
@@ -5199,7 +5204,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       who_tpp_target: "< 120 min", who_tpp_pass: true,
     },
     parameters: [
-      { param: "k_form (RNP association)", value: "1.75 \u00d7 10\u2075 M\u207b\u00b9s\u207b\u00b9", source: "Lesinski et al. 2024", note: "SPR measurement — analogous to on-pad scenario but different surface than LIG" },
+      { param: "k_form (RNP association)", value: "1.75 \u00d7 10\u2075 M\u207b\u00b9s\u207b\u00b9", source: "Lesinski et al. 2024", note: "SPR measurement; analogous to on-pad scenario but different surface than LIG" },
       { param: "k_off (RNP dissociation)", value: "1.87 \u00d7 10\u207b\u2074 s\u207b\u00b9", source: "Lesinski et al. 2024", note: null },
       { param: "k_cis (cis-cleavage)", value: "0.03 s\u207b\u00b9", source: "Lesinski et al. 2024", note: null },
       { param: "k_trans (solution, free ssDNA)", value: "~2.0 s\u207b\u00b9", source: "Nalefski et al. 2021", note: "Free ssDNA in solution. NOT applicable to surface-tethered reporters." },
@@ -5232,7 +5237,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     ],
   };
 
-  // Electrode layout — 7×2 grid (14-plex: 12 resistance mutations + IS6110 + RNaseP)
+  // Electrode layout; 7×2 grid (14-plex: 12 resistance mutations + IS6110 + RNaseP)
   const electrodeLayout = [
     ["IS6110","rpoB_S531L","rpoB_H526Y","rpoB_D516V","katG_S315T","fabG1_C-15T","embB_M306V"],
     ["embB_M306I","pncA_H57D","gyrA_D94G","gyrA_A90V","rrs_A1401G","eis_C-14T","RNaseP"],
@@ -5294,7 +5299,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   const WHO_thresholds = { RIF: 0.95, INH: 0.90, FQ: 0.90, EMB: 0.80, PZA: 0.80, AG: 0.80 };
   const DRUG_LINE_COLORS = { RIF: "#1E3A5F", INH: "#4338CA", EMB: "#059669", PZA: "#059669", FQ: "#DC2626", AG: "#3730A3", IS6110: "#6B7280" };
 
-  // ═══════════ PREDICTED ELECTROCHEMICAL READOUT — Physics Engine ═══════════
+  // ═══════════ PREDICTED ELECTROCHEMICAL READOUT; Physics Engine ═══════════
   // Architecture-specific electrochemistry configurations
   const ARCH_CONFIGS = {
     A: {
@@ -5322,14 +5327,14 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       I_scale_base: 3.0, // µA range for silver stripping
     },
     C: {
-      label: "MB", species: "surface-confined (Laviron 1979)",
-      reference: "Laviron 1979",
+      label: "MB", species: "surface-confined",
+      reference: "surface-confined model",
       E0: -0.22, n: 2, // MB: 2e⁻, 2H⁺ reduction
       E_start: -0.05, E_end: -0.40,
       E_sw: 0.025, E_pulse: 0.050, frequency: 50, step: 0.004,
       scan_rate: 0.05, signal_direction: "off",
       peak_label: "MB reduction",
-      peak_shape: "sech2", // Laviron surface-confined
+      peak_shape: "sech2", // surface-confined
       I_scale_base: 1.0,
     },
   };
@@ -5351,7 +5356,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   const echemGamma0_mol = echemGamma0 / 6.022e23;
   const echemAeff = ECHEM.A_geo * echemPorosity;
 
-  // Γ(t) — exact integral with in situ RNP formation
+  // Γ(t); exact integral with in situ RNP formation
   const computeGamma = useCallback((t_s, S_eff, k_trans) => {
     const { k_form, Cas12a_nM, Cas12a_ref } = ECHEM;
     const integral = t_s + (1 / k_form) * (Math.exp(-k_form * t_s) - 1);
@@ -5366,7 +5371,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
   }, [computeGamma, echemGamma0_mol]);
 
   // ── Architecture-specific peak shape helpers ──
-  // Arch C (MB): Laviron sech² for surface-confined species
+  // Arch C (MB): sech² for surface-confined species
   const peakShape_sech2 = (E, E0, nFRT, E_half_width) => {
     const xi_plus = nFRT * (E + E_half_width - E0);
     const xi_minus = nFRT * (E - E_half_width - E0);
@@ -5386,25 +5391,25 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     return Math.exp(-0.5 * x * x);
   };
 
-  // Unified SWV compute — architecture-aware
+  // Unified SWV compute; architecture-aware
   const computeSWV = useCallback((E_array, Gamma) => {
     const { n, F, R, Temp, E0, E_sw } = ECHEM;
     const nFRT = n * F / (R * Temp);
     const scale = echemIscale * echemAeff * archCfg.I_scale_base;
     const ratio = Gamma / echemGamma0_mol;
     if (archCfg.peak_shape === "asymmetric") {
-      // Arch A: pAP oxidation — asymmetric irreversible peak
+      // Arch A: pAP oxidation; asymmetric irreversible peak
       return E_array.map(E => scale * ratio * peakShape_asymmetric(E, E0, archCfg.alpha, 1, F, R, Temp));
     }
     if (archCfg.peak_shape === "stripping") {
-      // Arch B: Ag stripping — asymmetric Gaussian
+      // Arch B: Ag stripping; asymmetric Gaussian
       return E_array.map(E => scale * ratio * peakShape_stripping(E, E0, archCfg.sigma_onset, archCfg.sigma_tail));
     }
-    // Arch C: MB surface-confined — Laviron sech² (positive peaks for SWV net current)
+    // Arch C: MB surface-confined sech² (positive peaks for SWV net current)
     return E_array.map(E => scale * ratio * peakShape_sech2(E, E0, nFRT, E_sw));
   }, [echemIscale, echemAeff, echemGamma0_mol, echemArch]);
 
-  // SWV forward/reverse components for toggle display (Arch C only — other architectures use net only)
+  // SWV forward/reverse components for toggle display (Arch C only; other architectures use net only)
   const computeSWVComponents = useCallback((E_array, Gamma) => {
     const { n, F, R, Temp, E0, E_sw } = ECHEM;
     const nFRT = n * F / (R * Temp);
@@ -5419,7 +5424,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     });
   }, [echemIscale, echemAeff, echemGamma0_mol, echemArch]);
 
-  // Unified DPV compute — architecture-aware
+  // Unified DPV compute; architecture-aware
   const computeDPV = useCallback((E_array, Gamma) => {
     const { n, F, R, Temp, E0, E_pulse } = ECHEM;
     const nFRT = n * F / (R * Temp);
@@ -5431,11 +5436,11 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     if (archCfg.peak_shape === "stripping") {
       return E_array.map(E => scale * ratio * peakShape_stripping(E, E0, archCfg.sigma_onset, archCfg.sigma_tail));
     }
-    // Arch C: MB — DPV uses difference of Nernst equilibria, same sech² family
+    // Arch C: MB; DPV uses difference of Nernst equilibria, same sech² family
     return E_array.map(E => scale * ratio * peakShape_sech2(E, E0, nFRT, E_pulse / 2));
   }, [echemAeff, echemGamma0_mol, echemArch]);
 
-  // CV voltammogram — architecture-aware, scale-based (positive peaks for consistent peak detection)
+  // CV voltammogram; architecture-aware, scale-based (positive peaks for consistent peak detection)
   const computeCV = useCallback((E_array, Gamma) => {
     const { n, F, R, Temp, E0 } = ECHEM;
     const ratio = Gamma / echemGamma0_mol;
@@ -5450,7 +5455,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     return E_array.map(E => peakScale * ratio * peakShape_stripping(E, E0, archCfg.sigma_onset, archCfg.sigma_tail));
   }, [echemIscale, echemAeff, echemGamma0_mol, echemArch]);
 
-  // CV duck-shape: forward + reverse scan — architecture-aware with visible Faradaic peaks
+  // CV duck-shape: forward + reverse scan; architecture-aware with visible Faradaic peaks
   const computeCVDuck = useCallback((Gamma) => {
     const { n, F, R, Temp, E0 } = ECHEM;
     const ratio = Gamma / echemGamma0_mol;
@@ -5462,7 +5467,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     const forward = [], reverse = [];
 
     if (archCfg.peak_shape === "sech2") {
-      // Arch C (MB): surface-confined — symmetric cathodic/anodic sech² peaks
+      // Arch C (MB): surface-confined; symmetric cathodic/anodic sech² peaks
       const sigma = (R * Temp) / (n * F) * 2.0;
       const deltaEp = 0.010; // near-ideal surface-confined ΔEp
       const E_pc = E0 - deltaEp / 2, E_pa = E0 + deltaEp / 2;
@@ -5478,7 +5483,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     }
 
     if (archCfg.peak_shape === "asymmetric") {
-      // Arch A (pAP): irreversible oxidation — forward peak, no reverse peak
+      // Arch A (pAP): irreversible oxidation; forward peak, no reverse peak
       for (let i = 0; i <= N; i++) {
         const E = E_start + E_range * (i / N);
         const fara = peakScale * ratio * peakShape_asymmetric(E, E0, archCfg.alpha, 1, F, R, Temp);
@@ -5507,7 +5512,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
     return { forward, reverse, deltaEp: 0.150, E_pc: E0 - 0.15, E_pa: E0 };
   }, [echemIscale, echemAeff, echemGamma0_mol, echemArch]);
 
-  // Potential array — architecture-dependent range
+  // Potential array; architecture-dependent range
   const echemE = useMemo(() => {
     const start = archCfg.E_start, end = archCfg.E_end;
     const range = end - start;
@@ -5674,11 +5679,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
   return (
     <div>
-      {/* ── Status banner ── */}
-      <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "4px", padding: "10px 16px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-        <CheckCircle size={14} color="#2563EB" strokeWidth={2} />
-        <span style={{ fontSize: "12px", fontWeight: 500, color: "#1D4ED8", fontFamily: FONT }}>Computational design complete {"\u2014"} electrode characterisation pending</span>
-      </div>
+      <InSilicoCaveat />
 
       {/* ── Explainer box ── */}
       <div style={{ background: T.primaryLight, border: `1px solid ${T.primary}25`, borderRadius: "4px", padding: mobile ? "14px" : "16px 20px", marginBottom: "16px" }}>
@@ -5687,8 +5688,14 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
           <span style={{ fontSize: "13px", fontWeight: 600, color: T.primaryDark, fontFamily: HEADING }}>Multiplex Engineering</span>
         </div>
         <div style={{ fontSize: "13px", color: T.primaryDark, lineHeight: 1.6 }}>
-          Spatially-addressed 14-plex electrode array with per-pad crRNA, predicted electrochemical readout (SWV/DPV/CV), cross-reactivity analysis, and in situ RNP formation kinetics. Each detection zone is physically isolated by wax-printed hydrophobic barriers {"\u2014"} enabling simultaneous detection of {drugs.length} drug resistance classes from a single blood sample.
+          Spatially-addressed 14-plex electrode array with per-pad crRNA, predicted electrochemical readout (SWV/DPV/CV), cross-reactivity analysis, and in situ RNP formation kinetics. Each detection zone is physically isolated by wax-printed hydrophobic barriers, enabling simultaneous detection of {drugs.length} drug resistance classes from a single blood sample.
         </div>
+      </div>
+
+      {/* ── Status banner ── */}
+      <div style={{ background: "#EFF6FF", border: "1px solid #BFDBFE", borderRadius: "4px", padding: "10px 16px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
+        <CheckCircle size={14} color="#2563EB" strokeWidth={2} />
+        <span style={{ fontSize: "12px", fontWeight: 500, color: "#1D4ED8", fontFamily: FONT }}>Computational design complete - electrode characterisation pending</span>
       </div>
 
       {/* ═══════════ SECTION 0: 3D Interactive Chip Render ═══════════ */}
@@ -5767,8 +5774,8 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
         <div style={{ padding: "0", marginBottom: "24px" }}>
           <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "16px", lineHeight: 1.6 }}>
             In situ RNP formation is integral to the per-pad one-pot architecture. Cas12a protein arrives in the sample buffer
-            and encounters pad-specific lyophilized crRNA upon rehydration. Gradual RNP formation (Lesinski et al. 2024, <em>Anal. Chem.</em>)
-            limits early cis-cleavage competition with RPA — critical at the low template concentrations expected from blood cfDNA.
+            and encounters pad-specific lyophilized crRNA upon rehydration. Gradual RNP formation (Lesinski et al. 2024, Anal. Chem.)
+            limits early cis-cleavage competition with RPA; critical at the low template concentrations expected from blood cfDNA.
             RPA amplicons designed at ≤120 bp to fit within cfDNA fragment size distribution (median ~140 bp, range 100–160 bp).
           </p>
 
@@ -5812,7 +5819,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
           </div>
 
           <div style={{ marginBottom: "16px", padding: "8px 14px", borderRadius: "4px", background: "#22c55e0a", fontSize: "12px", color: T.textSec }}>
-            WHO TPP target: {kinetics.totals?.who_tpp_target || "< 120 min"}. Estimated total: {kinetics.totals?.total_electrode || "30\u201350 min"} — <strong style={{ color: T.success }}>within target</strong> with 2-4× margin.
+            WHO TPP target: {kinetics.totals?.who_tpp_target || "< 120 min"}. Estimated total: {kinetics.totals?.total_electrode || "30\u201350 min"}; <strong style={{ color: T.success }}>within target</strong> with 2-4× margin.
           </div>
 
           <div style={{ background: T.bgSub, border: `1px solid ${T.border}`, borderRadius: "4px", padding: "12px 16px" }}>
@@ -5831,22 +5838,18 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
       {/* ═══════════ SECTION 2: Predicted Electrochemical Readout ═══════════ */}
       <CollapsibleSection title="Predicted Electrochemical Readout" defaultOpen={true} badge={{ text: "computed", bg: T.primaryLight, color: T.primary }}>
         <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", padding: mobile ? "16px" : "24px", marginBottom: "24px" }}>
-          {/* Calibration caveat */}
-          <div style={{ background: "#FFFBEB", border: "1px solid #F59E0B", borderRadius: 4, padding: "8px 14px", marginBottom: 16, fontSize: 10, color: "#92400E", lineHeight: 1.6, maxWidth: "100%" }}>
-            <strong>Pre-calibration predictions.</strong> Absolute peak currents and detection times depend on electrode-specific parameters (surface k_trans, reporter density, electrode geometry) that vary between fabrication batches. Parameter sliders below will be locked to measured values after the first electrode characterisation. Relative peak heights between candidates and MUT/WT alleles are determined by pipeline efficiency and discrimination scores.
-          </div>
-          {/* Header description — architecture-dependent */}
+          {/* Header description; architecture-dependent */}
           <p style={{ fontSize: "12px", color: T.textSec, marginBottom: "20px", lineHeight: 1.6 }}>
             <strong>SWV, DPV, and CV curves computed from COMPASS pipeline predictions and analytical electrochemistry for {
               echemArch === "A" ? "enzymatic pAP generation (diffusion-controlled, Bezinge 2023)"
               : echemArch === "B" ? "silver anodic stripping voltammetry (Suea-Ngam 2021)"
-              : "surface-confined MB (Laviron 1979)"
+              : "surface-confined MB"
             }.</strong> {echemArch === "C"
-              ? "Peak shapes follow Laviron theory (1979) for adsorbed redox couples."
+              ? "Peak shapes follow surface-confined redox theory for adsorbed redox couples."
               : echemArch === "A"
               ? "Peak shapes follow Nicholson-Shain theory for irreversible diffusion-controlled oxidation."
               : "Peak shapes follow anodic stripping voltammetry dissolution kinetics."
-            } Relative peak heights between candidates and between MUT/WT alleles are determined by Compass-ML efficiency and discrimination scores (trained on 15K real measurements). Absolute peak currents and detection times depend on electrode-specific parameters (surface trans-cleavage rate, reporter density) provided as adjustable sliders {"\u2014"} to be locked to experimental values after the first electrode characterisation.
+            } Relative peak heights between candidates and between MUT/WT alleles are determined by Compass-ML efficiency and discrimination scores (trained on 15K real measurements). Absolute peak currents and detection times depend on electrode-specific parameters (surface trans-cleavage rate, reporter density) provided as adjustable sliders, to be locked to experimental values after the first electrode characterisation.
           </p>
 
           {/* ── Row 1: Candidate + Technique ── */}
@@ -5881,9 +5884,9 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                     onClick={() => setEchemTechnique(tech)}
                     style={{
                       padding: "8px 16px", fontSize: "11px", fontWeight: 600, fontFamily: MONO, cursor: "pointer",
-                      background: echemTechnique === tech ? T.primary : T.bg,
-                      color: echemTechnique === tech ? "#fff" : T.textSec,
-                      border: `1px solid ${echemTechnique === tech ? T.primary : T.border}`,
+                      background: echemTechnique === tech ? T.bgHover : T.bg,
+                      color: echemTechnique === tech ? T.text : T.textSec,
+                      border: `1px solid ${T.border}`,
                       borderRadius: i === 0 ? "6px 0 0 6px" : i === 2 ? "0 6px 6px 0" : "0",
                       borderLeft: i > 0 ? "none" : undefined,
                     }}
@@ -5904,9 +5907,9 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                     onClick={() => setEchemArch(arch.key)}
                     style={{
                       padding: "8px 12px", fontSize: "10px", fontWeight: 600, fontFamily: MONO, cursor: "pointer",
-                      background: echemArch === arch.key ? "#7c3aed" : T.bg,
-                      color: echemArch === arch.key ? "#fff" : T.textSec,
-                      border: `1px solid ${echemArch === arch.key ? "#7c3aed" : T.border}`,
+                      background: echemArch === arch.key ? T.bgHover : T.bg,
+                      color: echemArch === arch.key ? T.text : T.textSec,
+                      border: `1px solid ${T.border}`,
                       borderRadius: i === 0 ? "6px 0 0 6px" : i === 2 ? "0 6px 6px 0" : "0",
                       borderLeft: i > 0 ? "none" : undefined,
                     }}
@@ -5978,7 +5981,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
             return (
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "16px" }}>
 
-            {/* ═══ PANEL A: Voltammogram — negative (cathodic) MB peaks ═══ */}
+            {/* ═══ PANEL A: Voltammogram; negative (cathodic) MB peaks ═══ */}
             <div style={{ borderRadius: "4px", padding: "16px", background: "#FAFAFA" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
                 <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING }}>
@@ -5996,11 +5999,6 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                 <strong style={{ color: T.text }}>{echemCandidateData.label}</strong>
                 {" \u00b7 "}{"\u0394"}I% = <span style={{ fontWeight: 600, color: EC.purple }}>{echemMeta.deltaI}%</span>
                 {" \u00b7 "}{echemArch === "C" ? (Math.abs(echemMeta.peakBase) * 1000).toFixed(1) : Math.abs(echemMeta.peakBase).toFixed(3)} {echemArch === "C" ? "nA" : "\u03bcA"} {"\u2192"} {echemArch === "C" ? (Math.abs(echemMeta.peakAfter) * 1000).toFixed(1) : Math.abs(echemMeta.peakAfter).toFixed(3)} {echemArch === "C" ? "nA" : "\u03bcA"}
-                {echemCandidateData.discrimination <= 2.0 && echemCandidateData.discrimination < 900 && (
-                  <div style={{ marginTop: "4px", padding: "3px 8px", background: "#FEF3C7", borderRadius: "3px", fontSize: "9px", color: "#92400E", lineHeight: 1.5, fontFamily: MONO }}>
-                    {"\u26A0"} D = {echemCandidateData.discrimination.toFixed(1)}{"\u00d7"} {"\u2014"} WT allele {"\u0394"}I% {"\u2248"} MUT {"\u0394"}I% (S_eff_WT = {(echemCandidateData.efficiency / echemCandidateData.discrimination).toFixed(3)}). Clinical discrimination relies entirely on AS-RPA primer selectivity, not crRNA alone.
-                  </div>
-                )}
               </div>
               <div style={{ width: "100%", height: 280 }}>
                 {(() => {
@@ -6048,7 +6046,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                     );
                   }
 
-                  // SWV / DPV — architecture-aware positive peaks
+                  // SWV / DPV; architecture-aware positive peaks
                   const data = echemPlotData;
                   const allY = data.flatMap(d => {
                     const vals = [d.baseline, d.after];
@@ -6088,7 +6086,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                       <line x1={mg.left} y1={mg.top + ph} x2={mg.left + pw} y2={mg.top + ph} stroke="#444" strokeWidth="1.5" />
                       {/* Shaded ΔI region between baseline and after */}
                       <path d={fillPath} fill={EC.purple} opacity="0.08" />
-                      {/* SWV forward/reverse components — blue (fwd), orange (rev) */}
+                      {/* SWV forward/reverse components; blue (fwd), orange (rev) */}
                       {echemShowFwdRev && echemTechnique === "SWV" && data[0].base_fwd != null && (
                         <>
                           <path d={pathD("base_fwd")} fill="none" stroke={EC.blue} strokeWidth="1.5" opacity="0.6" />
@@ -6097,7 +6095,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                           <path d={pathD("after_rev")} fill="none" stroke={EC.orange} strokeWidth="1.2" opacity="0.35" strokeDasharray="4,2" />
                         </>
                       )}
-                      {/* Main curves — i_net (purple) */}
+                      {/* Main curves; i_net (purple) */}
                       <path d={pathD("baseline")} fill="none" stroke={EC.green} strokeWidth="2.2" strokeDasharray="7,4" opacity="0.85" />
                       <path d={pathD("after")} fill="none" stroke={EC.purple} strokeWidth="2.5" />
                       {/* E° reference */}
@@ -6152,7 +6150,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   );
                 })()}
               </div>
-              {/* Interpretation block — Panel A */}
+              {/* Interpretation block; Panel A */}
               <div style={{ marginTop: "8px", padding: "10px 14px", borderRadius: "4px", background: "#EFF6FF", border: "1px solid #BFDBFE", fontSize: "11px", color: "#1D4ED8", lineHeight: 1.6 }}>
                 <strong style={{ color: "#1D4ED8" }}>Interpretation:</strong>{" "}
                 {echemMeta.deltaI > 50
@@ -6162,7 +6160,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   : `Weak signal reduction (${"\u0394"}I = ${echemMeta.deltaI}%). At ${echemTime} min, the trans-cleavage signal for ${echemCandidateData.label} is near the detection limit. Consider increasing reporter density, incubation time, or optimizing surface chemistry to enhance k_trans.`
                 }
                 {echemCandidateData.discrimination <= 2.0 && echemCandidateData.discrimination < 900 &&
-                  ` Note: D = ${echemCandidateData.discrimination.toFixed(1)}\u00d7 indicates poor crRNA-level discrimination \u2014 allelic specificity depends on AS-RPA primer selectivity.`
+                  ` Note: D = ${echemCandidateData.discrimination.toFixed(1)}\u00d7 indicates poor crRNA-level discrimination. Allelic specificity depends on AS-RPA primer selectivity.`
                 }
               </div>
             </div>
@@ -6195,11 +6193,11 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                     <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" style={{ fontFamily: MONO }}>
                       <rect width={w} height={h} fill="#FAFAFA" rx="8" />
                       {/* Threshold zones */}
-                      {/* Positive zone: >30% — green tint */}
+                      {/* Positive zone: >30%; green tint */}
                       <rect x={mg.left} y={yS(100)} width={pw} height={yS(30) - yS(100)} fill={EC.green} opacity="0.04" />
-                      {/* Indeterminate zone: 5-30% — yellow tint */}
+                      {/* Indeterminate zone: 5-30%; yellow tint */}
                       <rect x={mg.left} y={yS(30)} width={pw} height={yS(5) - yS(30)} fill="#f59e0b" opacity="0.05" />
-                      {/* Negative zone: <5% — red tint */}
+                      {/* Negative zone: <5%; red tint */}
                       <rect x={mg.left} y={yS(5)} width={pw} height={yS(0) - yS(5)} fill="#ef4444" opacity="0.04" />
                       {/* Zone labels */}
                       <text x={w - mg.right - 2} y={yS(65)} textAnchor="end" fill={EC.green} fontSize="7" fontWeight="600" opacity="0.7">POSITIVE</text>
@@ -6255,20 +6253,20 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   );
                 })()}
               </div>
-              {/* Interpretation block — Panel B */}
+              {/* Interpretation block; Panel B */}
               <div style={{ marginTop: "8px", padding: "10px 14px", borderRadius: "4px", background: "#EFF6FF", border: "1px solid #BFDBFE", fontSize: "11px", color: "#1D4ED8", lineHeight: 1.6 }}>
                 <strong style={{ color: "#1D4ED8" }}>Interpretation:</strong>{" "}
                 {echemTimeCourse.timeMut != null && echemTimeCourse.timeMut <= 20
                   ? `Rapid detection: MUT signal crosses the 3\u03c3 threshold at ~${echemTimeCourse.timeMut} min, well within the WHO TPP target of <120 min. `
                   : echemTimeCourse.timeMut != null
-                  ? `Detection at ~${echemTimeCourse.timeMut} min. Signal accumulation is slower than ideal \u2014 increasing k_trans or extending RPA amplification could accelerate time-to-result. `
+                  ? `Detection at ~${echemTimeCourse.timeMut} min. Signal accumulation is slower than ideal. Increasing k_trans or extending RPA amplification could accelerate time-to-result. `
                   : `MUT signal does not reach the 3\u03c3 threshold within 60 min at current k_trans. Surface optimization required. `
                 }
                 {echemTimeCourse.timeWt != null && echemTimeCourse.timeMut != null && echemTimeCourse.timeWt > echemTimeCourse.timeMut
                   ? `A ${echemTimeCourse.timeWt - echemTimeCourse.timeMut}-min discrimination window separates MUT from WT detection, enabling time-gated allelic discrimination.`
                   : echemTimeCourse.timeWt == null
                   ? `WT remains below threshold throughout, providing clean allelic discrimination at all time points.`
-                  : `WT crosses threshold near MUT \u2014 allelic discrimination relies on AS-RPA primer specificity rather than crRNA kinetics.`
+                  : `WT crosses threshold near MUT. Allelic discrimination relies on AS-RPA primer specificity rather than crRNA kinetics.`
                 }
               </div>
             </div>
@@ -6327,7 +6325,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                     );
                   }
 
-                  // SWV / DPV discrimination overlay — architecture-aware
+                  // SWV / DPV discrimination overlay; architecture-aware
                   const data = echemDiscOverlay.data;
                   const allY = data.flatMap(d => [d.baseline, d.MUT, d.WT]);
                   const yMin = Math.min(0, Math.min(...allY) * 1.1 - 0.02);
@@ -6417,13 +6415,13 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
                   );
                 })()}
               </div>
-              {/* Interpretation block — Panel C */}
+              {/* Interpretation block; Panel C */}
               <div style={{ marginTop: "8px", padding: "10px 14px", borderRadius: "4px", background: "#EFF6FF", border: "1px solid #BFDBFE", fontSize: "11px", color: "#1D4ED8", lineHeight: 1.6 }}>
                 <strong style={{ color: "#1D4ED8" }}>Interpretation:</strong>{" "}
                 {echemDiscOverlay.measuredDisc >= 3
                   ? `Diagnostic-grade allelic discrimination (D = ${echemDiscOverlay.measuredDisc === Infinity ? "\u221e" : echemDiscOverlay.measuredDisc + "\u00d7"}). The voltammetric \u0394I% difference between MUT and WT alleles is clearly resolvable, enabling reliable genotyping from electrochemical signal alone.`
                   : echemDiscOverlay.measuredDisc >= 1.5
-                  ? `Moderate allelic discrimination (D = ${echemDiscOverlay.measuredDisc}\u00d7). The MUT/WT peak height difference is detectable but marginal \u2014 AS-RPA primer specificity provides additional discrimination at the amplification stage.`
+                  ? `Moderate allelic discrimination (D = ${echemDiscOverlay.measuredDisc}\u00d7). The MUT/WT peak height difference is detectable but marginal. AS-RPA primer specificity provides additional discrimination at the amplification stage.`
                   : echemDiscOverlay.measuredDisc >= 1
                   ? `Poor discrimination (D = ${echemDiscOverlay.measuredDisc}\u00d7). crRNA alone cannot distinguish alleles electrochemically. Clinical specificity depends entirely on AS-RPA allele-specific primer blocking.`
                   : `Inverted discrimination (D < 1): WT allele activates Cas12a more efficiently than MUT. This crRNA design requires redesign or relies exclusively on AS-RPA primer selectivity for correct genotyping.`
@@ -6491,7 +6489,7 @@ const MultiplexTab = ({ results, panelData, jobId, connected }) => {
 
 
 /* ═══════════════════════════════════════════════════════════════════
-   DIAGNOSTICS TAB — Block 3 Sensitivity-Specificity Optimization
+   DIAGNOSTICS TAB; Block 3 Sensitivity-Specificity Optimization
    ═══════════════════════════════════════════════════════════════════ */
 class TabErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { error: null }; }
@@ -6540,7 +6538,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
   }, [results, scorer]);
 
   // Compute diagnostics client-side from results prop + preset thresholds
-  // Normalize drug codes consistently — handles full names, lowercase, and short codes
+  // Normalize drug codes consistently; handles full names, lowercase, and short codes
   const normDrug = useCallback((d) => {
     if (!d) return "";
     const u = d.toUpperCase().trim();
@@ -6635,12 +6633,12 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
     }
   }, [presets]);
 
-  // Load presets on mount — try API first, fall back to hardcoded
+  // Load presets on mount; try API first, fall back to hardcoded
   useEffect(() => {
     const fallbackPresets = [
-      { name: "balanced", description: "WHO TPP-aligned — clinical diagnostic deployment.", efficiency_threshold: 0.4, discrimination_threshold: 3.0 },
-      { name: "high_sensitivity", description: "Field screening — maximise coverage, tolerate lower discrimination.", efficiency_threshold: 0.2, discrimination_threshold: 1.5 },
-      { name: "high_specificity", description: "Confirmatory — minimise false calls, reference lab use.", efficiency_threshold: 0.6, discrimination_threshold: 5.0 },
+      { name: "balanced", description: "WHO TPP-aligned; clinical diagnostic deployment.", efficiency_threshold: 0.4, discrimination_threshold: 3.0 },
+      { name: "high_sensitivity", description: "Field screening; maximise coverage, tolerate lower discrimination.", efficiency_threshold: 0.2, discrimination_threshold: 1.5 },
+      { name: "high_specificity", description: "Confirmatory; minimise false calls, reference lab use.", efficiency_threshold: 0.6, discrimination_threshold: 5.0 },
     ];
     if (!connected) { setPresets(fallbackPresets); return; }
     getPresets().then(({ data }) => { setPresets(data && data.length ? data : fallbackPresets); });
@@ -6652,7 +6650,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
     setParetoData(null);
   }, [activePreset]);
 
-  // Load diagnostics + WHO compliance — try API, fall back to client-side computation
+  // Load diagnostics + WHO compliance; try API, fall back to client-side computation
   useEffect(() => {
     if (!results || !results.length) return;
     let cancelled = false;
@@ -6734,7 +6732,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
     return () => { cancelled = true; };
   }, [jobId, activePreset, connected, results, computeLocalDiagnostics]);
 
-  // Run sweep — try API, fall back to client-side
+  // Run sweep; try API, fall back to client-side
   const handleSweep = (paramName) => {
     setSweepLoading(true);
     const values = paramName === "efficiency_threshold"
@@ -6771,7 +6769,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
     }
   };
 
-  // Run Pareto — try API, fall back to client-side
+  // Run Pareto; try API, fall back to client-side
   const handlePareto = () => {
     setParetoLoading(true);
 
@@ -7039,10 +7037,10 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                   return (
                     <div style={{ marginTop: "14px", padding: "12px 16px", background: T.primaryLight, border: `1px solid ${T.primary}33`, borderRadius: "4px", fontSize: "11px", color: T.textSec, lineHeight: 1.7 }}>
                       <strong style={{ color: T.primary }}>Interpretation:</strong> Mutant mean activity ({meanMut}) vs wildtype ({meanWt}) gives a separation of <strong style={{ color: separation >= 0.15 ? T.success : T.warning }}>{separation}</strong>.
-                      {separation >= 0.15 ? " Good separation — the panel reliably distinguishes resistant from susceptible samples at the aggregate level." : separation >= 0.08 ? " Moderate separation — borderline samples may produce ambiguous calls; consider tightening the panel to high-discrimination targets only." : " Poor separation — the panel cannot reliably distinguish MUT from WT; review target selection and consider dropping low-discrimination candidates."}
-                      {` Overlap zone: ${overlapPct}% — this is the aggregate overlap; individual targets with high discrimination (e.g., disc ≥10×) have near-zero overlap. In practice each target is read independently, so per-target separation matters more than panel-level aggregate.`}
+                      {separation >= 0.15 ? " Good separation. The panel reliably distinguishes resistant from susceptible samples at the aggregate level." : separation >= 0.08 ? " Moderate separation. Borderline samples may produce ambiguous calls; consider tightening the panel to high-discrimination targets only." : " Poor separation. The panel cannot reliably distinguish MUT from WT; review target selection and consider dropping low-discrimination candidates."}
+                      {` Overlap zone: ${overlapPct}%. This is the aggregate overlap; individual targets with high discrimination (e.g., disc >=10x) have near-zero overlap. In practice each target is read independently, so per-target separation matters more than panel-level aggregate.`}
                       {` Strongest MUT signal: ${bestMutLabel} (${mutSorted[0].toFixed(3)}). Weakest: ${worstMutLabel} (${mutSorted[mutSorted.length - 1].toFixed(3)}).`}
-                      {plotResults.length === results.filter(r => r.gene !== "IS6110").length && activePreset !== "balanced" && ` Note: all candidates exceed the ${PRESET_LABELS[activePreset] || activePreset} thresholds — this profile produces identical results to a less stringent profile for the current panel.`}
+                      {plotResults.length === results.filter(r => r.gene !== "IS6110").length && activePreset !== "balanced" && ` Note: all candidates exceed the ${PRESET_LABELS[activePreset] || activePreset} thresholds. This profile produces identical results to a less stringent profile for the current panel.`}
                     </div>
                   );
                 })()}
@@ -7050,7 +7048,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             );
           } catch (e) { console.error("MUT vs WT chart error:", e); return null; } })()}
 
-          {/* B2: Understanding Discrimination Scores — collapsible explainer */}
+          {/* B2: Understanding Discrimination Scores; collapsible explainer */}
           <CollapsibleSection title="Understanding Discrimination Scores" defaultOpen={false}>
             <div style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7 }}>
               <div style={{ marginBottom: "14px" }}>
@@ -7063,18 +7061,18 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
               </div>
               <div style={{ marginBottom: "14px" }}>
                 <div style={{ fontSize: "13px", fontWeight: 600, color: T.text, marginBottom: "4px" }}>High GC content reduces discrimination</div>
-                <em>M. tuberculosis</em> has 65.8% GC content. GC-rich sequences around a mismatch stabilise the R-loop through additional hydrogen bonds, partially compensating for the mismatch. This is why some targets (EMB, PZA) show low predicted discrimination — their mutations sit in GC-rich regions at PAM-distal positions.
+                M. tuberculosis has 65.8% GC content. GC-rich sequences around a mismatch stabilise the R-loop through additional hydrogen bonds, partially compensating for the mismatch. This is why some targets (EMB, PZA) show low predicted discrimination: their mutations sit in GC-rich regions at PAM-distal positions.
               </div>
               <div style={{ marginBottom: "14px" }}>
                 <div style={{ fontSize: "13px", fontWeight: 600, color: T.text, marginBottom: "4px" }}>Prediction model</div>
                 {results.some(r => r.discMethod === "neural")
-                  ? "Discrimination ratios are predicted by Compass-ML's neural discrimination head — a multi-task extension (235K params) trained end-to-end on efficiency and discrimination simultaneously. The disc head takes paired encoder representations [mut, wt, mut\u2212wt, mut\u00D7wt] from the shared CNN+RNA-FM+RLPA backbone and outputs a predicted MUT/WT ratio via Softplus. Trained on 6,136 paired trans-cleavage measurements from EasyDesign (Huang et al. 2024, LbCas12a). 3-fold CV: r = 0.440."
+                  ? "Discrimination ratios are predicted by Compass-ML's neural discrimination head, a multi-task extension (235K params) trained end-to-end on efficiency and discrimination simultaneously. The disc head takes paired encoder representations [mut, wt, mut\u2212wt, mut\u00D7wt] from the shared CNN+RNA-FM+RLPA backbone and outputs a predicted MUT/WT ratio via Softplus. Trained on 6,136 paired trans-cleavage measurements from EasyDesign (Huang et al. 2024, LbCas12a). 3-fold CV: r = 0.440."
                   : results.some(r => (r.discrimination?.model_name || "").includes("learned") || r.discMethod === "feature")
                   ? "Discrimination ratios are predicted by a gradient-boosted model (XGBoost) trained on 6,136 paired MUT/WT trans-cleavage measurements from the EasyDesign dataset (Huang et al. 2024, LbCas12a). The model uses 18 thermodynamic features including R-loop cumulative \u0394G, mismatch \u0394\u0394G penalties, and position sensitivity. Val: RMSE = 0.520, r = 0.565. Top feature: pam_to_mm_distance (0.148 importance)."
                   : "Discrimination ratios are predicted by a heuristic model using position sensitivity \u00D7 mismatch destabilisation scores. A trained model (XGBoost on 18 thermodynamic features) is available but was not loaded for this run."
                 }
               </div>
-              <div style={{ fontSize: "11px", color: T.textTer, fontStyle: "italic", borderTop: `1px solid ${T.borderLight}`, paddingTop: "10px" }}>
+              <div style={{ fontSize: "11px", color: T.textTer, borderTop: `1px solid ${T.borderLight}`, paddingTop: "10px" }}>
                 These are in silico predictions. Experimental validation on the electrochemical platform will provide measured discrimination ratios through the active learning loop.
               </div>
             </div>
@@ -7082,7 +7080,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
 
           {/* C: WHO Compliance Table */}
           {whoCompliance && whoCompliance.who_compliance && (() => {
-            // Filter out species_control/UNKNOWN from WHO table — it's not a resistance drug class
+            // Filter out species_control/UNKNOWN from WHO table; it's not a resistance drug class
             const whoEntries = Object.entries(whoCompliance.who_compliance).filter(([drug]) => !["UNKNOWN", "OTHER", "SPECIES_CONTROL", "species_control"].includes(drug));
             const WHO_TPP_SENS = { RIF: 0.95, INH: 0.90, FQ: 0.90, EMB: 0.80, PZA: 0.80, AG: 0.80 };
             const sensPassing = whoEntries.filter(([, d]) => d.meets_sensitivity).length;
@@ -7100,7 +7098,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                 </Badge>
               </div>
               <div style={{ padding: "12px 18px", fontSize: "11px", color: T.textSec, lineHeight: 1.6, borderBottom: `1px solid ${T.borderLight}`, background: T.bg }}>
-                WHO Target Product Profile (TPP) 2024 defines minimum sensitivity and specificity thresholds per drug class for diagnostic deployment. Sensitivity = fraction of resistance-conferring mutations detected (pass/fail per drug class). Specificity = approximate in silico estimate: Direct targets use 1−1/disc (assumes perfectly separated signal distributions — actual specificity depends on signal variance and threshold selection). Proximity targets use thermodynamic AS-RPA mismatch penalty. ≥98% required — marked "Pending" when below threshold as experimental validation is needed. {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Discrimination ratios used here are from the learned model (XGBoost, 18 thermodynamic features)." : "Discrimination ratios used here are from the heuristic model."}
+                WHO Target Product Profile (TPP) 2024 defines minimum sensitivity and specificity thresholds per drug class for diagnostic deployment. Sensitivity = fraction of resistance-conferring mutations detected (pass/fail per drug class). Specificity = approximate in silico estimate: Direct targets use 1−1/disc (assumes perfectly separated signal distributions; actual specificity depends on signal variance and threshold selection). Proximity targets use thermodynamic AS-RPA mismatch penalty. ≥98% required; marked "Pending" when below threshold as experimental validation is needed. {results.some(r => (r.discrimination?.model_name || "").includes("learned")) ? "Discrimination ratios used here are from the learned model (XGBoost, 18 thermodynamic features)." : "Discrimination ratios used here are from the heuristic model."}
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT, fontSize: "12px" }}>
@@ -7135,7 +7133,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                         </td>
                         <td style={{ padding: "10px 14px", fontFamily: FONT, fontSize: "11px", color: T.textTer }}>≥ {tppPercent.toFixed(0)}%</td>
                         <td style={{ padding: "10px 14px", fontFamily: FONT, fontWeight: 600 }}>{data.targets_covered}/{data.targets_total}</td>
-                        <td style={{ padding: "10px 14px", fontFamily: FONT, fontSize: "11px", color: avgDisc >= 3 ? T.success : avgDisc >= 2 ? T.warning : T.textTer }}>{avgDisc > 0 ? `${avgDisc.toFixed(1)}×` : "—"}</td>
+                        <td style={{ padding: "10px 14px", fontFamily: FONT, fontSize: "11px", color: avgDisc >= 3 ? T.success : avgDisc >= 2 ? T.warning : T.textTer }}>{avgDisc > 0 ? `${avgDisc.toFixed(1)}×` : "–"}</td>
                         <td style={{ padding: "10px 14px" }}>
                           {data.specificity != null ? (
                             <div>
@@ -7160,7 +7158,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                                 );
                               })()}
                             </div>
-                          ) : <span style={{ color: T.textTer }}>—</span>}
+                          ) : <span style={{ color: T.textTer }}>–</span>}
                         </td>
                         <td style={{ padding: "10px 14px" }}>
                           {data.meets_sensitivity ? (
@@ -7194,10 +7192,10 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                     {worstSens && ` ${worstSens[0]} is the weakest (${(worstSens[1].sensitivity * 100).toFixed(0)}% vs ${((WHO_TPP_SENS[worstSens[0]] || 0.80) * 100).toFixed(0)}% required).`}
                     {sensFailing.length > 1 && ` ${sensFailing.length} classes need additional mutation coverage.`}
                     {sensPassing === whoEntries.length && " All drug classes pass sensitivity."}
-                    {" "}<strong>Specificity:</strong> {specPassing}/{whoEntries.length} classes meet the ≥98% threshold (approximate in silico proxy — actual specificity requires experimental determination with clinical samples).
-                    {specFailing.length > 0 && ` ${specFailing.length} class${specFailing.length > 1 ? "es" : ""} pending — specificity estimates require experimental validation on the electrochemical platform.`}
+                    {" "}<strong>Specificity:</strong> {specPassing}/{whoEntries.length} classes meet the {"\u2265"}98% threshold (approximate in silico proxy; actual specificity requires experimental determination with clinical samples).
+                    {specFailing.length > 0 && ` ${specFailing.length} class${specFailing.length > 1 ? "es" : ""} pending. Specificity estimates require experimental validation on the electrochemical platform.`}
                     {specPassing === whoEntries.length && " All classes pass specificity."}
-                    {" "}<em>Note: coverage denominators reflect panel targets only, not the full WHO mutation catalogue. Clinical sensitivity for a drug class depends on the epidemiological frequency of included mutations (e.g., INH: katG S315T covers ~60% of INH-resistant isolates; adding fabG1 C-15T raises coverage to ~85%).</em>
+                    {" "}Note: coverage denominators reflect panel targets only, not the full WHO mutation catalogue. Clinical sensitivity for a drug class depends on the epidemiological frequency of included mutations (e.g., INH: katG S315T covers ~60% of INH-resistant isolates; adding fabG1 C-15T raises coverage to ~85%).
                   </div>
                 );
               })()}
@@ -7298,7 +7296,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                           <div style={{ fontSize: 9, color: T.textTer }}>Specificity 95% CI</div>
                         </div>
                       </div>
-                      {/* Histograms — 2 columns */}
+                      {/* Histograms; 2 columns */}
                       <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: 16 }}>
                         <div>
                           <div style={{ fontSize: 10, fontWeight: 600, color: T.textSec, marginBottom: 4 }}>Sensitivity distribution</div>
@@ -7344,7 +7342,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
             <CollapsibleSection title={`Per-Target Breakdown (${diagnostics.per_target.length} targets)`} defaultOpen={false}>
               <div style={{ padding: "10px 14px", marginBottom: "12px", background: T.primaryLight, borderRadius: "4px", fontSize: "11px", color: T.primaryDark, lineHeight: 1.6 }}>
                 <strong>Per-target assay readiness assessment.</strong> Each row shows the selected candidate's predicted efficiency and discrimination ratio against the active profile thresholds.
-                Click any row to expand the <strong>Top-K alternative candidates</strong> — ranked alternatives with tradeoff annotations for experimental fallback planning.
+                Click any row to expand the <strong>Top-K alternative candidates</strong>; ranked alternatives with tradeoff annotations for experimental fallback planning.
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: FONT, fontSize: "12px" }}>
@@ -7404,14 +7402,14 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                                 const ad = orig?.asrpaDiscrimination;
                                 if (ad) {
                                   const c = ad.block_class === "strong" ? T.success : ad.block_class === "moderate" ? T.warning : T.danger;
-                                  return <span style={{ fontSize: "10px", fontWeight: 600, color: c }} title={`AS-RPA ${ad.terminal_mismatch} — ${ad.block_class}`}>{ad.disc_ratio >= 100 ? "≥100" : ad.disc_ratio.toFixed(0)}× <span style={{ fontWeight: 500, color: T.purple }}>AS-RPA</span></span>;
+                                  return <span style={{ fontSize: "10px", fontWeight: 600, color: c }} title={`AS-RPA ${ad.terminal_mismatch}; ${ad.block_class}`}>{ad.disc_ratio >= 100 ? "≥100" : ad.disc_ratio.toFixed(0)}× <span style={{ fontWeight: 500, color: T.purple }}>AS-RPA</span></span>;
                                 }
                                 return <span style={{ fontSize: "10px", color: T.purple, fontWeight: 600 }}>AS-RPA</span>;
                               })() : (
-                                <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: "12px", color: discColor }}>{disc > 0 ? `${disc.toFixed(1)}×` : "—"}</span>
+                                <span style={{ fontFamily: FONT, fontWeight: 600, fontSize: "12px", color: discColor }}>{disc > 0 ? `${disc.toFixed(1)}×` : "–"}</span>
                               )}
                             </td>
-                            <td style={{ padding: "10px 12px" }}>{t.has_primers ? <CheckCircle size={14} color={T.success} /> : <span style={{ color: T.textTer }}>—</span>}</td>
+                            <td style={{ padding: "10px 12px" }}>{t.has_primers ? <CheckCircle size={14} color={T.success} /> : <span style={{ color: T.textTer }}>–</span>}</td>
                             <td style={{ padding: "10px 12px" }}>
                               {(() => {
                                 const isControl = t.drug === "OTHER" || t.target_label === "IS6110_N0N";
@@ -7438,7 +7436,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                                   {!topK ? (
                                     <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "11px", color: T.textTer, padding: "8px 0" }}><Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />Loading alternative candidates…</div>
                                   ) : topK.length === 0 ? (
-                                    <div style={{ fontSize: "11px", color: T.textTer, padding: "8px 0", fontStyle: "italic" }}>No alternative candidates available for this target.</div>
+                                    <div style={{ fontSize: "11px", color: T.textTer, padding: "8px 0" }}>No alternative candidates available for this target.</div>
                                   ) : (
                                     <div>
                                       {/* Clean ranked table */}
@@ -7467,11 +7465,11 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
                                                   <span style={{ fontFamily: FONT, fontWeight: 600, color: sColor }}>{s.toFixed(3)}</span>
                                                   {deltaEff != null && !isSelected && <span style={{ fontSize: "9px", fontFamily: FONT, fontWeight: 600, color: deltaEff >= 0 ? T.success : T.danger, marginLeft: "4px" }}>{deltaEff >= 0 ? "+" : ""}{deltaEff.toFixed(3)}</span>}
                                                 </td>
-                                                <td style={{ padding: "7px 10px", fontFamily: FONT, color: T.textSec }}>{isProximity ? <span style={{ fontSize: "10px", color: T.purple }}>AS-RPA</span> : aDisc > 0 ? `${aDisc.toFixed(1)}×` : "—"}</td>
-                                                <td style={{ padding: "7px 10px", fontFamily: FONT, color: alt.offtarget_count === 0 ? T.success : alt.offtarget_count != null ? T.warning : T.textTer }}>{alt.offtarget_count ?? "—"}</td>
-                                                <td style={{ padding: "7px 10px", fontFamily: MONO, fontSize: "10px", color: T.textTer, letterSpacing: "0.3px" }}>{spacer ? `${spacer.slice(0, 10)} ${spacer.slice(10, 20)}` : "—"}</td>
-                                                <td style={{ padding: "7px 10px", fontSize: "10px", color: T.textTer, fontStyle: isSelected ? "normal" : "italic" }}>
-                                                  {isSelected ? <span style={{ fontWeight: 600, color: T.primary, fontStyle: "normal" }}>Selected candidate</span> : (notes || "comparable")}
+                                                <td style={{ padding: "7px 10px", fontFamily: FONT, color: T.textSec }}>{isProximity ? <span style={{ fontSize: "10px", color: T.purple }}>AS-RPA</span> : aDisc > 0 ? `${aDisc.toFixed(1)}×` : "–"}</td>
+                                                <td style={{ padding: "7px 10px", fontFamily: FONT, color: alt.offtarget_count === 0 ? T.success : alt.offtarget_count != null ? T.warning : T.textTer }}>{alt.offtarget_count ?? "–"}</td>
+                                                <td style={{ padding: "7px 10px", fontFamily: MONO, fontSize: "10px", color: T.textTer, letterSpacing: "0.3px" }}>{spacer ? `${spacer.slice(0, 10)} ${spacer.slice(10, 20)}` : "–"}</td>
+                                                <td style={{ padding: "7px 10px", fontSize: "10px", color: T.textTer }}>
+                                                  {isSelected ? <span style={{ fontWeight: 600, color: T.primary }}>Selected candidate</span> : (notes || "comparable")}
                                                 </td>
                                               </tr>
                                             );
@@ -7570,7 +7568,7 @@ const DiagnosticsTab = ({ results, jobId, connected, scorer }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   RESULTS PAGE — Tab container with accordion candidates
+   RESULTS PAGE; Tab container with accordion candidates
    ═══════════════════════════════════════════════════════════════════ */
 const RESULT_TABS = [
   { id: "overview", label: "Overview", icon: Activity },
@@ -7627,7 +7625,7 @@ const ResultsPage = ({ connected, jobId, scorer: scorerProp, goTo }) => {
         setLoading(false);
       });
     } else if (activeJob.startsWith("mock-")) {
-      /* Mock mode — adapt mock data to scorer + panel encoded in job ID */
+      /* Mock mode; adapt mock data to scorer + panel encoded in job ID */
       const isHeuristic = activeJob.includes("-heuristic-");
       // Extract selected mutation indices from job ID (format: mock-scorer-0,1,2,...-timestamp)
       const parts = activeJob.split("-");
@@ -8009,7 +8007,7 @@ const MutationsPage = () => {
                   <td style={{ padding: "10px 14px" }}><DrugBadge drug={m.drug} /></td>
                   <td style={{ padding: "10px 14px" }}><Badge variant={m.conf === "High" ? "success" : "warning"}>{m.conf}</Badge></td>
                   <td style={{ padding: "10px 14px", fontFamily: FONT }}>{m.tier}</td>
-                  <td style={{ padding: "10px 14px", fontSize: "11px", color: T.textSec }}>{ref?.freq || "—"}</td>
+                  <td style={{ padding: "10px 14px", fontSize: "11px", color: T.textSec }}>{ref?.freq || "N/A"}</td>
                 </tr>
               );
             })}
@@ -8203,7 +8201,7 @@ const ScoringPage = ({ connected }) => {
       {/* ── B-JEPA (teaser) ── */}
       <ScoringBlock id="bjepa" icon={Brain} title="B-JEPA" badge="In development" dashed dimmed>
         <p style={{ fontSize: "13px", color: T.textSec, lineHeight: 1.7, margin: "0 0 16px" }}>
-          Self-supervised foundation model using Joint-Embedding Predictive Architecture with latent grounding — pretrained on 6,326 complete bacterial reference genomes (10M fragments {"\u00d7"} 2048bp).
+          Self-supervised foundation model using Joint-Embedding Predictive Architecture with latent grounding; pretrained on 6,326 complete bacterial reference genomes (10M fragments {"\u00d7"} 2048bp).
           Dynamic JEPA{"\u2192"}MLM loss scheduling: JEPA shapes high-dimensional representation space (RankMe {">"}450), then masked language modeling drives token-level genomic feature learning.
           Per-dimension variance floor prevents representational collapse. Targets downstream Cas12a guide efficiency prediction and MDR-TB drug resistance classification.
         </p>
@@ -8224,7 +8222,7 @@ const ScoringPage = ({ connected }) => {
         </div>
       </ScoringBlock>
 
-      {/* API models — hidden by default, developer-only */}
+      {/* API models; hidden by default, developer-only */}
       {models.length > 0 && (
         <div style={{ marginTop: "8px" }}>
           <button onClick={() => setShowApiRef(!showApiRef)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", color: T.textTer, padding: "6px 0", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -8249,7 +8247,7 @@ const ScoringPage = ({ connected }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   RESEARCH PAGE — Experimental sandbox for scoring R&D
+   RESEARCH PAGE; Experimental sandbox for scoring R&D
    ═══════════════════════════════════════════════════════════════════ */
 const ResearchPage = ({ connected }) => {
   const mobile = useIsMobile();
@@ -8353,7 +8351,7 @@ const ResearchPage = ({ connected }) => {
         <div style={{ fontSize: "11px", fontWeight: 600, color: RS.accent, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Research</div>
         <h2 style={{ fontSize: "20px", fontWeight: 600, color: RS.text, margin: 0, letterSpacing: "-0.02em", fontFamily: HEADING }}>Scoring R&D Sandbox</h2>
         <p style={{ fontSize: "13px", color: RS.muted, marginTop: "8px", lineHeight: 1.7, maxWidth: "720px" }}>
-          Experimental workspace for scoring model development. Results here are exploratory — they inform model selection and feature engineering but do not affect production panel design. All thermodynamic calculations use nearest-neighbor parameters (Sugimoto et al. 1995 for RNA:DNA; SantaLucia 1998 for DNA:DNA) and are approximations of the true molecular energetics.
+          Experimental workspace for scoring model development. Results here are exploratory; they inform model selection and feature engineering but do not affect production panel design. All thermodynamic calculations use nearest-neighbor parameters (Sugimoto et al. 1995 for RNA:DNA; SantaLucia 1998 for DNA:DNA) and are approximations of the true molecular energetics.
         </p>
       </div>
 
@@ -8398,7 +8396,7 @@ const ResearchPage = ({ connected }) => {
               <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
                 <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "12px 16px" }}>
                   <div style={{ fontSize: "11px", color: RS.muted, fontWeight: 600, marginBottom: "4px" }}>KENDALL TAU</div>
-                  <div style={{ fontSize: "18px", fontWeight: 600, color: RS.text, fontFamily: FONT }}>{summary.kendall_tau?.toFixed(3) ?? "—"}</div>
+                  <div style={{ fontSize: "18px", fontWeight: 600, color: RS.text, fontFamily: FONT }}>{summary.kendall_tau?.toFixed(3) ?? "–"}</div>
                   <div style={{ fontSize: "10px", color: RS.muted, marginTop: "2px" }}>1.0 = identical ranking, 0 = unrelated</div>
                 </div>
                 <div style={{ background: RS.cardBg, border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "12px 16px" }}>
@@ -8447,18 +8445,18 @@ const ResearchPage = ({ connected }) => {
                         return (
                           <tr key={i} style={{ borderBottom: `1px solid ${RS.border}`, fontWeight: bigShift ? 700 : 400 }}>
                             <td style={{ ...tdStyle, fontWeight: 600 }}>{t.label}</td>
-                            <td style={{ ...tdStyle, color: RS.muted }}>{t.drug || "—"}</td>
-                            <td style={{ ...tdStyle, color: RS.muted, fontSize: "11px" }}>{t.strategy || "—"}</td>
-                            <td style={{ ...tdStyle, textAlign: "right" }}>{t.model_a.score?.toFixed(3) ?? "—"}</td>
-                            <td style={{ ...tdStyle, textAlign: "right" }}>{t.model_b.score?.toFixed(3) ?? "—"}</td>
+                            <td style={{ ...tdStyle, color: RS.muted }}>{t.drug || "N/A"}</td>
+                            <td style={{ ...tdStyle, color: RS.muted, fontSize: "11px" }}>{t.strategy || "N/A"}</td>
+                            <td style={{ ...tdStyle, textAlign: "right" }}>{t.model_a.score?.toFixed(3) ?? "–"}</td>
+                            <td style={{ ...tdStyle, textAlign: "right" }}>{t.model_b.score?.toFixed(3) ?? "–"}</td>
                             <td style={{ ...tdStyle, textAlign: "right", color: t.score_delta > 0 ? RS.positive : t.score_delta < 0 ? RS.negative : RS.muted }}>
-                              {t.score_delta != null ? `${t.score_delta > 0 ? "+" : ""}${t.score_delta.toFixed(3)}` : "—"}
+                              {t.score_delta != null ? `${t.score_delta > 0 ? "+" : ""}${t.score_delta.toFixed(3)}` : "–"}
                             </td>
-                            <td style={{ ...tdStyle, textAlign: "center", color: RS.muted }}>{t.model_a.disc != null ? `${t.model_a.disc}x` : "—"}</td>
-                            <td style={{ ...tdStyle, textAlign: "center" }}>#{t.model_a.rank ?? "—"}</td>
-                            <td style={{ ...tdStyle, textAlign: "center" }}>#{t.model_b.rank ?? "—"}</td>
+                            <td style={{ ...tdStyle, textAlign: "center", color: RS.muted }}>{t.model_a.disc != null ? `${t.model_a.disc}x` : "–"}</td>
+                            <td style={{ ...tdStyle, textAlign: "center" }}>#{t.model_a.rank ?? "–"}</td>
+                            <td style={{ ...tdStyle, textAlign: "center" }}>#{t.model_b.rank ?? "–"}</td>
                             <td style={{ ...tdStyle, textAlign: "center", color: t.rank_delta > 0 ? RS.positive : t.rank_delta < 0 ? RS.negative : RS.muted }}>
-                              {t.rank_delta != null ? (t.rank_delta > 0 ? `▲${t.rank_delta}` : t.rank_delta < 0 ? `▼${Math.abs(t.rank_delta)}` : "—") : "—"}
+                              {t.rank_delta != null ? (t.rank_delta > 0 ? `▲${t.rank_delta}` : t.rank_delta < 0 ? `▼${Math.abs(t.rank_delta)}` : "–") : "N/A"}
                             </td>
                             <td style={{ ...tdStyle, textAlign: "center" }}>
                               <button onClick={() => handleThermo(t.label)} style={{ background: "none", border: `1px solid ${RS.border}`, borderRadius: "4px", padding: "2px 8px", cursor: "pointer", fontSize: "10px", color: RS.accent, fontWeight: 600 }}>View</button>
@@ -8517,12 +8515,12 @@ const ResearchPage = ({ connected }) => {
               <p style={{ margin: "0 0 10px 0" }}>Zhang et al. (Nucleic Acids Research 2024, DOI: 10.1093/nar/gkae1124) demonstrated a linear correlation between Cas12a trans-cleavage kinetics and the free energy change required to unwind the crRNA spacer and DNA target from their self-folded states to a hybridisation-competent conformation. This "unwinding cost" is the dominant predictor of trans-cleavage rate.</p>
               <p style={{ margin: "0 0 10px 0" }}>CRISPRzip (Offerhaus et al., bioRxiv 2025) formalises R-loop formation as movement through a sequence-dependent free-energy landscape, combining nearest-neighbor RNA:DNA hybrid energetics with protein-mediated contributions inferred from high-throughput kinetics.</p>
               <p style={{ margin: "0 0 10px 0" }}>Aris et al. (Nature Communications 2025, DOI: 10.1038/s41467-025-57703-y) established a four-state kinetic model for Cas12a R-loop dynamics using single-molecule measurements, showing that R-loop formation is dynamic and reversible, with supercoiling-dependent interrogation.</p>
-              <p style={{ margin: 0, fontStyle: "italic", fontSize: "11px", color: "#a3a3a3" }}>The profiles shown here use the Sugimoto et al. (1995) nearest-neighbor parameters for RNA:DNA hybrid thermodynamics and the SantaLucia (1998) unified parameters for DNA:DNA duplex stability. These are approximations — the true free-energy landscape includes protein-mediated contributions, supercoiling effects, and PAM-proximal protein contacts that stabilise early R-loop intermediates beyond what nucleic acid thermodynamics alone predict.</p>
+              <p style={{ margin: 0, fontSize: "11px", color: "#a3a3a3" }}>The profiles shown here use the Sugimoto et al. (1995) nearest-neighbor parameters for RNA:DNA hybrid thermodynamics and the SantaLucia (1998) unified parameters for DNA:DNA duplex stability. These are approximations. The true free-energy landscape includes protein-mediated contributions, supercoiling effects, and PAM-proximal protein contacts that stabilise early R-loop intermediates beyond what nucleic acid thermodynamics alone predict.</p>
             </div>
           )}
         </div>
 
-        {/* Target input — dual mode */}
+        {/* Target input; dual mode */}
         {!thermoData && !thermoLoading && (
           <div style={{ fontSize: "12px", color: RS.muted }}>
             {/* Mode tabs */}
@@ -8741,7 +8739,7 @@ const ResearchPage = ({ connected }) => {
                   </div>
                 )}
                 {/* References */}
-                <div style={{ marginTop: "12px", fontSize: "10px", color: "#a3a3a3", fontStyle: "italic" }}>
+                <div style={{ marginTop: "12px", fontSize: "10px", color: "#a3a3a3" }}>
                   {(thermoData.references || []).join(" | ")}
                 </div>
               </div>
@@ -8755,7 +8753,7 @@ const ResearchPage = ({ connected }) => {
         {ablation.length === 0 ? (
           <div style={{ fontSize: "12px", color: RS.muted }}>No ablation data available.</div>
         ) : (() => {
-          // Build scatter data — only rows with both kim and ed rho
+          // Build scatter data; only rows with both kim and ed rho
           const scatterPts = ablation.filter(r => r.kim_rho != null && r.ed_rho != null);
           const allPts = ablation.map(r => ({ ...r, ed_rho: r.ed_rho ?? 0 }));
           const productionRow = ablation.find(r => r.notes && r.notes.toLowerCase().includes("production"));
@@ -8825,7 +8823,7 @@ const ResearchPage = ({ connected }) => {
 
               {/* Insight box */}
               <div style={{ padding: "12px 16px", background: RS.seedBg, borderRadius: "4px", fontSize: "12px", color: RS.text, lineHeight: 1.7, marginBottom: "16px" }}>
-                <strong>Key finding:</strong> Models optimised for cis-cleavage gene editing (Kim 2018 benchmark) show near-zero predictive value for diagnostic trans-cleavage (rho = 0.04). The production checkpoint (multi-dataset, no domain adversarial) achieves rho = 0.55 on trans-cleavage while retaining rho = 0.49 on cis-cleavage — the best all-rounder across both benchmarks. Domain-adversarial training (Ganin et al., JMLR 2016) is counter-productive: forcing domain invariance destroys trans-cleavage-specific signal.
+                <strong>Key finding:</strong> Models optimised for cis-cleavage gene editing (Kim 2018 benchmark) show near-zero predictive value for diagnostic trans-cleavage (rho = 0.04). The production checkpoint (multi-dataset, no domain adversarial) achieves rho = 0.55 on trans-cleavage while retaining rho = 0.49 on cis-cleavage; the best all-rounder across both benchmarks. Domain-adversarial training (Ganin et al., JMLR 2016) is counter-productive: forcing domain invariance destroys trans-cleavage-specific signal.
               </div>
 
               {/* Table */}
@@ -8851,8 +8849,8 @@ const ResearchPage = ({ connected }) => {
                               {isProd && <span style={{ marginLeft: "6px", fontSize: "9px", fontWeight: 600, color: RS.accent, background: `${RS.accent}15`, padding: "2px 6px", borderRadius: "3px", fontFamily: FONT }}>PRODUCTION</span>}
                             </td>
                             <td style={{ ...tdStyle, color: RS.muted, fontFamily: FONT, fontSize: "11px" }}>{row.features}</td>
-                            <td style={{ ...tdStyle, textAlign: "right" }}>{row.kim_rho?.toFixed(3) ?? "—"}</td>
-                            <td style={{ ...tdStyle, textAlign: "right", color: row.ed_rho ? RS.text : "#d4d4d4" }}>{row.ed_rho?.toFixed(3) ?? "—"}</td>
+                            <td style={{ ...tdStyle, textAlign: "right" }}>{row.kim_rho?.toFixed(3) ?? "–"}</td>
+                            <td style={{ ...tdStyle, textAlign: "right", color: row.ed_rho ? RS.text : "#d4d4d4" }}>{row.ed_rho?.toFixed(3) ?? "–"}</td>
                             <td style={{ ...tdStyle, color: RS.muted, fontFamily: FONT, fontSize: "11px" }}>{row.notes}</td>
                           </tr>
                         );
@@ -8976,28 +8974,28 @@ const ResearchPage = ({ connected }) => {
               icon: <RefreshCw size={18} />,
               title: "Active Learning Loop",
               desc: "Feed experimental measurements back into Compass-ML. Fluorescence or electrochemical data recalibrates activity predictions, closing the gap between in silico and platform-specific signal.",
-              milestone: "Phase 1 — Experimental validation",
+              milestone: "Phase 1; Experimental validation",
               ready: true,
             },
             {
               icon: <Zap size={18} />,
               title: "Electrochemical Transfer Function",
               desc: "Model the relationship between solution-phase trans-cleavage and surface-tethered MB reporter degradation on LIG electrodes.",
-              milestone: "Phase 2 — Electrode characterisation",
+              milestone: "Phase 2; Electrode characterisation",
               ready: false,
             },
             {
               icon: <Grid3x3 size={18} />,
               title: "Spatial Multiplexing Optimiser",
               desc: "Assign targets to electrode pads on the spatially addressed array, minimising electrochemical crosstalk. Replaces solution-phase M8 when using in-situ complexation.",
-              milestone: "Phase 2–3 — Array fabrication",
+              milestone: "Phase 2–3; Array fabrication",
               ready: false,
             },
             {
               icon: <FlaskConical size={18} />,
               title: "Nuclease Adaptation Engine",
               desc: "Swap Cas12a variants via transfer learning. Freeze sequence encoders, fine-tune RLPA attention and output heads on variant-specific data.",
-              milestone: "Phase 3 — Variant screening",
+              milestone: "Phase 3; Variant screening",
               ready: false,
             },
           ].map((card, i) => (
@@ -9027,7 +9025,7 @@ const ResearchPage = ({ connected }) => {
         <p style={{ fontSize: "12px", color: RS.muted, marginBottom: "16px", lineHeight: 1.7, maxWidth: "800px" }}>
           Compare Cas12a variants on the current 14-target MDR-TB panel. PAM coverage is computed by running COMPASS's M2 PAM scanner against the
           H37Rv genome with each variant's published PAM set. Scoring and discrimination columns show whether Compass-ML has been trained on data
-          for that variant — "Retraining required" indicates the scoring model needs variant-specific experimental data before predictions are valid.
+          for that variant; "Retraining required" indicates the scoring model needs variant-specific experimental data before predictions are valid.
         </p>
 
         {/* Load coverage button */}
@@ -9092,9 +9090,9 @@ const ResearchPage = ({ connected }) => {
                               {cov.targets_with_pam}/{cov.targets_total}
                             </span>
                           ) : cov?.error ? (
-                            <span style={{ color: RS.muted, fontSize: "10px" }}>{cov.error.split(" — ")[0]}</span>
+                            <span style={{ color: RS.muted, fontSize: "10px" }}>{cov.error.split("; ")[0]}</span>
                           ) : (
-                            <span style={{ color: RS.muted }}>—</span>
+                            <span style={{ color: RS.muted }}>–</span>
                           )}
                         </td>
                         <td style={{ ...tdStyle, fontSize: "10px" }}>
@@ -9104,7 +9102,7 @@ const ResearchPage = ({ connected }) => {
                             ) : (
                               <span style={{ color: RS.positive }}>None</span>
                             )
-                          ) : "—"}
+                          ) : "N/A"}
                         </td>
                         <td style={tdStyle}>
                           <span style={{
@@ -9138,7 +9136,7 @@ const ResearchPage = ({ connected }) => {
                                     {p.display_name}
                                   </div>
                                   <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
-                                    <strong>Organism:</strong> <em>{p.organism}</em>
+                                    <strong>Organism:</strong> {p.organism}
                                   </div>
                                   {p.mutations && (
                                     <div style={{ fontSize: "11px", color: RS.muted, marginBottom: "6px" }}>
@@ -9287,8 +9285,8 @@ const ResearchPage = ({ connected }) => {
             <div>
               <div style={{ fontSize: "12px", fontWeight: 600, color: RS.text, marginBottom: "4px" }}>Mg{"\u00b2\u207a"} Concentration Inverts Seed Specificity</div>
               <p style={{ fontSize: "11px", color: RS.muted, lineHeight: 1.7, margin: 0 }}>
-                Nguyen et al. (2024, <em>NAR</em> 52:9343) showed that at low Mg{"\u00b2\u207a"} ({"\u2264"}1 mM), seed mismatches become <em>more</em> tolerated
-                while PAM-distal mismatches become <em>less</em> tolerated — partially inverting the canonical specificity pattern.
+                Nguyen et al. (2024, NAR 52:9343) showed that at low Mg{"\u00b2\u207a"} ({"\u2264"}1 mM), seed mismatches become more tolerated
+                while PAM-distal mismatches become less tolerated, partially inverting the canonical specificity pattern.
                 The standard 10 mM MgCl{"\u2082"} used in most published assays may not reflect diagnostic buffer conditions.
                 Buffer Mg{"\u00b2\u207a"} optimisation is a critical experimental variable for achieving reliable SNV discrimination.
               </p>
@@ -9310,7 +9308,7 @@ const ResearchPage = ({ connected }) => {
             <Lock size={14} color={RS.muted} style={{ flexShrink: 0, marginTop: 2 }} />
             <p style={{ fontSize: "11px", color: RS.muted, lineHeight: 1.7, margin: 0 }}>
               <strong>CasDx1</strong> (Mammoth Biosciences) showed superior SNV discrimination in SARS-CoV-2 detection
-              (Fasching et al. 2022, <em>J Clin Microbiol</em>) but its PAM specificity and biochemical parameters are proprietary
+              (Fasching et al. 2022, J Clin Microbiol) but its PAM specificity and biochemical parameters are proprietary
               and cannot be configured. 97.3% SNP concordance on 261 clinical samples.
             </p>
           </div>
@@ -9321,7 +9319,7 @@ const ResearchPage = ({ connected }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════════════
-   COMPASS PLATFORM — Root component
+   COMPASS PLATFORM; Root component
    ═══════════════════════════════════════════════════════════════════ */
 const COMPASSPlatform = () => {
   const mobile = useIsMobile();
