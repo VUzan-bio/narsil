@@ -3579,7 +3579,7 @@ const generateInterpretation = (r) => {
   // Overall assessment — factor in PAM-adjusted signal
   const pamAdj = r.pamAdjusted ?? (r.pamPenalty != null ? eff * r.pamPenalty : eff);
   const signalNote = (r.pamPenalty != null && r.pamPenalty < 0.8)
-    ? ` However, the PAM-adjusted signal is ${pamAdj.toFixed(3)} (${r.pamPenalty}\u00d7 penalty), ${pamAdj < 0.3 ? "below the 0.3 risk threshold. Longer incubation or higher RPA input may be needed for a resolvable SWV peak" : pamAdj < 0.4 ? "near the lower end of reliable detection" : "still within detectable range"}.`
+    ? ` However, the PAM-adjusted signal is ${pamAdj.toFixed(3)} (${r.pamPenalty}\u00d7 penalty), ${pamAdj <= 0.3 ? "at or below the 0.3 risk threshold. Longer incubation or higher RPA input may be needed for a resolvable SWV peak" : pamAdj < 0.4 ? "near the lower end of reliable detection" : "still within detectable range"}.`
     : "";
   if (eff >= 0.7) lines.push(`Strong candidate (activity score ${eff.toFixed(3)}).${signalNote || " High predicted Cas12a trans-cleavage rate, expected to produce a clear SWV signal decrease within 15-30 min on the electrochemical platform, well above the limit of detection."}`);
   else if (eff >= 0.5) lines.push(`Moderate candidate (activity score ${eff.toFixed(3)}).${signalNote || " Predicted trans-cleavage is sufficient for detection but not optimal. The SWV signal decrease may require 30-45 min to reach a confident positive call on the electrochemical platform."}`);
