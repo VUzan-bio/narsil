@@ -300,6 +300,20 @@ class AppState:
             # Each run still has its own scorer instances with independent
             # mutable state, but shares the heavy model objects.
             _inject_cached_models(pipeline)
+            if _model_cache_ready:
+                ml = getattr(pipeline, "ml_scorer", None)
+                has_model = ml is not None and ml.model is not None
+                has_cache = ml is not None and ml._rnafm_cache is not None
+                cache_len = len(ml._rnafm_cache) if has_cache else 0
+                disc = getattr(pipeline, "disc_scorer", None)
+                has_disc = disc is not None and getattr(disc, "_model_loaded", False)
+                logger.info(
+                    "Model injection: CNN=%s, RNA-FM cache=%s (%d sequences), "
+                    "calibrated=%s, disc=%s",
+                    has_model, has_cache, cache_len,
+                    getattr(ml, "calibrated", False) if ml else False,
+                    has_disc,
+                )
 
             # Convert mutations
             self._update_progress(job, 0.05, "Target Resolution")
@@ -345,20 +359,22 @@ class AppState:
                 original_info = runner_mod.logger.info
 
                 stage_progress = {
-                    "Module 3:": (0.15, "Candidate Filtering"),
-                    "Module 4:": (0.20, "Off-Target Screening"),
-                    "Module 5:": (0.25, "Heuristic Scoring"),
-                    "Module 5.ML: Encoding": (0.30, "Compass-ML: Encoding targets"),
-                    "Module 5.ML: Computing RNA-FM": (0.35, "Compass-ML: RNA-FM embeddings"),
-                    "Module 5.ML: Running CNN": (0.40, "Compass-ML: CNN inference"),
-                    "Module 5.ML: Inference complete": (0.45, "Compass-ML: Calibration"),
-                    "Module 5.5": (0.50, "Mismatch Pairs"),
-                    "Module 6:": (0.55, "SM Enhancement"),
+                    "Module 3:": (0.10, "Candidate Filtering"),
+                    "Module 4:": (0.15, "Off-Target Screening"),
+                    "Module 5:": (0.20, "Heuristic Scoring"),
+                    "Module 5.ML: Encoding": (0.25, "Compass-ML: Encoding"),
+                    "Module 5.ML: Computing RNA-FM": (0.30, "Compass-ML: RNA-FM"),
+                    "Module 5.ML: Running CNN": (0.35, "Compass-ML: CNN inference"),
+                    "Module 5.ML: Inference complete": (0.40, "Compass-ML: Calibration"),
+                    "Module 5.5": (0.45, "Mismatch Pairs"),
+                    "Module 6:": (0.50, "SM Enhancement"),
+                    "Enhancement batch:": (0.55, "SM Enhancement complete"),
                     "Module 6.5": (0.60, "Discrimination Scoring"),
-                    "Module 7:": (0.65, "Multiplex Optimization"),
-                    "Module 8:": (0.70, "RPA Primer Design"),
-                    "Module 8.5": (0.75, "Co-Selection Validation"),
-                    "Module 9:": (0.85, "Panel Assembly"),
+                    "Discrimination scoring:": (0.65, "Discrimination complete"),
+                    "Module 7:": (0.70, "Multiplex Optimization"),
+                    "Module 8:": (0.78, "RPA Primer Design"),
+                    "Module 8.5": (0.85, "Co-Selection Validation"),
+                    "Module 9:": (0.90, "Panel Assembly"),
                     "PANEL COMPLETE": (0.95, "Export"),
                 }
 
