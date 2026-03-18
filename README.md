@@ -8,7 +8,7 @@ Live platform: [compass-crispr.com](https://compass-crispr.com/)
 
 ---
 
-COMPASS takes WHO-catalogued drug-resistance mutations as input and produces a complete, optimised diagnostic panel: crRNA sequences, RPA primer pairs, discrimination predictions, and clinical compliance metrics — ready for experimental validation on electrochemical or fluorescence platforms. The pipeline handles PAM deserts in the GC-rich *M. tuberculosis* genome (65.6% GC) through automatic proximity detection with allele-specific RPA primer design. Guide scoring uses Compass-ML — a dual-branch CNN + RNA-FM architecture with physics-informed R-loop attention — calibrated via Spearman-optimised ensemble weighting against both cis-cleavage (Kim et al. 2018) and trans-cleavage (Huang et al. 2024) benchmarks. Discrimination prediction uses a gradient-boosted model trained on 6,136 paired MUT/WT measurements with 15 thermodynamic features. COMPASS produces a 15-channel MDR-TB panel covering rifampicin, isoniazid, ethambutol, pyrazinamide, fluoroquinolone, and aminoglycoside resistance, plus an IS6110 species identification control.
+COMPASS takes WHO-catalogued drug-resistance mutations as input and produces a complete, optimised diagnostic panel: crRNA sequences, RPA primer pairs, discrimination predictions, and clinical compliance metrics — ready for experimental validation on electrochemical or fluorescence platforms. The pipeline handles PAM deserts in the GC-rich *M. tuberculosis* genome (65.6% GC) through automatic proximity detection with allele-specific RPA primer design. Guide scoring uses Compass-ML — a dual-branch CNN + RNA-FM architecture with physics-informed R-loop attention — calibrated via Spearman-optimised ensemble weighting against both cis-cleavage (Kim et al. 2018) and trans-cleavage (Huang et al. 2024) benchmarks. Discrimination prediction blends a gradient-boosted model (XGBoost, 18 thermodynamic features, 6,136 paired MUT/WT measurements from Huang et al. 2024) with a physics-based R-loop propagation estimate (D_rloop). COMPASS produces a 14-channel MDR-TB panel (12 resistance mutations + IS6110 species control + RNaseP extraction control) covering rifampicin, isoniazid, ethambutol, pyrazinamide, fluoroquinolone, and aminoglycoside resistance, plus an IS6110 species identification control.
 
 ## Pipeline
 
@@ -31,10 +31,10 @@ Ten modules execute sequentially across three processing blocks:
 |--------|----------|--------|
 | M5 Efficiency Scoring | Predict Cas12a cleavage activity | Compass-ML ensemble (see Architecture) |
 | M5.5 Mismatch Pair Generation | Create MUT/WT spacer pairs | Complement substitution at SNP position |
-| M6 Discrimination Scoring | Predict MUT/WT selectivity | Learned model: LightGBM, 15 thermodynamic features, 6,136 pairs (r = 0.46); fallback: position-dependent heuristic (r = 0.30) |
+| M6 Discrimination Scoring | Predict MUT/WT selectivity | Learned model: XGBoost + R-loop physics (D_rloop), 18 thermodynamic features, 6,136 pairs; fallback: heuristic + D_rloop |
 | M7 Synthetic Mismatch Enhancement | Boost discrimination for borderline candidates | Deliberate mismatches at seed positions 2–6; 2–6× → 10–100× |
 | M8 Multiplex Optimisation | Select optimal panel combination | Simulated annealing, 10,000 iterations; objective: efficiency + discrimination − cross-reactivity |
-| M9 RPA Primer Co-Design | Design amplification primers per target | Standard RPA (28–38 nt, Tm 57–72°C) + allele-specific primers for proximity candidates |
+| M9 RPA Primer Co-Design | Design amplification primers per target | Standard RPA (25–35 nt, Tm 57–72°C) + allele-specific primers for proximity candidates |
 
 **Block 3 — Clinical Assessment (M10)**
 
@@ -56,7 +56,7 @@ crRNA spacer (20×640 RNA-FM) → Linear(640→64) + zero-pad to 34 ──→ (B
 
 **CNN branch.** Multi-scale parallel Conv1d (kernel sizes 3, 5, 7; 32 channels each) with batch normalisation and dropout (0.3). Input: 34-nucleotide one-hot encoded target context (4 nt PAM + 20 nt protospacer + 10 nt flanking). Output: 64-dimensional features per position.
 
-**RNA-FM branch.** Frozen RNA-FM embeddings (Chen et al. 2022; 23M training sequences, 640-dim per-nucleotide) projected to 64 dimensions via learned linear layer, zero-padded from 20 to 34 positions for alignment with the CNN branch. Captures guide RNA folding stability and accessibility properties.
+**RNA-FM branch.** Frozen RNA-FM embeddings (Chen et al. 2022; ~23.7M non-coding RNA sequences, 640-dim per-nucleotide) projected to 64 dimensions via learned linear layer, zero-padded from 20 to 34 positions for alignment with the CNN branch. Captures guide RNA folding stability and accessibility properties.
 
 **R-Loop Propagation Attention (RLPA).** Single-head causal self-attention with 32-dim Q/K/V projections and a learnable 34×34 positional bias matrix. The causal (lower-triangular) mask encodes the directional R-loop propagation of Cas12a (PAM-proximal → PAM-distal), motivated by the kinetic observation that R-loop formation is sequential and reversible (Strohkendl et al. 2018). RLPA improved cross-dataset generalisation by +6.7% on the Kim 2018 cross-library evaluation (test ρ: 0.496 → 0.534). ~25,000 parameters.
 
@@ -91,11 +91,12 @@ Discrimination prediction replaces the position-dependent heuristic (Strohkendl 
 
 **Training data.** 6,136 paired measurements extracted from the EasyDesign dataset: same crRNA tested on both perfect-match (0-mismatch) and single-mismatch targets, from 1,224 unique guides. The discrimination ratio for each pair is the ratio of trans-cleavage activity on the perfect match vs the mismatched target.
 
-**Features (15).** Four categories:
+**Features (18).** Four categories:
 - Position: spacer position, seed binary, normalised position, sensitivity region
 - Mismatch chemistry: ΔΔG destabilisation penalty, wobble pair flag, purine-purine flag, transition/transversion class
 - Thermodynamics: cumulative ΔG at mismatch position, seed ΔG (positions 1–8), total hybrid ΔG, energy ratio (cumulative/penalty)
 - Sequence context: global GC content, local GC (±2 nt window)
+- Cooperative context: flanking AT richness, normalised PAM-to-mismatch distance, upstream GC density
 
 Thermodynamic parameters from Sugimoto et al. (2000, Biochemistry) for RNA:DNA mismatch penalties and Sugimoto et al. (1995, Biochemistry) for RNA:DNA hybrid nearest-neighbour parameters.
 
@@ -107,6 +108,17 @@ Thermodynamic parameters from Sugimoto et al. (2000, Biochemistry) for RNA:DNA m
 | **Learned (LightGBM, 15 features)** | **0.540** | **0.459** |
 
 Top features by importance: seed ΔG, total hybrid ΔG, cumulative ΔG at mismatch, energy ratio — thermodynamic features dominate over position alone.
+
+### R-Loop Physics Prior (D_rloop)
+
+The learned discrimination model is blended with a deterministic physics-based estimate computed from R-loop thermodynamics. For each mismatch, the cumulative free energy at the mismatch position and the mismatch ΔΔG penalty are used to compute a Boltzmann propagation probability:
+
+```
+barrier = ΔΔG_mismatch × sigmoid(-dG_accumulated / scale)
+D_rloop = exp(barrier / RT)
+```
+
+This captures the key biophysical insight: a mismatch penalty in the seed (where the R-loop is barely formed) creates a full barrier, while the same penalty in the tail (where the R-loop is deeply stable) is absorbed. The final discrimination is a geometric mean of D_xgboost and D_rloop (α = 0.35), with confidence increasing when both estimates agree.
 
 ## Post-Optimisation Analysis
 
@@ -141,7 +153,7 @@ WHO TPP compliance is evaluated per drug class: ≥95% sensitivity for RIF, ≥9
 
 ## Platform
 
-The web platform ([compass-design.app](https://compass-design.app)) provides six result tabs per panel run:
+The web platform ([compass-crispr.com](https://compass-design.app)) provides six result tabs per panel run:
 
 | Tab | Content |
 |-----|---------|
@@ -149,7 +161,7 @@ The web platform ([compass-design.app](https://compass-design.app)) provides six
 | **Candidates** | Per-candidate detail: spacer architecture, interpretation, oligo sequences, evidence metadata. Expandable rows with Top-K alternatives |
 | **Discrimination** | Direct detection ranking (learned model) + AS-RPA thermodynamic estimates for proximity candidates |
 | **Primers** | Standard and allele-specific RPA primer pairs, amplicon sizes, SM status |
-| **Multiplex** | Panel composition, primer dimer ΔG heatmap, AS-RPA discrimination table, crRNA cross-reactivity matrix |
+| **Multiplex** | Panel composition, 3D chip visualisation, predicted electrochemical readout (SWV/DPV/CV), in situ RNP kinetics |
 | **Diagnostics** | WHO TPP compliance per drug class, MUT vs WT density plots (filtered per preset), per-target readiness breakdown, parameter sweep |
 
 The **Research** page provides experimental tools: Scorer Comparison Lab, R-Loop Thermodynamic Explorer (per-position cumulative ΔG profiles with MUT/WT overlay), Ablation Tracker (cis vs trans benchmark scatter plot), and Feature Importance analysis.
@@ -257,19 +269,23 @@ python -m compass.scoring.calibrate
 22. WHO. Catalogue of mutations in *Mycobacterium tuberculosis* complex and their association with drug resistance, 2nd edition. Geneva: World Health Organization (2023).
 23. CRyPTIC Consortium. A data compendium associating the genomes of 12,289 *Mycobacterium tuberculosis* isolates with quantitative resistance phenotypes to 13 antibiotics. *PLoS Biology* **20**, e3001721 (2022). [DOI](https://doi.org/10.1371/journal.pbio.3001721)
 
+### Electrochemical Platform
+24. Bezinge L, Shih CJ, deMello AJ, et al. Paper-based laser-pyrolyzed electrofluidics: an electrochemical platform for capillary-driven diagnostic bioassays. *Advanced Materials* **35**, e2302893 (2023). [DOI](https://doi.org/10.1002/adma.202302893)
+25. Suea-Ngam A, Howes PD, Stanley CE, deMello AJ. An amplification-free ultra-sensitive electrochemical CRISPR/Cas biosensor for drug-resistant bacteria detection. *Chemical Science* **12**, 12733-12743 (2021). [DOI](https://doi.org/10.1039/D1SC02197D)
+
 ### CRISPR Diagnostics
-24. Broughton JP, Deng X, Yu G, et al. CRISPR-Cas12-based detection of SARS-CoV-2. *Nature Biotechnology* **38**, 870–874 (2020). [DOI](https://doi.org/10.1038/s41587-020-0513-4)
-25. Ai JW, Zhou X, Xu T, et al. CRISPR-based rapid and ultra-sensitive diagnostic test for *Mycobacterium tuberculosis*. *Emerging Microbes & Infections* **8**, 1361–1369 (2019). [DOI](https://doi.org/10.1080/22221751.2019.1664939)
+26. Broughton JP, Deng X, Yu G, et al. CRISPR-Cas12-based detection of SARS-CoV-2. *Nature Biotechnology* **38**, 870–874 (2020). [DOI](https://doi.org/10.1038/s41587-020-0513-4)
+27. Ai JW, Zhou X, Xu T, et al. CRISPR-based rapid and ultra-sensitive diagnostic test for *Mycobacterium tuberculosis*. *Emerging Microbes & Infections* **8**, 1361–1369 (2019). [DOI](https://doi.org/10.1080/22221751.2019.1664939)
 
 ### Bioinformatics
-26. Langmead B, Salzberg SL. Fast gapped-read alignment with Bowtie 2. *Nature Methods* **9**, 357–359 (2012). [DOI](https://doi.org/10.1038/nmeth.1923)
+28. Langmead B, Salzberg SL. Fast gapped-read alignment with Bowtie 2. *Nature Methods* **9**, 357–359 (2012). [DOI](https://doi.org/10.1038/nmeth.1923)
 
 ## Citation
 
 ```bibtex
 @software{compass2025,
   author = {Uzan, Valentin},
-  title = {COMPASS: Guide RNA Automated Resistance Diagnostics},
+  title = {COMPASS: CRISPR-Optimized Multiplex Panel And Spacer Selection},
   year = {2025},
   url = {https://github.com/VUzan-bio/compass},
   note = {Computational pipeline for multiplexed CRISPR-Cas12a MDR-TB diagnostics}
@@ -278,7 +294,7 @@ python -m compass.scoring.calibrate
 
 ## Acknowledgements
 
-Developed for the BRIDGE Discovery grant project on CRISPR-Cas12a electrochemical diagnostics for drug-resistant tuberculosis, in collaboration with the deMello Group (ETH Zurich) and CSEM.
+Developed for the SNSF BRIDGE Discovery grant (CHF 2.5M) on CRISPR-Cas12a electrochemical diagnostics for multidrug-resistant tuberculosis, in collaboration with the deMello Group (D-CHAB, ETH Zurich), CSEM, Swiss TPH, and NCTLD Georgia.
 
 
 ## License
