@@ -566,6 +566,10 @@ function transformApiCandidate(c) {
       ampliconSeq: c.amplicon_seq ?? null,
       locusGroup: c.locus_group ?? null,
       sharedAmpliconTargets: c.shared_amplicon_targets ?? null,
+      asrpaFwd: c.asrpa_fwd ?? null,
+      asrpaRev: c.asrpa_rev ?? null,
+      asrpaAmpliconLength: c.asrpa_amplicon_length ?? null,
+      sharedLocusWithAsrpa: c.shared_locus_with_asrpa ?? false,
     };
   }
   /* Original detailed per-candidate shape */
@@ -596,6 +600,10 @@ function transformApiCandidate(c) {
     isControl: c.is_control || false,
     locusGroup: c.locus_group ?? null,
     sharedAmpliconTargets: c.shared_amplicon_targets ?? null,
+    asrpaFwd: c.asrpa_fwd ?? null,
+    asrpaRev: c.asrpa_rev ?? null,
+    asrpaAmpliconLength: c.asrpa_amplicon_length ?? null,
+    sharedLocusWithAsrpa: c.shared_locus_with_asrpa ?? false,
   };
 }
 
@@ -5205,17 +5213,31 @@ const PrimersTab = ({ results }) => {
                   <Badge variant={r.strategy === "Direct" ? "success" : "purple"}>
                     {r.strategy === "Direct" ? "Standard" : "AS-RPA"}
                   </Badge>
+                  {r.sharedLocusWithAsrpa && (
+                    <div style={{ fontSize: "9px", color: "#0284C7", marginTop: "2px" }}>+ shared std</div>
+                  )}
                 </td>
                 <td style={{ padding: "10px 14px", fontFamily: FONT, fontWeight: 600, fontSize: "11px", color: r.gene === "IS6110" ? T.textTer : r.strategy === "Proximity" ? T.purple : r.disc >= 3 ? T.success : r.disc >= 2 ? T.warning : T.danger }}>
                   {discVal}
                 </td>
                 <td style={{ padding: "10px 14px" }}>
-                  {isHov ? <Seq s={r.fwd} /> : <span style={{ fontFamily: MONO, fontSize: "11.5px", letterSpacing: "1.2px", color: T.textTer }}>{r.fwd}</span>}
+                  {(() => {
+                    const fwdSeq = r.sharedLocusWithAsrpa && r.asrpaFwd ? r.asrpaFwd : r.fwd;
+                    return isHov ? <Seq s={fwdSeq} /> : <span style={{ fontFamily: MONO, fontSize: "11.5px", letterSpacing: "1.2px", color: r.sharedLocusWithAsrpa ? T.purple : T.textTer }}>{fwdSeq}</span>;
+                  })()}
+                  {r.sharedLocusWithAsrpa && r.asrpaFwd && (
+                    <div style={{ fontSize: "9px", color: "#0284C7", marginTop: "1px" }}>AS primer (allele-specific)</div>
+                  )}
                 </td>
                 <td style={{ padding: "10px 14px" }}>
-                  {isHov ? <Seq s={r.rev} /> : <span style={{ fontFamily: MONO, fontSize: "11.5px", letterSpacing: "1.2px", color: T.textTer }}>{r.rev}</span>}
+                  {(() => {
+                    const revSeq = r.sharedLocusWithAsrpa && r.asrpaRev ? r.asrpaRev : r.rev;
+                    return isHov ? <Seq s={revSeq} /> : <span style={{ fontFamily: MONO, fontSize: "11.5px", letterSpacing: "1.2px", color: r.sharedLocusWithAsrpa ? T.purple : T.textTer }}>{revSeq}</span>;
+                  })()}
                 </td>
-                <td style={{ padding: "10px 14px", fontFamily: FONT, fontWeight: 600, color: r.amplicon <= 100 ? T.success : r.amplicon <= 120 ? T.warning : T.danger }}>{r.amplicon} bp</td>
+                <td style={{ padding: "10px 14px", fontFamily: FONT, fontWeight: 600, color: (r.sharedLocusWithAsrpa ? r.asrpaAmpliconLength : r.amplicon) <= 100 ? T.success : (r.sharedLocusWithAsrpa ? r.asrpaAmpliconLength : r.amplicon) <= 120 ? T.warning : T.danger }}>
+                  {r.sharedLocusWithAsrpa && r.asrpaAmpliconLength ? r.asrpaAmpliconLength : r.amplicon} bp
+                </td>
                 <td style={{ padding: "10px 14px", fontFamily: FONT, fontSize: "11px", color: (r.ampliconGc || r.gc || 0.656) >= 0.70 ? T.warning : T.textSec }}>{((r.ampliconGc || r.gc || 0.656) * 100).toFixed(0)}%{(r.ampliconGc || r.gc || 0.656) >= 0.70 ? <span style={{ fontSize: "9px", color: T.warning, marginLeft: "3px" }} title="High GC may cause hairpins blocking RPA recombinase invasion">{"\u26a0"}</span> : ""}</td>
                 <td style={{ padding: "10px 14px" }}><Badge variant={r.hasSM ? "primary" : "default"}>{r.hasSM ? "Yes" : "No"}</Badge></td>
               </tr>

@@ -974,10 +974,31 @@ class COMPASSPipeline:
                     member.primers = locus_primers[member.locus_group]
                     n_with_primers += 1
                     n_shared_primers += 1
-                    logger.info(
-                        "  %s: shared primers from locus %s (amp=%dbp)",
-                        member.label, member.locus_group, member.primers.amplicon_length,
-                    )
+
+                    # Proximity targets in shared loci need ADDITIONAL AS-RPA primers
+                    # for allele discrimination (the shared standard primers amplify both WT and MUT)
+                    if candidate.detection_strategy != DetectionStrategy.DIRECT:
+                        asrpa_pairs = as_rpa.design(
+                            candidate=candidate, target=target, genome_seq=genome_seq,
+                        )
+                        if asrpa_pairs:
+                            best_as, _ = self.coselection.select_best_pair(candidate, asrpa_pairs)
+                            member.asrpa_primers = best_as or asrpa_pairs[0]
+                            logger.info(
+                                "  %s: shared locus %s + AS-RPA primer (amp=%dbp, AS for allele discrimination)",
+                                member.label, member.locus_group, member.asrpa_primers.amplicon_length,
+                            )
+                            n_asrpa += 1
+                        else:
+                            logger.warning(
+                                "  %s: shared locus %s but AS-RPA design failed; discrimination relies on shared amplicon only",
+                                member.label, member.locus_group,
+                            )
+                    else:
+                        logger.info(
+                            "  %s: shared primers from locus %s (amp=%dbp)",
+                            member.label, member.locus_group, member.primers.amplicon_length,
+                        )
                     continue
 
                 # Design primers — strategy-based dispatch
@@ -1729,6 +1750,14 @@ class COMPASSPipeline:
                 entry["rev_primer"] = member.primers.rev.seq
                 entry["amplicon_length"] = member.primers.amplicon_length
                 entry["has_as_rpa"] = member.primers.has_allele_specific_primer
+
+            # AS-RPA primers for Proximity targets in shared loci
+            if member.asrpa_primers is not None:
+                entry["has_as_rpa"] = True
+                entry["asrpa_fwd"] = member.asrpa_primers.fwd.seq
+                entry["asrpa_rev"] = member.asrpa_primers.rev.seq
+                entry["asrpa_amplicon_length"] = member.asrpa_primers.amplicon_length
+                entry["shared_locus_with_asrpa"] = True
 
             if member.asrpa_discrimination is not None:
                 entry["asrpa_discrimination"] = member.asrpa_discrimination
