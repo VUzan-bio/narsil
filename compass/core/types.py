@@ -651,6 +651,9 @@ class PanelMember(BaseModel):
     sm_improvement_factor: Optional[float] = None   # improvement over natural discrimination
     # AS-RPA thermodynamic discrimination (Module 8 — proximity candidates only)
     asrpa_discrimination: Optional[dict] = None     # full result from asrpa_discrimination.py
+    # Locus-based primer grouping (Module 8)
+    locus_group: Optional[str] = None               # locus ID (e.g. "rpoB_RRDR") — None if unique
+    shared_amplicon_targets: Optional[list[str]] = None  # other targets sharing this amplicon
 
     @property
     def label(self) -> str:

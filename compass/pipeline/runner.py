@@ -910,6 +910,31 @@ class COMPASSPipeline:
         if n_pam_disrupted:
             logger.info("PAM disruption: %d/%d panel members", n_pam_disrupted, panel.plex)
 
+        # --- Module 7.5: Locus-based primer grouping ---
+        # Group targets sharing a genomic locus (e.g. rpoB RRDR: S531L, H526Y, D516V)
+        # so they share a single RPA primer pair instead of redundant per-target pairs.
+        locus_groups = self._group_targets_by_locus(panel, target_map)
+        n_locus_groups = len(locus_groups)
+        n_shared = sum(1 for g in locus_groups.values() if len(g) > 1)
+        n_unique_primer_pairs = n_locus_groups
+        if n_shared:
+            logger.info(
+                "Locus grouping: %d targets \u2192 %d primer pairs (%d shared loci)",
+                panel.plex, n_unique_primer_pairs, n_shared,
+            )
+        else:
+            logger.info("Locus grouping: %d targets, no shared loci", panel.plex)
+
+        # Annotate panel members with their locus group
+        for locus_id, member_labels in locus_groups.items():
+            for label in member_labels:
+                member = next((m for m in panel.members if m.label == label), None)
+                if member:
+                    member.locus_group = locus_id if len(member_labels) > 1 else None
+                    member.shared_amplicon_targets = (
+                        [l for l in member_labels if l != label] if len(member_labels) > 1 else None
+                    )
+
         # --- Module 8: RPA primer design ---
         t0 = time.perf_counter_ns()
         logger.info("Module 8: RPA primer design...")
@@ -917,6 +942,7 @@ class COMPASSPipeline:
         n_with_primers = 0
         n_standard = 0
         n_asrpa = 0
+        n_shared_primers = 0
 
         if genome_seq:
             from compass.primers.as_rpa import ASRPADesigner
@@ -933,6 +959,9 @@ class COMPASSPipeline:
             as_rpa = ASRPADesigner(**primer_kwargs)
             std_rpa = StandardRPADesigner(**primer_kwargs)
 
+            # Track which locus groups already have primers designed
+            locus_primers: dict[str, RPAPrimerPair] = {}
+
             for member in panel.members:
                 target = target_map.get(member.target.label)
                 if target is None:
@@ -940,18 +969,39 @@ class COMPASSPipeline:
 
                 candidate = member.selected_candidate.candidate
 
+                # Check if this member's locus group already has a shared primer pair
+                if member.locus_group and member.locus_group in locus_primers:
+                    member.primers = locus_primers[member.locus_group]
+                    n_with_primers += 1
+                    n_shared_primers += 1
+                    logger.info(
+                        "  %s: shared primers from locus %s (amp=%dbp)",
+                        member.label, member.locus_group, member.primers.amplicon_length,
+                    )
+                    continue
+
                 # Design primers — strategy-based dispatch
                 if candidate.detection_strategy == DetectionStrategy.DIRECT:
-                    primer_pairs = std_rpa.design(
-                        candidate=candidate,
-                        target=target,
-                        genome_seq=genome_seq,
-                    )
+                    # For shared loci, try to design amplicon spanning all targets
+                    if member.locus_group:
+                        shared_primer_pairs = self._design_shared_locus_primers(
+                            member.locus_group, locus_groups[member.locus_group],
+                            panel, target_map, std_rpa, genome_seq,
+                        )
+                        if shared_primer_pairs:
+                            primer_pairs = shared_primer_pairs
+                        else:
+                            # Fallback to per-target design
+                            primer_pairs = std_rpa.design(
+                                candidate=candidate, target=target, genome_seq=genome_seq,
+                            )
+                    else:
+                        primer_pairs = std_rpa.design(
+                            candidate=candidate, target=target, genome_seq=genome_seq,
+                        )
                 else:
                     primer_pairs = as_rpa.design(
-                        candidate=candidate,
-                        target=target,
-                        genome_seq=genome_seq,
+                        candidate=candidate, target=target, genome_seq=genome_seq,
                     )
 
                 if primer_pairs:
@@ -973,6 +1023,11 @@ class COMPASSPipeline:
                             "  %s: primer co-selection failed, using best available",
                             member.label,
                         )
+
+                    # Cache shared primer for locus group
+                    if member.locus_group:
+                        locus_primers[member.locus_group] = member.primers
+
                     n_with_primers += 1
                     if candidate.detection_strategy == DetectionStrategy.DIRECT:
                         n_standard += 1
@@ -988,8 +1043,13 @@ class COMPASSPipeline:
             "duration_ms": (time.perf_counter_ns() - t0) // 1_000_000,
             "candidates_in": panel.plex,
             "candidates_out": n_with_primers,
-            "detail": f"{n_with_primers}/{panel.plex} primer pairs designed ({n_standard} standard, {n_asrpa} AS-RPA)",
-            "breakdown": {"standard_rpa": n_standard, "allele_specific_rpa": n_asrpa, "tm_range": "57\u201372\u00b0C", "amplicon_range": "80\u2013250 bp"},
+            "detail": f"{n_with_primers}/{panel.plex} primer pairs designed ({n_standard} standard, {n_asrpa} AS-RPA, {n_shared_primers} shared)",
+            "breakdown": {
+                "standard_rpa": n_standard, "allele_specific_rpa": n_asrpa,
+                "shared_locus": n_shared_primers,
+                "unique_primer_pairs": n_unique_primer_pairs,
+                "tm_range": "57\u201372\u00b0C", "amplicon_range": "80\u2013250 bp",
+            },
         })
 
         # --- Module 8.5a: AS-RPA thermodynamic discrimination ---
@@ -1422,6 +1482,135 @@ class COMPASSPipeline:
         return panel
 
     # ==================================================================
+    # Locus grouping
+    # ==================================================================
+
+    def _group_targets_by_locus(
+        self,
+        panel,
+        target_map: dict,
+        locus_window: int = 500,
+    ) -> dict[str, list[str]]:
+        """Group panel members by genomic locus.
+
+        Targets within `locus_window` bp of each other on the same gene
+        share a single RPA amplicon. For example, rpoB S531L/H526Y/D516V
+        are all within the 81 bp RRDR and share one primer pair.
+
+        Returns: {locus_id: [target_label1, target_label2, ...]}
+        """
+        # Build (label, gene, genomic_pos) tuples
+        member_info = []
+        for member in panel.members:
+            target = target_map.get(member.label)
+            if target is None:
+                continue
+            gene = member.target.mutation.gene
+            pos = target.genomic_pos
+            member_info.append((member.label, gene, pos))
+
+        # Sort by gene then position for deterministic grouping
+        member_info.sort(key=lambda x: (x[1], x[2]))
+
+        locus_groups: dict[str, list[str]] = {}
+        assigned: set[str] = set()
+
+        for label, gene, pos in member_info:
+            if label in assigned:
+                continue
+
+            # Find all unassigned targets in the same gene within the window
+            group = [label]
+            assigned.add(label)
+
+            for other_label, other_gene, other_pos in member_info:
+                if other_label in assigned:
+                    continue
+                if other_gene == gene and abs(other_pos - pos) <= locus_window:
+                    group.append(other_label)
+                    assigned.add(other_label)
+
+            # Generate a locus ID
+            if len(group) > 1:
+                locus_id = f"{gene}_locus"
+            else:
+                locus_id = label
+
+            locus_groups[locus_id] = group
+
+        return locus_groups
+
+    def _design_shared_locus_primers(
+        self,
+        locus_id: str,
+        member_labels: list[str],
+        panel,
+        target_map: dict,
+        std_rpa,
+        genome_seq: str,
+    ) -> list:
+        """Design a single primer pair spanning all crRNA sites in a locus group.
+
+        The shared amplicon must contain all crRNA binding sites for every
+        target in the group. Falls back to None if no valid shared pair found
+        (e.g. combined span exceeds max amplicon length).
+        """
+        # Find the union of all crRNA footprints in this locus
+        min_crrna_start = float("inf")
+        max_crrna_end = 0
+        representative_target = None
+        representative_candidate = None
+
+        for label in member_labels:
+            member = next((m for m in panel.members if m.label == label), None)
+            if member is None:
+                continue
+            cand = member.selected_candidate.candidate
+            min_crrna_start = min(min_crrna_start, cand.genomic_start)
+            max_crrna_end = max(max_crrna_end, cand.genomic_end)
+            if representative_target is None:
+                representative_target = target_map.get(label)
+                representative_candidate = cand
+
+        if representative_target is None or representative_candidate is None:
+            return []
+
+        # Check if shared span is feasible (< max amplicon - primer margins)
+        span = max_crrna_end - min_crrna_start
+        max_amp = self.config.primers.amplicon_max
+        if span > max_amp - 40:  # need ~20bp margin on each side for primers
+            logger.info(
+                "  Locus %s: span %d bp too wide for shared amplicon (max %d bp), falling back to per-target",
+                locus_id, span, max_amp,
+            )
+            return []
+
+        # Design primers using the representative candidate but with expanded bounds
+        primer_pairs = std_rpa.design(
+            candidate=representative_candidate,
+            target=representative_target,
+            genome_seq=genome_seq,
+        )
+
+        if not primer_pairs:
+            return []
+
+        # Filter: keep only pairs whose amplicon spans ALL crRNA sites
+        valid_pairs = []
+        for pair in primer_pairs:
+            amp_start = pair.fwd.amplicon_start
+            amp_end = pair.rev.amplicon_end
+            if amp_start <= min_crrna_start and amp_end >= max_crrna_end:
+                valid_pairs.append(pair)
+
+        if valid_pairs:
+            logger.info(
+                "  Locus %s: shared amplicon covers %d targets (span %d bp, %d valid pairs)",
+                locus_id, len(member_labels), span, len(valid_pairs),
+            )
+
+        return valid_pairs
+
     # Genome loading
     # ==================================================================
 
@@ -1544,6 +1733,11 @@ class COMPASSPipeline:
             if member.asrpa_discrimination is not None:
                 entry["asrpa_discrimination"] = member.asrpa_discrimination
 
+            # Locus grouping info
+            if member.locus_group is not None:
+                entry["locus_group"] = member.locus_group
+                entry["shared_amplicon_targets"] = member.shared_amplicon_targets or []
+
             # Enhancement info
             enh_reports = enhancement_reports.get(member.label, [])
             best_enh = None
@@ -1608,17 +1802,27 @@ class COMPASSPipeline:
 
         # Save panel summary (backward compatible)
         summary_path = self._output / "panel_summary.json"
+        # Compute locus grouping summary
+        locus_summary = {}
+        for m in panel.members:
+            if m.locus_group:
+                if m.locus_group not in locus_summary:
+                    locus_summary[m.locus_group] = []
+                locus_summary[m.locus_group].append(m.label)
         summary = {
             "plex": panel.plex,
             "complete": panel.complete_members,
             "direct": len(panel.direct_members),
             "proximity": len(panel.proximity_members),
             "panel_score": panel.panel_score,
+            "unique_primer_pairs": panel.plex - sum(len(v) - 1 for v in locus_summary.values()),
+            "locus_groups": locus_summary if locus_summary else None,
             "targets": {
                 m.label: {
                     "n_candidates": len(scored_by_target.get(m.label, [])),
                     "strategy": m.selected_candidate.candidate.detection_strategy.value,
                     "score": m.selected_candidate.heuristic.composite,
+                    "locus_group": m.locus_group,
                 }
                 for m in panel.members
             },

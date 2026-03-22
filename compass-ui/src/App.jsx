@@ -564,6 +564,8 @@ function transformApiCandidate(c) {
       fwdGc: c.fwd_gc ?? null, revGc: c.rev_gc ?? null,
       primerDimerDg: c.primer_dimer_dg ?? null,
       ampliconSeq: c.amplicon_seq ?? null,
+      locusGroup: c.locus_group ?? null,
+      sharedAmpliconTargets: c.shared_amplicon_targets ?? null,
     };
   }
   /* Original detailed per-candidate shape */
@@ -592,6 +594,8 @@ function transformApiCandidate(c) {
     refs: WHO_REFS[c.target_label] || null,
     scoringBreakdown: c.scoring_breakdown || null,
     isControl: c.is_control || false,
+    locusGroup: c.locus_group ?? null,
+    sharedAmpliconTargets: c.shared_amplicon_targets ?? null,
   };
 }
 
@@ -5127,6 +5131,43 @@ const PrimersTab = ({ results }) => {
         </div>
       )}
 
+      {/* Locus grouping summary */}
+      {(() => {
+        const locusGroups = {};
+        withPrimers.forEach(r => {
+          if (r.locusGroup) {
+            if (!locusGroups[r.locusGroup]) locusGroups[r.locusGroup] = [];
+            locusGroups[r.locusGroup].push(r.label);
+          }
+        });
+        const sharedLoci = Object.entries(locusGroups).filter(([, targets]) => targets.length > 1);
+        const uniquePairs = withPrimers.length - sharedLoci.reduce((sum, [, t]) => sum + t.length - 1, 0);
+        if (sharedLoci.length > 0) return (
+          <div style={{ background: "#F0F9FF", border: "1px solid #BAE6FD", borderRadius: "4px", padding: "16px 20px", marginBottom: "16px", display: "flex", gap: "12px", alignItems: "flex-start" }}>
+            <Layers size={16} color="#0284C7" style={{ flexShrink: 0, marginTop: 2 }} />
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 600, color: "#0284C7", fontFamily: HEADING, marginBottom: "4px" }}>
+                Shared Amplicon Architecture: {withPrimers.length} targets, {uniquePairs} primer pairs
+              </div>
+              <p style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.6, margin: 0 }}>
+                Targets at the same genomic locus share a single RPA amplicon. Each amplicon is distributed to separate detection wells,
+                each pre-loaded with a target-specific crRNA. This reduces the RPA multiplex from {withPrimers.length}-plex to {uniquePairs}-plex,
+                within validated range for isothermal amplification.
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginTop: "8px" }}>
+                {sharedLoci.map(([locus, targets]) => (
+                  <div key={locus} style={{ display: "flex", alignItems: "center", gap: "4px", padding: "4px 8px", background: "rgba(255,255,255,0.7)", borderRadius: "4px", border: "1px solid #BAE6FD" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: "#0284C7" }}>{locus.replace("_locus", "")}:</span>
+                    <span style={{ fontSize: "11px", color: T.textSec }}>{targets.length} targets, 1 primer pair</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+        return null;
+      })()}
+
       {/* Primer table */}
       <div style={{ background: T.bg, border: `1px solid ${T.border}`, borderRadius: "4px", overflow: "hidden" }}>
         <div style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, padding: "16px 20px", borderBottom: `1px solid ${T.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -5152,7 +5193,14 @@ const PrimersTab = ({ results }) => {
               return (
               <tr key={r.label} style={{ borderBottom: `1px solid ${T.borderLight}`, transition: "background 0.15s", background: isHov ? `${T.primary}08` : "transparent" }}
                 onMouseEnter={() => setHoveredRow(r.label)} onMouseLeave={() => setHoveredRow(null)}>
-                <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 600, fontSize: "11px" }}>{r.label}</td>
+                <td style={{ padding: "10px 14px", fontFamily: MONO, fontWeight: 600, fontSize: "11px" }}>
+                  {r.label}
+                  {r.sharedAmpliconTargets && r.sharedAmpliconTargets.length > 0 && (
+                    <span title={"Shared amplicon with " + r.sharedAmpliconTargets.join(", ")} style={{ marginLeft: "4px", display: "inline-flex", alignItems: "center", gap: "2px", padding: "1px 4px", background: "#E0F2FE", borderRadius: "3px", fontSize: "9px", color: "#0284C7", fontWeight: 600, verticalAlign: "middle" }}>
+                      <Layers size={8} /> {r.sharedAmpliconTargets.length + 1}
+                    </span>
+                  )}
+                </td>
                 <td style={{ padding: "10px 14px" }}>
                   <Badge variant={r.strategy === "Direct" ? "success" : "purple"}>
                     {r.strategy === "Direct" ? "Standard" : "AS-RPA"}
