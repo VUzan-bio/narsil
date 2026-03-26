@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-  BarChart3, Brain, ChevronDown, ChevronRight, ExternalLink, Loader2, RefreshCw,
+  BarChart3, Brain, ChevronDown, ChevronRight, Cpu, ExternalLink, Loader2, RefreshCw, TrendingUp,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,

@@ -10,7 +10,7 @@ import {
 } from "recharts";
 import { T, FONT, HEADING, MONO } from "../tokens";
 import { useIsMobile } from "../hooks/useIsMobile";
-import { Badge, Btn, tooltipStyle } from "../components/ui/index.jsx";
+import { Badge, Btn, tooltipStyle, gaussianKDE } from "../components/ui/index.jsx";
 import { CollapsibleSection } from "../components/CollapsibleSection";
 import {
   listJobs, compareScorers, getThermoProfile, getThermoStandalone, getAblation,

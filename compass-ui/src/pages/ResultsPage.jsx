@@ -26,7 +26,7 @@ import {
   getResults, exportResults, getFigureUrl, getTopK, getUmapData, getPoolData,
   getPresets, getDiagnostics, getWHOCompliance, runSweep, runPareto,
   compareScorers, getThermoProfile, getThermoStandalone, getAblation,
-  getNucleaseProfiles, getNucleaseComparison, getEnzymes,
+  getNucleaseProfiles, getNucleaseComparison, getEnzymes, listJobs,
 } from "../api";
 import { transformApiCandidate } from "../utils/api";
 import ChipRender3D from "../ChipRender3D";
