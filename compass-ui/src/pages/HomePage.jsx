@@ -312,7 +312,7 @@ const HomePage = ({ goTo, connected }) => {
                     display: "flex", flexDirection: "column", transition: "border-color 0.12s, background 0.12s",
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                      <span style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, fontStyle: "italic" }}>{org.name}</span>
+                      <span style={{ fontSize: "14px", fontWeight: 600, color: T.text, fontFamily: HEADING, fontStyle: "normal" }}>{org.name}</span>
                       <span style={{ fontSize: "11px", fontWeight: 500, fontFamily: MONO, color: organism === org.id ? T.primary : T.textTer }}>{org.mutations.length} targets</span>
                     </div>
                     <div style={{ fontSize: "12px", color: T.textSec, lineHeight: 1.5, marginBottom: "6px" }}>{org.description}</div>

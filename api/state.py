@@ -254,7 +254,7 @@ class AppState:
 
         try:
             from compass.core.config import PipelineConfig, ReferenceConfig
-            from compass.core.types import Drug, Mutation
+            from compass.core.types import Drug, Mutation, MutationCategory
             from compass.pipeline.runner import COMPASSPipeline
 
             # Build config
@@ -375,12 +375,15 @@ class AppState:
             mutations = []
             for m in job.mutations:
                 drug = drug_map.get(m.drug.upper(), Drug.OTHER)
+                cat = MutationCategory.LARGE_DELETION if m.mutation == "gene_presence" else None
                 mutations.append(Mutation(
                     gene=m.gene,
                     ref_aa=m.ref_aa,
                     position=m.position,
                     alt_aa=m.alt_aa,
                     drug=drug,
+                    category=cat,
+                    notes="Gene presence detection" if m.mutation == "gene_presence" else None,
                 ))
 
             # Execute pipeline

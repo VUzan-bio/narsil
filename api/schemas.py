@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 # ======================================================================
@@ -42,10 +42,26 @@ class ExportFormat(str, Enum):
 
 class MutationInput(BaseModel):
     gene: str
-    ref_aa: str
-    position: int
-    alt_aa: str
+    ref_aa: Optional[str] = None
+    position: Optional[int] = None
+    alt_aa: Optional[str] = None
     drug: str = "OTHER"
+    mutation: Optional[str] = None  # "gene_presence" for acquired resistance genes
+
+    @model_validator(mode="after")
+    def _validate_fields(self) -> MutationInput:
+        """Require ref_aa/position/alt_aa for SNP targets; skip for gene_presence."""
+        if self.mutation == "gene_presence":
+            if self.ref_aa is None:
+                self.ref_aa = "N"
+            if self.position is None:
+                self.position = 1
+            if self.alt_aa is None:
+                self.alt_aa = "N"
+        else:
+            if self.ref_aa is None or self.position is None or self.alt_aa is None:
+                raise ValueError("ref_aa, position, and alt_aa are required for non-gene_presence mutations")
+        return self
 
 
 class PipelineRunRequest(BaseModel):
