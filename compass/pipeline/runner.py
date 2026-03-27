@@ -185,7 +185,20 @@ class COMPASSPipeline:
         )
 
         # Module 5 ML: scorer selection (Compass-ML or SeqCNN)
-        if config.scoring.scorer == "compass_ml":
+        # Compass-ML was trained on M. tuberculosis CRISPR activity data only.
+        # For non-MTB organisms, fall back to heuristic scoring until
+        # species-specific models are trained.
+        _use_compass_ml = (
+            config.scoring.scorer == "compass_ml" and config.organism == "mtb"
+        )
+        if config.scoring.scorer == "compass_ml" and config.organism != "mtb":
+            logger.warning(
+                "Compass-ML is trained on M. tuberculosis data only. "
+                "Falling back to heuristic scoring for organism '%s'. "
+                "Train a species-specific model to enable ML scoring.",
+                config.organism,
+            )
+        if _use_compass_ml:
             from compass.scoring.compass_ml_scorer import CompassMlScorer
             # weights_path=None triggers auto-detection: phase1_v2 > diagnostic > best
             self.ml_scorer = CompassMlScorer(

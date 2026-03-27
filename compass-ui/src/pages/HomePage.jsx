@@ -74,6 +74,7 @@ const HomePage = ({ goTo, connected }) => {
     setOrganism(id);
     setPanel(null);
     setSelected(new Set());
+    if (id !== "mtb" && scorer === "compass_ml") setScorer("heuristic");
   };
 
   const selectPanel = (p) => {
@@ -237,21 +238,37 @@ const HomePage = ({ goTo, connected }) => {
 
     return MODULES.map(m => {
       let mod = { ...m, desc: fill(m.desc), execDesc: fill(m.execDesc), substeps: (m.substeps || []).map(fill) };
-      if (m.id === "M5" && scorer === "compass_ml") {
-        mod = {
-          ...mod,
-          name: "Compass-ML Scoring",
-          execDesc: "Compass-ML (CNN + RNA-FM + RLPA) inference for efficiency and discrimination scoring",
-          estSec: 180,
-          substeps: [
-            "Loading Compass-ML checkpoint (235K params, CNN + PAM + RNA-FM + RLPA)",
-            "Downloading RNA-FM weights from HuggingFace (~1.1 GB)",
-            "Computing RNA-FM embeddings (640-dim, frozen) per candidate",
-            "Running multi-scale CNN branch (kernels 3/5/7)",
-            "Applying R-loop propagation attention (RLPA, 34×34)",
-            "Predicting efficiency + discrimination scores per candidate",
-          ],
-        };
+      if (m.id === "M5") {
+        if (scorer === "compass_ml" && organism === "mtb") {
+          mod = {
+            ...mod,
+            name: "Compass-ML Scoring",
+            execDesc: "Compass-ML (CNN + RNA-FM + RLPA) inference for efficiency and discrimination scoring",
+            estSec: 180,
+            substeps: [
+              "Loading Compass-ML checkpoint (235K params, CNN + PAM + RNA-FM + RLPA)",
+              "Downloading RNA-FM weights from HuggingFace (~1.1 GB)",
+              "Computing RNA-FM embeddings (640-dim, frozen) per candidate",
+              "Running multi-scale CNN branch (kernels 3/5/7)",
+              "Applying R-loop propagation attention (RLPA, 34×34)",
+              "Predicting efficiency + discrimination scores per candidate",
+            ],
+          };
+        } else {
+          mod = {
+            ...mod,
+            name: "Heuristic Scoring",
+            execDesc: `Organism-tuned heuristic scoring for ${org.name} (GC optimal ${org.gc ? (org.gc * 100).toFixed(0) : 50}%)`,
+            substeps: [
+              `Loading ${org.name} heuristic weights from organism profile`,
+              `Computing seed position scores (weight tuned for ${org.name})`,
+              `Evaluating GC content scores (optimal ${org.gc ? (org.gc * 100).toFixed(0) : 50}%)`,
+              "Scoring self-complementarity and structure penalties",
+              "Computing homopolymer penalties",
+              "Calculating composite heuristic score per candidate",
+            ],
+          };
+        }
       }
       return mod;
     });
@@ -426,21 +443,24 @@ const HomePage = ({ goTo, connected }) => {
             <div style={{ padding: "16px 20px", borderTop: `1px solid ${T.borderLight}` }}>
               <div style={{ display: "grid", gridTemplateColumns: mobile ? "1fr" : "1fr 1fr", gap: "10px" }}>
                 {[
-                  { id: "heuristic", label: "Heuristic", desc: "Position-weighted composite across 5 biophysical features.", tag: "Baseline" },
-                  { id: "compass_ml", label: "Compass-ML", desc: "Dual-branch CNN & RNA-FM with R-loop propagation attention.", tag: "Recommended" },
-                ].map(s => (
-                  <button key={s.id} onClick={() => setScorer(s.id)} style={{
-                    padding: "16px 20px", borderRadius: "4px", cursor: "pointer", fontFamily: FONT, textAlign: "left",
+                  { id: "heuristic", label: "Heuristic", desc: "Position-weighted composite across 5 biophysical features. Organism-aware weights.", tag: "Baseline", available: true },
+                  { id: "compass_ml", label: "Compass-ML", desc: organism === "mtb" ? "Dual-branch CNN & RNA-FM with R-loop propagation attention." : `Trained on M. tuberculosis only. Not yet available for ${activeOrganism.name}. Falls back to heuristic.`, tag: organism === "mtb" ? "Recommended" : "MTB only", available: organism === "mtb" },
+                ].map(s => {
+                  const disabled = !s.available;
+                  return (
+                  <button key={s.id} onClick={() => { if (!disabled) setScorer(s.id); else setScorer("heuristic"); }} style={{
+                    padding: "16px 20px", borderRadius: "4px", cursor: disabled ? "not-allowed" : "pointer", fontFamily: FONT, textAlign: "left",
                     border: scorer === s.id ? `2px solid ${T.primary}` : `1px solid ${T.border}`,
-                    background: scorer === s.id ? T.primaryLight : T.bg, transition: "all 0.15s",
+                    background: scorer === s.id ? T.primaryLight : T.bg, opacity: disabled ? 0.5 : 1, transition: "all 0.15s",
                   }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                       <span style={{ fontSize: "14px", fontWeight: 600, color: scorer === s.id ? T.primaryDark : T.text, fontFamily: HEADING }}>{s.label}</span>
-                      <span style={{ fontSize: "10px", fontWeight: 600, fontFamily: MONO, padding: "2px 8px", borderRadius: "3px", background: s.id === "compass_ml" ? T.primaryLight : T.bgSub, color: s.id === "compass_ml" ? T.primary : T.textTer }}>{s.tag}</span>
+                      <span style={{ fontSize: "10px", fontWeight: 600, fontFamily: MONO, padding: "2px 8px", borderRadius: "3px", background: disabled ? "#fee2e2" : s.id === "compass_ml" ? T.primaryLight : T.bgSub, color: disabled ? "#dc2626" : s.id === "compass_ml" ? T.primary : T.textTer }}>{s.tag}</span>
                     </div>
                     <div style={{ fontSize: "13px", color: scorer === s.id ? T.primaryDark : T.textSec, lineHeight: 1.5 }}>{s.desc}</div>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
