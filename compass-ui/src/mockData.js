@@ -32,7 +32,7 @@ const WHO_REFS = {
   "ecoli_gyrA_D87N": { who: "Associated", catalogue: "CARD (2024); EUCAST (2023)", cryptic: null, freq: "2nd-step FQ-R; +S83L = high-level" },
   "ecoli_parC_S80I": { who: "Associated", catalogue: "CARD (2024)", cryptic: null, freq: "Topo IV; contributes to high-level FQ-R" },
   "ecoli_parC_E84V": { who: "Interim", catalogue: "CARD (2024)", cryptic: null, freq: "Auxiliary FQ-R determinant" },
-  "ampC_P-42L": { who: "Associated", catalogue: "CARD (2024); Jacoby (2009)", cryptic: null, freq: "Promoter ↑ AmpC → cephalosporin-R" },
+  "ampC_C-42T": { who: "Associated", catalogue: "CARD (2024); Jacoby (2009)", cryptic: null, freq: "Promoter ↑ AmpC → cephalosporin-R" },
   // S. aureus MRSA / VRSA
   "mecA_presence": { who: "WHO Critical", catalogue: "EUCAST (2023); CLSI (2024)", cryptic: null, freq: "Defines MRSA; PBP2a on SCCmec" },
   "mecC_presence": { who: "WHO Critical", catalogue: "EUCAST (2023); Podkowik et al. (2025)", cryptic: null, freq: "mecA homolog SCCmec XI; missed by some PCRs" },
@@ -410,7 +410,7 @@ const ORGANISMS = [
       { gene: "parC", ref: "S", pos: 80, alt: "I", drug: "CIP", drugFull: "Ciprofloxacin", conf: "Moderate", tier: 2, category: "aa_substitution" },
       { gene: "parC", ref: "E", pos: 84, alt: "V", drug: "CIP", drugFull: "Ciprofloxacin", conf: "Moderate", tier: 2, category: "aa_substitution" },
       // AmpC promoter
-      { gene: "ampC", ref: "P", pos: -42, alt: "L", drug: "AMP", drugFull: "Ampicillin", conf: "High", tier: 1, category: "promoter" },
+      { gene: "ampC", ref: "C", pos: -42, alt: "T", drug: "AMP", drugFull: "Ampicillin", conf: "High", tier: 1, category: "promoter" },
     ],
   },
   {

@@ -343,13 +343,15 @@ class AppState:
                 config_kwargs["scoring"] = ScoringConfig(**scoring_kwargs)
 
             # Pre-warm model cache (blocks only the very first run)
-            _warm_model_cache()
+            # Compass-ML is MTB-only; non-MTB organisms use heuristic/seq_cnn
+            if organism_id == "mtb":
+                _warm_model_cache()
 
             # When models are cached, override scoring config to skip
             # redundant disk loading inside COMPASSPipeline.__init__.
             # The scorer will initialise with model=None, then we inject
             # the cached torch model + RNA-FM cache afterwards.
-            if _model_cache_ready:
+            if _model_cache_ready and organism_id == "mtb":
                 from compass.core.config import ScoringConfig
                 skip_scoring = ScoringConfig(
                     scorer="compass_ml",
@@ -366,8 +368,9 @@ class AppState:
             # Inject pre-loaded model weights into the pipeline's scorers.
             # Each run still has its own scorer instances with independent
             # mutable state, but shares the heavy model objects.
-            _inject_cached_models(pipeline)
-            if _model_cache_ready:
+            if organism_id == "mtb":
+                _inject_cached_models(pipeline)
+            if _model_cache_ready and organism_id == "mtb":
                 ml = getattr(pipeline, "ml_scorer", None)
                 has_model = ml is not None and ml.model is not None
                 has_cache = ml is not None and ml._rnafm_cache is not None

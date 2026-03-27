@@ -563,17 +563,25 @@ class COMPASSPipeline:
             n_total = len(all_sc)
             logger.info("Module 5.ML: Scoring %d candidates with %s...", n_total, ml_name)
             if hasattr(self.ml_scorer, '_encode_context'):
-                # CompassMlScorer: batch encode + predict
+                # Batch encode + predict (CompassMlScorer or SequenceMLScorer)
                 logger.info("Module 5.ML: Encoding %d target contexts...", n_total)
                 contexts = [self.ml_scorer._encode_context(sc.candidate) for sc in all_sc]
-                # Batched RNA-FM: one forward pass for all candidates instead of N sequential calls
-                logger.info("Module 5.ML: Computing RNA-FM embeddings for %d candidates...", n_total)
-                if hasattr(self.ml_scorer, '_compute_rnafm_batch'):
-                    rnafm_embs = self.ml_scorer._compute_rnafm_batch([sc.candidate for sc in all_sc])
-                else:
-                    rnafm_embs = [self.ml_scorer._get_rnafm_embedding(sc.candidate) for sc in all_sc]
+
+                # RNA-FM embeddings: only available on CompassMlScorer
+                rnafm_embs = None
+                if hasattr(self.ml_scorer, '_get_rnafm_embedding'):
+                    logger.info("Module 5.ML: Computing RNA-FM embeddings for %d candidates...", n_total)
+                    if hasattr(self.ml_scorer, '_compute_rnafm_batch'):
+                        rnafm_embs = self.ml_scorer._compute_rnafm_batch([sc.candidate for sc in all_sc])
+                    else:
+                        rnafm_embs = [self.ml_scorer._get_rnafm_embedding(sc.candidate) for sc in all_sc]
+
                 logger.info("Module 5.ML: Running CNN inference on %d candidates...", n_total)
-                raw_preds = self.ml_scorer._predict_batch(contexts, rnafm_embs)
+                # SequenceMLScorer._predict_batch takes only contexts; CompassMlScorer takes contexts + rnafm_embs
+                if rnafm_embs is not None:
+                    raw_preds = self.ml_scorer._predict_batch(contexts, rnafm_embs)
+                else:
+                    raw_preds = self.ml_scorer._predict_batch(contexts)
                 logger.info("Module 5.ML: Inference complete.")
 
                 # Collect 128-dim RLPA embeddings for UMAP visualization
@@ -669,8 +677,12 @@ class COMPASSPipeline:
                             objs = [SimpleNamespace(pam_seq=p, spacer_seq=s)
                                     for s, p, _, _, _ in batch]
                             ctx = [self.ml_scorer._encode_context(c) for c in objs]
-                            rfm = [self.ml_scorer._get_rnafm_embedding(c) for c in objs]
-                            chunk_preds = self.ml_scorer._predict_batch(ctx, rfm)
+                            if hasattr(self.ml_scorer, '_get_rnafm_embedding'):
+                                rfm = [self.ml_scorer._get_rnafm_embedding(c) for c in objs]
+                                chunk_preds = self.ml_scorer._predict_batch(ctx, rfm)
+                            else:
+                                chunk_preds = self.ml_scorer._predict_batch(ctx)
+                                rfm = None
                             del ctx, rfm  # free immediately
 
                             if self.ml_scorer._last_batch_embeddings is not None:

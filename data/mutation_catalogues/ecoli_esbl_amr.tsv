@@ -12,4 +12,4 @@ gyrA	S83L	CIP	1 - assoc w resistance	aa_substitution	Primary FQ resistance mutat
 gyrA	D87N	CIP	1 - assoc w resistance	aa_substitution	Second-step FQ resistance mutation; with S83L = high-level resistance
 parC	S80I	CIP	2 - assoc w resistance	aa_substitution	Topoisomerase IV mutation; contributes to high-level FQ resistance
 parC	E84V	CIP	2 - assoc w resistance	aa_substitution	parC QRDR mutation; auxiliary FQ resistance determinant
-ampC	P-42L	AMP	1 - assoc w resistance	promoter	Promoter mutation increasing AmpC expression; cephalosporin resistance
+ampC	C-42T	AMP	1 - assoc w resistance	promoter	Promoter mutation increasing AmpC expression; cephalosporin resistance
